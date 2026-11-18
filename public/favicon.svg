@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32" shape-rendering="crispEdges">
+  <!-- Charcoal Drop Shadow -->
+  <rect x="6" y="26" width="22" height="4" fill="#171717" />
+  <rect x="8" y="24" width="20" height="2" fill="#171717" />
+
+  <!-- Outline -->
+  <rect x="8" y="4" width="16" height="2" fill="#171717" />
+  <rect x="6" y="6" width="20" height="2" fill="#171717" />
+  <rect x="4" y="8" width="24" height="18" fill="#171717" />
+  <rect x="6" y="26" width="20" height="2" fill="#171717" />
+
+  <!-- Orange Body Base -->
+  <rect x="6" y="8" width="20" height="18" fill="#F97316" />
+  <rect x="8" y="6" width="16" height="2" fill="#F97316" />
+
+  <!-- Top-Left Translucent Highlight -->
+  <rect x="8" y="8" width="6" height="4" fill="#FED7AA" />
+  <rect x="8" y="12" width="2" height="4" fill="#FED7AA" />
+  <rect x="14" y="8" width="4" height="2" fill="#FFEDD5" />
+
+  <!-- Pixel Eyes -->
+  <!-- Left Eye -->
+  <rect x="9" y="14" width="3" height="4" fill="#171717" />
+  <rect x="9" y="14" width="1" height="2" fill="#FFFFFF" />
+  <!-- Right Eye -->
+  <rect x="20" y="14" width="3" height="4" fill="#171717" />
+  <rect x="20" y="14" width="1" height="2" fill="#FFFFFF" />
+
+  <!-- Rosy Blush Cheeks -->
+  <rect x="7" y="19" width="3" height="2" fill="#EA580C" opacity="0.8" />
+  <rect x="22" y="19" width="3" height="2" fill="#EA580C" opacity="0.8" />
+
+  <!-- Mouth -->
+  <rect x="15" y="18" width="2" height="1" fill="#171717" />
+</svg>
