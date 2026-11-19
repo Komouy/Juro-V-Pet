@@ -16,7 +16,10 @@ import {
   Upload,
   Database,
   Settings,
+  Bot,
+  Key,
 } from "lucide-react";
+import { getGeminiApiKey, setGeminiApiKey } from "../services/geminiService";
 
 export const SettingsPage: React.FC = () => {
   const { name } = usePetStore();
@@ -25,14 +28,35 @@ export const SettingsPage: React.FC = () => {
   const [savedSuccess, setSavedSuccess] = useState(false);
   const [confirmingReset, setConfirmingReset] = useState(false);
 
+  const [geminiKeyInput, setGeminiKeyInput] = useState(() => getGeminiApiKey() || "");
+  const [geminiSavedSuccess, setGeminiSavedSuccess] = useState(false);
+
   const fileInputRef = useRef<HTMLInputElement>(null);
   const savedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const geminiTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     return () => {
       if (savedTimerRef.current) clearTimeout(savedTimerRef.current);
+      if (geminiTimerRef.current) clearTimeout(geminiTimerRef.current);
     };
   }, []);
+
+  const handleSaveGeminiKey = (e: React.FormEvent) => {
+    e.preventDefault();
+    setGeminiApiKey(geminiKeyInput);
+    setGeminiSavedSuccess(true);
+    soundEffects.playSuccess();
+    showToast(
+      geminiKeyInput.trim() ? "API Key Gemini tersimpan" : "API Key Gemini dihapus",
+      "success"
+    );
+    if (geminiTimerRef.current) clearTimeout(geminiTimerRef.current);
+    geminiTimerRef.current = setTimeout(() => {
+      setGeminiSavedSuccess(false);
+      geminiTimerRef.current = null;
+    }, 2200);
+  };
 
   const petNameInput = draftName ?? name;
   const trimmedName = petNameInput.trim();
@@ -156,6 +180,43 @@ export const SettingsPage: React.FC = () => {
               onChange={toggleSound}
             />
           </div>
+        </Card>
+
+        {/* Gemini AI Settings */}
+        <Card shadowOffset="sm" className="p-4 md:col-span-2 space-y-3">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h2 className="pixel-text text-[11px] text-charcoal dark:text-white uppercase flex items-center gap-2">
+              <Bot size={13} strokeWidth={2.5} className="text-juro-orange" />
+              <span>Gemini AI Pet Chat</span>
+            </h2>
+            <span className="pixel-text text-[8px] sm:text-[9px] text-neutral-500 uppercase">
+              {geminiKeyInput.trim() ? "Kunci Terpasang" : "Mode Standar / Offline"}
+            </span>
+          </div>
+
+          <p className="pixel-text text-[8px] sm:text-[9px] text-neutral-600 dark:text-neutral-400 leading-relaxed">
+            Masukkan Google Gemini API Key agar Juro bisa membalas obrolanmu secara cerdas menggunakan model Gemini 2.5 Flash. Kunci disimpan lokal di browser.
+          </p>
+
+          <form onSubmit={handleSaveGeminiKey} className="flex flex-col sm:flex-row sm:items-end gap-2.5">
+            <div className="flex-1">
+              <PixelInput
+                type="password"
+                value={geminiKeyInput}
+                onChange={(e) => setGeminiKeyInput(e.target.value)}
+                onClear={() => setGeminiKeyInput("")}
+                placeholder="AIzaSy..."
+                isSuccess={geminiSavedSuccess}
+              />
+            </div>
+            <Button
+              label={geminiSavedSuccess ? "Tersimpan" : "Simpan Kunci"}
+              icon={geminiSavedSuccess ? Check : Key}
+              size="sm"
+              variant="primary"
+              type="submit"
+            />
+          </form>
         </Card>
 
         {/* Backup & Reset */}

@@ -30,6 +30,8 @@ import { ResponsiveCamera } from "./viewport/ResponsiveCamera";
 import { StatBars } from "./viewport/StatBars";
 import { ActionTray, type DragPayload } from "./viewport/ActionTray";
 import { JuroContextMenu } from "./viewport/JuroContextMenu";
+import { JuroSpeechBubble } from "./viewport/JuroSpeechBubble";
+import { chatWithJuro } from "../../services/geminiService";
 
 type ActiveTray = "none" | "food" | "toy" | "bath";
 
@@ -87,6 +89,25 @@ export const PetViewport: React.FC = () => {
     y: 0,
     isNearTop: false,
   });
+
+  const [speechBubble, setSpeechBubble] = useState<{
+    text: string;
+    isLoading: boolean;
+    visible: boolean;
+  }>({
+    text: "",
+    isLoading: false,
+    visible: false,
+  });
+  const speechTimerRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (speechTimerRef.current) {
+        clearTimeout(speechTimerRef.current);
+      }
+    };
+  }, []);
 
   const [isPettingActive, setIsPettingActive] = useState(false);
   const [hearts, setHearts] = useState<{ id: number; x: number; y: number; dx: number }[]>([]);
@@ -206,20 +227,74 @@ export const PetViewport: React.FC = () => {
     [juroMenu.open]
   );
 
-  // Dismiss open trays / stat popover / Juro menu / Petting Mode on Escape key
+  // Dismiss open trays / stat popover / Juro menu / Petting Mode / Speech Bubble on Escape key
   useEffect(() => {
-    if (activeTray === "none" && !showStatDetails && !juroMenu.open && !isPettingActive) return;
+    if (activeTray === "none" && !showStatDetails && !juroMenu.open && !isPettingActive && !speechBubble.visible) return;
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
         if (isPettingActive) setIsPettingActive(false);
         setActiveTray("none");
         setShowStatDetails(false);
         setJuroMenu({ open: false, x: 0, y: 0, isNearTop: false });
+        setSpeechBubble((s) => ({ ...s, visible: false }));
       }
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [activeTray, showStatDetails, juroMenu.open, isPettingActive]);
+  }, [activeTray, showStatDetails, juroMenu.open, isPettingActive, speechBubble.visible]);
+
+  // AI Pet Chat message handler (triggers Gemini API or fallback & shows speech bubble)
+  const handleSendMessage = useCallback(async (userMessage: string) => {
+    if (speechTimerRef.current) {
+      clearTimeout(speechTimerRef.current);
+    }
+
+    setSpeechBubble({
+      text: "",
+      isLoading: true,
+      visible: true,
+    });
+
+    soundEffects.playPop();
+
+    try {
+      const petState = usePetStore.getState();
+      const currentHour = new Date().getHours();
+      const isNight = currentHour >= 18 || currentHour < 6;
+
+      const reply = await chatWithJuro(userMessage, {
+        name: petState.name,
+        hunger: petState.hunger,
+        energy: petState.energy,
+        cleanliness: petState.cleanliness,
+        happiness: petState.happiness,
+        affection: petState.affection,
+        currentState: petState.currentState,
+        isNight,
+      });
+
+      setSpeechBubble({
+        text: reply,
+        isLoading: false,
+        visible: true,
+      });
+
+      soundEffects.playHappy();
+
+      speechTimerRef.current = window.setTimeout(() => {
+        setSpeechBubble((prev) => ({ ...prev, visible: false }));
+      }, 8000);
+    } catch {
+      setSpeechBubble({
+        text: "Bloop! Juro lagi asyik bergoyang dan agak melamun nih... bloop!",
+        isLoading: false,
+        visible: true,
+      });
+      speechTimerRef.current = window.setTimeout(() => {
+        setSpeechBubble((prev) => ({ ...prev, visible: false }));
+      }, 6000);
+    }
+  }, []);
 
   // Dismiss Juro menu when tapping/clicking outside (supporting both mouse and touch)
   useEffect(() => {
@@ -1085,8 +1160,24 @@ export const PetViewport: React.FC = () => {
         currentState={currentState}
         totalFoodStock={totalFoodStock}
         onAction={handleMenuAction}
+        onSendMessage={handleSendMessage}
+        isChatLoading={speechBubble.isLoading}
         menuRef={juroMenuRef}
         tailRef={tailRef}
+      />
+
+      {/* Juro's Floating Retro Speech Bubble */}
+      <JuroSpeechBubble
+        open={speechBubble.visible}
+        text={speechBubble.text}
+        isLoading={speechBubble.isLoading}
+        targetPosRef={juroScreenPosRef}
+        containerRef={containerRef}
+        onClose={() => {
+          if (speechTimerRef.current) clearTimeout(speechTimerRef.current);
+          setSpeechBubble((s) => ({ ...s, visible: false }));
+        }}
+        petName={name}
       />
 
       {/* Floating Petting Guide Pill when Petting Mode is active */}

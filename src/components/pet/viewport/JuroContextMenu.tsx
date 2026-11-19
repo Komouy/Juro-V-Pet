@@ -1,5 +1,5 @@
-import React from "react";
-import { Utensils, Gamepad2, Sun, Moon, Droplets, HandHeart } from "lucide-react";
+import React, { useState } from "react";
+import { Utensils, Gamepad2, Sun, Moon, Droplets, HandHeart, MessageSquare, Send } from "lucide-react";
 
 export interface JuroContextMenuProps {
   open: boolean;
@@ -9,6 +9,8 @@ export interface JuroContextMenuProps {
   currentState: string;
   totalFoodStock: number;
   onAction: (action: "food" | "toy" | "sleep" | "bath" | "pet") => void;
+  onSendMessage?: (message: string) => void;
+  isChatLoading?: boolean;
   menuRef?: React.RefObject<HTMLDivElement | null>;
   tailRef?: React.RefObject<HTMLDivElement | null>;
 }
@@ -21,10 +23,23 @@ export const JuroContextMenu: React.FC<JuroContextMenuProps> = ({
   currentState,
   totalFoodStock,
   onAction,
+  onSendMessage,
+  isChatLoading = false,
   menuRef,
   tailRef,
 }) => {
+  const [chatInput, setChatInput] = useState("");
+
   if (!open) return null;
+
+  const handleChatSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const trimmed = chatInput.trim();
+    if (trimmed && !isChatLoading) {
+      onSendMessage?.(trimmed);
+      setChatInput("");
+    }
+  };
 
   return (
     <div
@@ -37,7 +52,7 @@ export const JuroContextMenu: React.FC<JuroContextMenuProps> = ({
         isNearTop ? "translate-y-2" : "-translate-y-full"
       }`}
     >
-      <div className="animate-tray-enter relative flex items-center justify-center gap-1 sm:gap-1.5 p-1 sm:p-1.5 bg-warm-white/95 dark:bg-neutral-900/95 backdrop-blur-xs border-2 border-charcoal dark:border-neutral-600 shadow-[3px_3px_0px_#171717] dark:shadow-[3px_3px_0px_#000000] max-w-[calc(100vw-20px)] sm:max-w-none">
+      <div className="animate-tray-enter relative flex flex-col gap-1 sm:gap-1.5 p-1 sm:p-1.5 bg-warm-white/95 dark:bg-neutral-900/95 backdrop-blur-xs border-2 border-charcoal dark:border-neutral-600 shadow-[3px_3px_0px_#171717] dark:shadow-[3px_3px_0px_#000000] max-w-[calc(100vw-20px)] sm:max-w-none">
         <div
           ref={tailRef}
           style={{ left: "50%" }}
@@ -49,70 +64,102 @@ export const JuroContextMenu: React.FC<JuroContextMenuProps> = ({
           aria-hidden="true"
         />
 
-        {/* 1. Makan */}
-        <button
-          type="button"
-          onClick={() => onAction("food")}
-          className="relative flex flex-col sm:flex-row items-center justify-center gap-0.5 sm:gap-1.5 px-1.5 sm:px-2.5 py-1.5 bg-white dark:bg-neutral-800 text-charcoal dark:text-white border-2 border-charcoal dark:border-neutral-600 shadow-[2px_2px_0px_#171717] dark:shadow-[2px_2px_0px_#000000] hover:border-juro-orange hover:text-juro-orange active:translate-x-[1px] active:translate-y-[1px] active:shadow-none pixel-text text-[7.5px] sm:text-[9.5px] uppercase font-bold tracking-tight sm:tracking-wider transition-all cursor-pointer select-none min-w-[48px] sm:min-w-0"
+        {/* AI Chat Input Box atop the 5 action buttons */}
+        <form
+          onSubmit={handleChatSubmit}
+          className="flex items-center gap-1.5 w-full bg-white dark:bg-neutral-800 border-2 border-charcoal dark:border-neutral-600 px-2 py-1 shadow-[2px_2px_0px_#171717] dark:shadow-[2px_2px_0px_#000000]"
         >
-          <Utensils size={14} strokeWidth={2.5} className="shrink-0 text-juro-orange" />
-          <span className="leading-none">Makan</span>
-          {totalFoodStock === 0 && (
-            <span
-              className="absolute -top-1 -right-1 w-2 h-2 bg-rose-500 border border-charcoal"
-              aria-hidden="true"
-            />
-          )}
-        </button>
+          <MessageSquare size={13} className="text-juro-orange shrink-0" />
+          <input
+            type="text"
+            value={chatInput}
+            onChange={(e) => setChatInput(e.target.value)}
+            placeholder="Tulis pesan untuk Juro..."
+            maxLength={100}
+            disabled={isChatLoading}
+            className="pixel-text text-[7.5px] sm:text-[9px] bg-transparent text-charcoal dark:text-white placeholder:text-neutral-400 dark:placeholder:text-neutral-500 focus:outline-none flex-1 min-w-0 font-medium"
+          />
+          <button
+            type="submit"
+            disabled={!chatInput.trim() || isChatLoading}
+            className={`p-1 border border-charcoal dark:border-neutral-600 transition-all ${
+              chatInput.trim() && !isChatLoading
+                ? "bg-juro-orange text-white hover:bg-orange-600 active:translate-x-[1px] active:translate-y-[1px] cursor-pointer"
+                : "bg-neutral-200 dark:bg-neutral-700 text-neutral-400 dark:text-neutral-500 cursor-not-allowed opacity-60"
+            }`}
+            aria-label="Kirim pesan"
+          >
+            <Send size={10} strokeWidth={2.5} />
+          </button>
+        </form>
 
-        {/* 2. Main */}
-        <button
-          type="button"
-          onClick={() => onAction("toy")}
-          className="relative flex flex-col sm:flex-row items-center justify-center gap-0.5 sm:gap-1.5 px-1.5 sm:px-2.5 py-1.5 bg-white dark:bg-neutral-800 text-charcoal dark:text-white border-2 border-charcoal dark:border-neutral-600 shadow-[2px_2px_0px_#171717] dark:shadow-[2px_2px_0px_#000000] hover:border-rose-500 hover:text-rose-500 active:translate-x-[1px] active:translate-y-[1px] active:shadow-none pixel-text text-[7.5px] sm:text-[9.5px] uppercase font-bold tracking-tight sm:tracking-wider transition-all cursor-pointer select-none min-w-[48px] sm:min-w-0"
-        >
-          <Gamepad2 size={14} strokeWidth={2.5} className="shrink-0 text-rose-500" />
-          <span className="leading-none">Main</span>
-        </button>
+        {/* 5 Bottom Action Buttons: Makan | Main | Bangun/Tidur | Mandi | Elus */}
+        <div className="flex items-center justify-center gap-1 sm:gap-1.5">
+          {/* 1. Makan */}
+          <button
+            type="button"
+            onClick={() => onAction("food")}
+            className="relative flex flex-col sm:flex-row items-center justify-center gap-0.5 sm:gap-1.5 px-1.5 sm:px-2.5 py-1.5 bg-white dark:bg-neutral-800 text-charcoal dark:text-white border-2 border-charcoal dark:border-neutral-600 shadow-[2px_2px_0px_#171717] dark:shadow-[2px_2px_0px_#000000] hover:border-juro-orange hover:text-juro-orange active:translate-x-[1px] active:translate-y-[1px] active:shadow-none pixel-text text-[7.5px] sm:text-[9.5px] uppercase font-bold tracking-tight sm:tracking-wider transition-all cursor-pointer select-none min-w-[48px] sm:min-w-0"
+          >
+            <Utensils size={14} strokeWidth={2.5} className="shrink-0 text-juro-orange" />
+            <span className="leading-none">Makan</span>
+            {totalFoodStock === 0 && (
+              <span
+                className="absolute -top-1 -right-1 w-2 h-2 bg-rose-500 border border-charcoal"
+                aria-hidden="true"
+              />
+            )}
+          </button>
 
-        {/* 3. Tidur / Bangun */}
-        <button
-          type="button"
-          onClick={() => onAction("sleep")}
-          className="relative flex flex-col sm:flex-row items-center justify-center gap-0.5 sm:gap-1.5 px-1.5 sm:px-2.5 py-1.5 bg-white dark:bg-neutral-800 text-charcoal dark:text-white border-2 border-charcoal dark:border-neutral-600 shadow-[2px_2px_0px_#171717] dark:shadow-[2px_2px_0px_#000000] hover:border-purple-500 hover:text-purple-500 active:translate-x-[1px] active:translate-y-[1px] active:shadow-none pixel-text text-[7.5px] sm:text-[9.5px] uppercase font-bold tracking-tight sm:tracking-wider transition-all cursor-pointer select-none min-w-[48px] sm:min-w-0"
-        >
-          {currentState === "sleep" ? (
-            <>
-              <Sun size={14} strokeWidth={2.5} className="text-amber-500 shrink-0" />
-              <span className="leading-none">Bangun</span>
-            </>
-          ) : (
-            <>
-              <Moon size={14} strokeWidth={2.5} className="text-purple-500 shrink-0" />
-              <span className="leading-none">Tidur</span>
-            </>
-          )}
-        </button>
+          {/* 2. Main */}
+          <button
+            type="button"
+            onClick={() => onAction("toy")}
+            className="relative flex flex-col sm:flex-row items-center justify-center gap-0.5 sm:gap-1.5 px-1.5 sm:px-2.5 py-1.5 bg-white dark:bg-neutral-800 text-charcoal dark:text-white border-2 border-charcoal dark:border-neutral-600 shadow-[2px_2px_0px_#171717] dark:shadow-[2px_2px_0px_#000000] hover:border-rose-500 hover:text-rose-500 active:translate-x-[1px] active:translate-y-[1px] active:shadow-none pixel-text text-[7.5px] sm:text-[9.5px] uppercase font-bold tracking-tight sm:tracking-wider transition-all cursor-pointer select-none min-w-[48px] sm:min-w-0"
+          >
+            <Gamepad2 size={14} strokeWidth={2.5} className="shrink-0 text-rose-500" />
+            <span className="leading-none">Main</span>
+          </button>
 
-        {/* 4. Mandi */}
-        <button
-          type="button"
-          onClick={() => onAction("bath")}
-          className="relative flex flex-col sm:flex-row items-center justify-center gap-0.5 sm:gap-1.5 px-1.5 sm:px-2.5 py-1.5 bg-white dark:bg-neutral-800 text-charcoal dark:text-white border-2 border-charcoal dark:border-neutral-600 shadow-[2px_2px_0px_#171717] dark:shadow-[2px_2px_0px_#000000] hover:border-sky-400 hover:text-sky-500 active:translate-x-[1px] active:translate-y-[1px] active:shadow-none pixel-text text-[7.5px] sm:text-[9.5px] uppercase font-bold tracking-tight sm:tracking-wider transition-all cursor-pointer select-none min-w-[48px] sm:min-w-0"
-        >
-          <Droplets size={14} strokeWidth={2.5} className="text-sky-500 shrink-0" />
-          <span className="leading-none">Mandi</span>
-        </button>
+          {/* 3. Tidur / Bangun */}
+          <button
+            type="button"
+            onClick={() => onAction("sleep")}
+            className="relative flex flex-col sm:flex-row items-center justify-center gap-0.5 sm:gap-1.5 px-1.5 sm:px-2.5 py-1.5 bg-white dark:bg-neutral-800 text-charcoal dark:text-white border-2 border-charcoal dark:border-neutral-600 shadow-[2px_2px_0px_#171717] dark:shadow-[2px_2px_0px_#000000] hover:border-purple-500 hover:text-purple-500 active:translate-x-[1px] active:translate-y-[1px] active:shadow-none pixel-text text-[7.5px] sm:text-[9.5px] uppercase font-bold tracking-tight sm:tracking-wider transition-all cursor-pointer select-none min-w-[48px] sm:min-w-0"
+          >
+            {currentState === "sleep" ? (
+              <>
+                <Sun size={14} strokeWidth={2.5} className="text-amber-500 shrink-0" />
+                <span className="leading-none">Bangun</span>
+              </>
+            ) : (
+              <>
+                <Moon size={14} strokeWidth={2.5} className="text-purple-500 shrink-0" />
+                <span className="leading-none">Tidur</span>
+              </>
+            )}
+          </button>
 
-        {/* 5. Elus */}
-        <button
-          type="button"
-          onClick={() => onAction("pet")}
-          className="relative flex flex-col sm:flex-row items-center justify-center gap-0.5 sm:gap-1.5 px-1.5 sm:px-2.5 py-1.5 bg-white dark:bg-neutral-800 text-charcoal dark:text-white border-2 border-charcoal dark:border-neutral-600 shadow-[2px_2px_0px_#171717] dark:shadow-[2px_2px_0px_#000000] hover:border-rose-500 hover:text-rose-500 active:translate-x-[1px] active:translate-y-[1px] active:shadow-none pixel-text text-[7.5px] sm:text-[9.5px] uppercase font-bold tracking-tight sm:tracking-wider transition-all cursor-pointer select-none min-w-[48px] sm:min-w-0"
-        >
-          <HandHeart size={14} strokeWidth={2.5} className="text-rose-500 shrink-0" />
-          <span className="leading-none">Elus</span>
-        </button>
+          {/* 4. Mandi */}
+          <button
+            type="button"
+            onClick={() => onAction("bath")}
+            className="relative flex flex-col sm:flex-row items-center justify-center gap-0.5 sm:gap-1.5 px-1.5 sm:px-2.5 py-1.5 bg-white dark:bg-neutral-800 text-charcoal dark:text-white border-2 border-charcoal dark:border-neutral-600 shadow-[2px_2px_0px_#171717] dark:shadow-[2px_2px_0px_#000000] hover:border-sky-400 hover:text-sky-500 active:translate-x-[1px] active:translate-y-[1px] active:shadow-none pixel-text text-[7.5px] sm:text-[9.5px] uppercase font-bold tracking-tight sm:tracking-wider transition-all cursor-pointer select-none min-w-[48px] sm:min-w-0"
+          >
+            <Droplets size={14} strokeWidth={2.5} className="text-sky-500 shrink-0" />
+            <span className="leading-none">Mandi</span>
+          </button>
+
+          {/* 5. Elus */}
+          <button
+            type="button"
+            onClick={() => onAction("pet")}
+            className="relative flex flex-col sm:flex-row items-center justify-center gap-0.5 sm:gap-1.5 px-1.5 sm:px-2.5 py-1.5 bg-white dark:bg-neutral-800 text-charcoal dark:text-white border-2 border-charcoal dark:border-neutral-600 shadow-[2px_2px_0px_#171717] dark:shadow-[2px_2px_0px_#000000] hover:border-rose-500 hover:text-rose-500 active:translate-x-[1px] active:translate-y-[1px] active:shadow-none pixel-text text-[7.5px] sm:text-[9.5px] uppercase font-bold tracking-tight sm:tracking-wider transition-all cursor-pointer select-none min-w-[48px] sm:min-w-0"
+          >
+            <HandHeart size={14} strokeWidth={2.5} className="text-rose-500 shrink-0" />
+            <span className="leading-none">Elus</span>
+          </button>
+        </div>
       </div>
     </div>
   );
