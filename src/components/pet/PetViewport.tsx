@@ -157,12 +157,23 @@ export const PetViewport: React.FC = () => {
       const rawX = screenPos?.x ?? (juroScreenPosRef.current?.x ?? contW / 2);
       const rawY = screenPos?.y ?? (juroScreenPosRef.current?.headY ?? contH / 2);
 
-      const halfMenuW = Math.min(180, (contW - 24) / 2);
-      const clampedX = Math.max(halfMenuW + 12, Math.min(contW - halfMenuW - 12, rawX));
+      const menuEl = juroMenuRef.current;
+      const menuW = menuEl?.offsetWidth || Math.min(280, contW - 24);
+      const menuH = menuEl?.offsetHeight || 52;
+      const halfMenuW = menuW / 2;
+      const pad = 12;
+      const clampedX = Math.max(halfMenuW + pad, Math.min(contW - halfMenuW - pad, rawX));
 
-      const isNearTop = rawY < 140;
-      const targetY = isNearTop ? rawY + 45 : rawY - 14;
-      const clampedY = Math.max(20, Math.min(contH - 70, targetY));
+      const isNearTop = rawY < menuH + 30;
+      let targetY: number;
+      let clampedY: number;
+      if (isNearTop) {
+        targetY = rawY + 45;
+        clampedY = Math.max(10, Math.min(contH - menuH - 20, targetY));
+      } else {
+        targetY = rawY - 14;
+        clampedY = Math.max(menuH + 10, Math.min(contH - 20, targetY));
+      }
 
       setJuroMenu({
         open: true,
@@ -170,6 +181,13 @@ export const PetViewport: React.FC = () => {
         y: clampedY,
         isNearTop,
       });
+
+      if (tailRef.current) {
+        const menuLeft = clampedX - halfMenuW;
+        const tailOffset = rawX - menuLeft;
+        const clampedTailOffset = Math.max(20, Math.min(menuW - 20, tailOffset));
+        tailRef.current.style.left = `${clampedTailOffset}px`;
+      }
     },
     [juroMenu.open]
   );
@@ -189,21 +207,21 @@ export const PetViewport: React.FC = () => {
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [activeTray, showStatDetails, juroMenu.open, isGrabActive, handleFinishGrab]);
 
-  // Dismiss Juro menu when clicking outside
+  // Dismiss Juro menu when tapping/clicking outside (supporting both mouse and touch)
   useEffect(() => {
     if (!juroMenu.open) return;
-    const onWindowClick = (e: MouseEvent) => {
+    const onWindowPointer = (e: Event) => {
       if (juroMenuRef.current && juroMenuRef.current.contains(e.target as Node)) {
         return;
       }
       setJuroMenu({ open: false, x: 0, y: 0, isNearTop: false });
     };
     const timer = setTimeout(() => {
-      window.addEventListener("click", onWindowClick);
-    }, 60);
+      window.addEventListener("pointerdown", onWindowPointer);
+    }, 80);
     return () => {
       clearTimeout(timer);
-      window.removeEventListener("click", onWindowClick);
+      window.removeEventListener("pointerdown", onWindowPointer);
     };
   }, [juroMenu.open]);
 
@@ -275,16 +293,34 @@ export const PetViewport: React.FC = () => {
         const contW = contRect.width || window.innerWidth;
         const contH = contRect.height || window.innerHeight;
 
-        const halfMenuW = Math.min(180, (contW - 24) / 2);
-        const clampedX = Math.max(halfMenuW + 12, Math.min(contW - halfMenuW - 12, pos.x));
+        const menuEl = juroMenuRef.current;
+        const menuW = menuEl.offsetWidth || Math.min(280, contW - 24);
+        const menuH = menuEl.offsetHeight || 52;
+        const halfMenuW = menuW / 2;
+        const pad = 12;
+        const clampedX = Math.max(halfMenuW + pad, Math.min(contW - halfMenuW - pad, pos.x));
 
         const crownY = pos.headY ?? (pos.y - pos.radiusPx);
-        const isNearTop = crownY < 140;
-        const targetY = isNearTop ? crownY + 45 : crownY - 14;
-        const clampedY = Math.max(20, Math.min(contH - 70, targetY));
+        const isNearTop = crownY < menuH + 30;
+        let targetY: number;
+        let clampedY: number;
+        if (isNearTop) {
+          targetY = crownY + 45;
+          clampedY = Math.max(10, Math.min(contH - menuH - 20, targetY));
+        } else {
+          targetY = crownY - 14;
+          clampedY = Math.max(menuH + 10, Math.min(contH - 20, targetY));
+        }
 
         juroMenuRef.current.style.left = `${clampedX}px`;
         juroMenuRef.current.style.top = `${clampedY}px`;
+
+        if (tailRef.current) {
+          const menuLeft = clampedX - halfMenuW;
+          const tailOffset = pos.x - menuLeft;
+          const clampedTailOffset = Math.max(20, Math.min(menuW - 20, tailOffset));
+          tailRef.current.style.left = `${clampedTailOffset}px`;
+        }
       }
       animId = requestAnimationFrame(update);
     };
