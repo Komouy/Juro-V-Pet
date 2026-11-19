@@ -15,12 +15,22 @@ describe("Dynamic Expressions & Toy Play System", () => {
     });
   });
 
-  it("identifies hungry mood when hunger < 35", () => {
-    usePetStore.setState({ hunger: 25 });
+  it("identifies hungry mood when hunger < 45 with realistic threshold", () => {
+    usePetStore.setState({ hunger: 42 });
     expect(usePetStore.getState().getMood()).toBe("hungry");
   });
 
-  it("identifies sleepy/tired mood when energy < 30", () => {
+  it("prioritizes the lowest need when multiple attributes are below threshold", () => {
+    // Both hunger (40) and energy (25) are below 45, but energy (25) is lower
+    usePetStore.setState({ hunger: 40, energy: 25 });
+    expect(usePetStore.getState().getMood()).toBe("sleepy");
+
+    // Hunger is lower than energy
+    usePetStore.setState({ hunger: 20, energy: 35 });
+    expect(usePetStore.getState().getMood()).toBe("hungry");
+  });
+
+  it("identifies sleepy/tired mood when energy < 40", () => {
     usePetStore.setState({ hunger: 80, energy: 25 });
     expect(usePetStore.getState().getMood()).toBe("sleepy");
   });

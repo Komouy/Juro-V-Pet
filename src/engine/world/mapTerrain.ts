@@ -41,7 +41,7 @@ export const MAP_OBSTACLES: SolidObstacle[] = [
   { x: 4.35, z: -2.08, radius: 0.68, topY: 1.1 },
 
   // Crystal Mine Cave Portal & Side Rock Mounds
-  { x: -0.36, z: -4.55, radius: 1.25, topY: 1.6 },
+  { x: -0.36, z: -4.55, radius: 1.05, topY: 1.6 },
   { x: -1.14, z: -4.4, radius: 0.75, topY: 1.2 },
   { x: 0.42, z: -4.4, radius: 0.75, topY: 1.2 },
 
@@ -187,8 +187,18 @@ export function getBridgeElevation(x: number, z: number): number | null {
   const localX = x - -0.36;
   const localZ = z - -2.32;
 
-  if (Math.abs(localX) <= 0.44 && Math.abs(localZ) <= 0.64) {
-    return 0.11;
+  // Deck width is 0.82m (halfWidth = 0.41m, allow 0.44m for clearance)
+  if (Math.abs(localX) <= 0.44) {
+    const absZ = Math.abs(localZ);
+    // Main level wooden bridge deck spans |localZ| <= 0.62
+    if (absZ <= 0.62) {
+      return 0.11;
+    }
+    // Smooth wooden ramp transition connecting bridge planks to meadow banks (|localZ| up to 0.86m)
+    if (absZ <= 0.86) {
+      const rampT = 1 - (absZ - 0.62) / 0.24;
+      return 0.11 * Math.max(0, rampT);
+    }
   }
   return null;
 }
@@ -196,6 +206,11 @@ export function getBridgeElevation(x: number, z: number): number | null {
 // Check if (x, z) is inside the lily pond or winding brook (excluding bridge & dry platforms)
 export function isWaterAt(x: number, z: number): boolean {
   if (getBridgeElevation(x, z) !== null) return false;
+
+  // Bridge corridor clearance (both approach ramps and bridge deck)
+  const localBridgeX = Math.abs(x - -0.36);
+  const localBridgeZ = Math.abs(z - -2.32);
+  if (localBridgeX <= 0.46 && localBridgeZ <= 0.90) return false;
 
   // Stumps and platforms are elevated dry land above water
   for (let i = 0; i < MAP_PLATFORMS.length; i++) {
@@ -313,9 +328,9 @@ export function resolveHorizontalCollisions(
       const dz = rz - JURO_BED_POS.z;
       const dist = Math.hypot(dx, dz);
       const minDist = 0.44 + petRadius;
-      if (dist < minDist) {
-        const nx = dist > 0.0001 ? dx / dist : 1;
-        const nz = dist > 0.0001 ? dz / dist : 0;
+      if (dist >= 0.22 && dist < minDist) {
+        const nx = dx / dist;
+        const nz = dz / dist;
         rx = JURO_BED_POS.x + nx * minDist;
         rz = JURO_BED_POS.z + nz * minDist;
         hitObstacle = true;
@@ -344,9 +359,9 @@ export function resolveHorizontalCollisions(
       }
     }
 
-    // 3. Water Collision (Lily Pond & Brook Stream) — Juro must never walk into water unless on the footbridge!
-    const bridgeElev = getBridgeElevation(rx, rz);
-    if (bridgeElev === null) {
+    // 3. Water Collision (Lily Pond & Brook Stream) — Juro must never walk into water unless in bridge corridor!
+    const isBridgeCorridor = Math.abs(rx - -0.36) <= 0.46 && Math.abs(rz - -2.32) <= 0.90;
+    if (!isBridgeCorridor) {
       // 3a. Lily Pond Oval centered at (2.45, -1.05) with outer bank margin
       const pondCenterX = 2.45;
       const pondCenterZ = -1.05;
@@ -380,16 +395,14 @@ export function resolveHorizontalCollisions(
       }
     } else {
       // 4. Wooden Footbridge Handrails: keep Juro centered safely on bridge planks (rx in [-0.56, -0.16])
-      if (Math.abs(rz - -2.32) <= 0.64) {
-        const localBridgeX = rx - -0.36;
-        if (Math.abs(localBridgeX) <= 0.44) {
-          if (rx < -0.56) {
-            rx = -0.56;
-            hitObstacle = true;
-          } else if (rx > -0.16) {
-            rx = -0.16;
-            hitObstacle = true;
-          }
+      // Only apply railings on the bridge deck proper (|rz - -2.32| <= 0.62), keeping north and south approach ramps wide open
+      if (Math.abs(rz - -2.32) <= 0.62) {
+        if (rx < -0.56) {
+          rx = -0.56;
+          hitObstacle = true;
+        } else if (rx > -0.16) {
+          rx = -0.16;
+          hitObstacle = true;
         }
       }
     }

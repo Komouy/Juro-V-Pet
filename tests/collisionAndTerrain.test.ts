@@ -104,6 +104,47 @@ describe("Terrain & Object Collision Hull System", () => {
     expect(isWaterAt(resolved.x, resolved.z)).toBe(false);
   });
 
+  it("allows Juro to smoothly walk onto and across the footbridge from both south and north banks", () => {
+    // 1. South approach (stepping stones at z = -1.56 and z = -1.75)
+    const southApproach = resolveHorizontalCollisions(
+      -0.36,
+      -1.56,
+      BASE_GROUND_Y,
+      0.38,
+      false,
+      false
+    );
+    // Must NOT be pushed back by stream water collision!
+    expect(southApproach.hitObstacle).toBe(false);
+    expect(southApproach.z).toBeCloseTo(-1.56, 2);
+    expect(isWaterAt(-0.36, -1.56)).toBe(false);
+
+    // 2. Mid-bridge wooden deck planks
+    const deckMid = resolveHorizontalCollisions(
+      -0.36,
+      -2.32,
+      BASE_GROUND_Y + 0.11,
+      0.38,
+      false,
+      false
+    );
+    expect(deckMid.hitObstacle).toBe(false);
+    expect(getBridgeElevation(-0.36, -2.32)).toBe(0.11);
+
+    // 3. North approach (mine path at z = -3.10)
+    const northApproach = resolveHorizontalCollisions(
+      -0.36,
+      -3.10,
+      BASE_GROUND_Y,
+      0.38,
+      false,
+      false
+    );
+    expect(northApproach.hitObstacle).toBe(false);
+    expect(northApproach.z).toBeCloseTo(-3.10, 2);
+    expect(isWaterAt(-0.36, -3.10)).toBe(false);
+  });
+
   it("clamps Juro safely between bridge railings when crossing footbridge", () => {
     const bridgeZ = -2.32;
     expect(getBridgeElevation(-0.36, bridgeZ)).not.toBeNull();

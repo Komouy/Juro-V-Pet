@@ -99,6 +99,9 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
   const leftCatchlightRef = useRef<THREE.Mesh>(null);
   const rightCatchlightRef = useRef<THREE.Mesh>(null);
   const mouthGroupRef = useRef<THREE.Group>(null);
+  const hungryMouthGroupRef = useRef<THREE.Group>(null);
+  const poutMouthGroupRef = useRef<THREE.Group>(null);
+  const flatMouthGroupRef = useRef<THREE.Group>(null);
   const sleepMouthGroupRef = useRef<THREE.Group>(null);
   const sleepBubbleRef = useRef<THREE.Mesh>(null);
   const shadowRef = useRef<THREE.Mesh>(null);
@@ -181,8 +184,6 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
   const waterDropsInstRef = useRef<THREE.InstancedMesh>(null);
 
   const {
-    getMood,
-    getAttributes,
     currentState: storeState,
     currentFoodBeingEaten,
     currentToyBeingPlayed,
@@ -191,9 +192,6 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
   } = usePetStore();
   const { activeSkin } = useGameStore();
   const skinPalette = getSkinById(activeSkin);
-
-  const mood = getMood();
-  const attributes = getAttributes();
 
   // Behavior Finite State Machine
   const fsm = useMemo(() => new BehaviorStateMachine("idle"), []);
@@ -473,6 +471,38 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
     return shape;
   }, []);
 
+  // 3. Dedicated Expressive Mouth Geometries (Hungry "o", Grumpy Pout, Bored Flat)
+  const hungryMouthShape = useMemo(() => {
+    const shape = new THREE.Shape();
+    // A cute small trembling sad longing "o" mouth: rounded oval
+    const rw = 0.056;
+    const rh = 0.072;
+    shape.absellipse(0, -0.04, rw, rh, 0, Math.PI * 2, false, 0);
+    return shape;
+  }, []);
+
+  const poutMouthShape = useMemo(() => {
+    const shape = new THREE.Shape();
+    // Turned down frown arc / pout: ( ︵ )
+    const pw = 0.105;
+    shape.moveTo(-pw, -0.065);
+    shape.quadraticCurveTo(0, -0.025, pw, -0.065);
+    shape.quadraticCurveTo(pw * 0.9, -0.08, 0, -0.05);
+    shape.quadraticCurveTo(-pw * 0.9, -0.08, -pw, -0.065);
+    return shape;
+  }, []);
+
+  const flatMouthShape = useMemo(() => {
+    const shape = new THREE.Shape();
+    // Flat horizontal neutral slit: ( — )
+    const fw = 0.085;
+    shape.moveTo(-fw, -0.05);
+    shape.lineTo(fw, -0.05);
+    shape.lineTo(fw, -0.065);
+    shape.lineTo(-fw, -0.065);
+    return shape;
+  }, []);
+
   // Handle Petting Mode (Elus) activation / focus
   useEffect(() => {
     if (isPettingActive) {
@@ -487,7 +517,11 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
   useFrame((state, delta) => {
     const t = state.clock.getElapsedTime();
 
-    // 1. Update Autonomous Behavior Engine
+    // 1. Update Autonomous Behavior Engine with live pet attributes & mood (no closure staleness!)
+    const livePetStore = usePetStore.getState();
+    const liveAttributes = livePetStore.getAttributes();
+    const liveMood = livePetStore.getMood();
+
     if (isHeadingToBedRef?.current) {
       // Keep Juro locked into wander mode moving towards bed without autonomous distraction
       if (fsm.currentState !== "wander") {
@@ -497,7 +531,7 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
       fsm.stateDuration = 24.0;
       fsm.timeInState = 0;
     } else {
-      const activeState = fsm.update(delta, attributes, mood);
+      const activeState = fsm.update(delta, liveAttributes, liveMood);
       if (activeState !== storeState) {
         setBehaviorState(activeState);
       }
@@ -519,9 +553,12 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
         spring.position.x - JURO_BED_POS.x,
         spring.position.z - JURO_BED_POS.z
       );
-      if (distToBed < 0.22) {
+      if (distToBed < 0.35) {
         spring.position.x = JURO_BED_POS.x;
         spring.position.z = JURO_BED_POS.z;
+        spring.target.x = JURO_BED_POS.x;
+        spring.target.z = JURO_BED_POS.z;
+        spring.velocity.set(0, 0, 0);
         onBedArrival?.();
       }
     }
@@ -821,18 +858,31 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
             }
           }
         } else if (currentState === "sleep") {
-          const isAtBed =
-            Math.hypot(spring.position.x - JURO_BED_POS.x, spring.position.z - JURO_BED_POS.z) < 0.85;
-          const targetX = isAtBed ? JURO_BED_POS.x : spring.position.x;
-          const targetZ = isAtBed ? JURO_BED_POS.z : spring.position.z;
-          if (isAtBed) {
-            // Anchor Juro snugly in the center of the sofa mattress
-            spring.position.x = THREE.MathUtils.lerp(spring.position.x, JURO_BED_POS.x, 0.15);
-            spring.position.z = THREE.MathUtils.lerp(spring.position.z, JURO_BED_POS.z, 0.15);
+          // Whether Juro fell asleep from night time, low energy, or player command,
+          // anchor Juro snugly in the center of the sofa mattress atop the West Knoll!
+          const distToBed = Math.hypot(
+            spring.position.x - JURO_BED_POS.x,
+            spring.position.z - JURO_BED_POS.z
+          );
+          if (distToBed > 0.04) {
+            spring.position.x = THREE.MathUtils.lerp(spring.position.x, JURO_BED_POS.x, 0.2);
+            spring.position.z = THREE.MathUtils.lerp(spring.position.z, JURO_BED_POS.z, 0.2);
+          } else {
+            spring.position.x = JURO_BED_POS.x;
+            spring.position.z = JURO_BED_POS.z;
           }
-          const targetGroundY = getTerrainHeightAt(targetX, targetZ);
+          spring.target.x = JURO_BED_POS.x;
+          spring.target.z = JURO_BED_POS.z;
+          spring.velocity.x *= 0.1;
+          spring.velocity.z *= 0.1;
 
-          _targetVec.set(targetX, targetGroundY + BODY_BOTTOM_OFFSET * 0.96, targetZ);
+          const targetGroundY = getTerrainHeightAt(JURO_BED_POS.x, JURO_BED_POS.z);
+          // Target includes the +0.135m soft mattress height!
+          _targetVec.set(
+            JURO_BED_POS.x,
+            targetGroundY + 0.135 + BODY_BOTTOM_OFFSET * 0.96,
+            JURO_BED_POS.z
+          );
           spring.setTarget(_targetVec);
           if (groupRef.current) {
             const gentleSway = -0.055 + Math.sin(t * 1.1) * 0.02 * motionScale;
@@ -846,8 +896,8 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
               0.04,
               0.08
             );
-            const targetYaw = isAtBed ? 0.35 : 0;
-            groupRef.current.rotation.y = lerpAngle(groupRef.current.rotation.y, targetYaw, 0.08);
+            // Rotate Juro to align cozy with sofa backrest (angle 0.35 rad matches PetSofaBed)
+            groupRef.current.rotation.y = lerpAngle(groupRef.current.rotation.y, 0.35, 0.08);
           }
         } else if (currentState === "eating") {
           const chewY = restY + Math.sin(t * 14) * 0.015 * motionScale;
@@ -881,7 +931,9 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
     spring.update(delta);
 
     const isSleepingOrHeading =
-      currentState === "sleep" || (isHeadingToBedRef?.current ?? false);
+      currentState === "sleep" ||
+      storeState === "sleep" ||
+      (isHeadingToBedRef?.current ?? false);
 
     const postStepCollision = resolveHorizontalCollisions(
       spring.position.x,
@@ -940,9 +992,7 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
       scale.multiplyScalar(JURO_BASE_SCALE);
 
       // Hard terrain collision boundary: keep Juro's bottom resting cleanly on grass/hill/bridge/stump/mattress
-      const isSleepingOnBed =
-        currentState === "sleep" &&
-        Math.hypot(spring.position.x - JURO_BED_POS.x, spring.position.z - JURO_BED_POS.z) < 0.85;
+      const isSleepingOnBed = currentState === "sleep";
       const bedMattressLift = isSleepingOnBed ? 0.135 : 0;
       const minCenterY = liveSurfaceY + bedMattressLift + 0.01 + BODY_BOTTOM_LOCAL * scale.y;
       spring.clampFloor(minCenterY, 0.22);
@@ -1418,17 +1468,21 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
       }
     }
 
-    // 7. Dynamic Need-State Facial Expressions
-    const isDirty = attributes.cleanliness < 35;
-    let expression: "hungry" | "tired" | "angry" | "bored" | "normal" = "normal";
-    if (attributes.hunger < 35) {
-      expression = "hungry";
-    } else if (attributes.energy < 35) {
-      expression = "tired";
-    } else if (attributes.affection < 35) {
-      expression = "angry";
-    } else if (attributes.happiness < 35) {
-      expression = "bored";
+    // 7. Dynamic Need-State Facial Expressions (Real-time live attributes with realistic thresholds)
+    const isDirty = liveAttributes.cleanliness < 45;
+    type NeedExpression = "hungry" | "tired" | "angry" | "bored" | "normal";
+    let expression: NeedExpression = "normal";
+
+    const candidateNeeds: { type: NeedExpression; val: number }[] = [
+      { type: "hungry", val: liveAttributes.hunger },
+      { type: "tired", val: liveAttributes.energy },
+      { type: "angry", val: liveAttributes.affection },
+      { type: "bored", val: liveAttributes.happiness },
+    ];
+    // Sort ascending: prioritize whichever need is the lowest below 45%
+    candidateNeeds.sort((a, b) => a.val - b.val);
+    if (candidateNeeds[0].val < 45) {
+      expression = candidateNeeds[0].type;
     }
 
     // Eyes: Awake vs Sleeping Curved Eyelids (︶ ︶)
@@ -1459,10 +1513,12 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
         fetchBallRef.current.stage === "bouncing" ||
         fetchBallRef.current.stage === "ground");
     const isPlayingBubbles = isPlayingToy && currentToyBeingPlayed?.id === "bubble-blower";
+    const isInteractingHappy =
+      (isPlayingToy && !isChasingBall && !isPlayingBubbles) || isPettingActive;
     const isHappyFace =
-      (isPlayingToy && !isChasingBall && !isPlayingBubbles) ||
-      currentState === "happy" ||
-      isPettingActive;
+      !isSleeping &&
+      !isDizzy &&
+      (isInteractingHappy || (currentState === "happy" && expression === "normal"));
 
     const blinkScaleY = isRinsingNow
       ? 0.16
@@ -1498,6 +1554,10 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
         } else if (isEating) {
           lookX = 0;
           lookY = -0.05;
+        } else if (expression === "hungry") {
+          // Looking up pleadingly at the player begging for food
+          lookX = 0;
+          lookY = 0.045;
         } else if (currentState === "curious") {
           lookX = fsm.lookTarget.x * 0.08;
           lookY = fsm.lookTarget.y * 0.06;
@@ -1509,11 +1569,12 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
         rightEyeRef.current.position.y = 0.07 + lookY;
 
         if (expression === "hungry") {
-          // Puppy dog pleading watery eyes with sparkling shimmer
-          leftEyeRef.current.scale.set(1.18, 1.35 * blinkScaleY, 0.52);
-          rightEyeRef.current.scale.set(1.18, 1.35 * blinkScaleY, 0.52);
-          leftEyeRef.current.rotation.z = -0.05;
-          rightEyeRef.current.rotation.z = 0.05;
+          // Puppy dog pleading sad watery eyes with outer corner droop & looking up
+          leftEyeRef.current.scale.set(1.22, 1.35 * blinkScaleY, 0.52);
+          rightEyeRef.current.scale.set(1.22, 1.35 * blinkScaleY, 0.52);
+          // Outward droop (sad puppy eyes)
+          leftEyeRef.current.rotation.z = 0.16;
+          rightEyeRef.current.rotation.z = -0.16;
           if (leftCatchlightRef.current && rightCatchlightRef.current) {
             const catchPulse = 1.35 + Math.sin(t * 8) * 0.2;
             leftCatchlightRef.current.scale.setScalar(catchPulse);
@@ -1588,9 +1649,14 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
     }
 
     // 8. Mouth: Dynamic Expression vs Eating vs Sleeping
+    const isHungryMouth = !isSleeping && !isDizzy && !isEating && !isHappyFace && expression === "hungry";
+    const isAngryMouth = !isSleeping && !isDizzy && !isEating && !isHappyFace && expression === "angry";
+    const isBoredMouth = !isSleeping && !isDizzy && !isEating && !isHappyFace && expression === "bored";
+    const isDefaultMouth = !isSleeping && !isDizzy && !isHungryMouth && !isAngryMouth && !isBoredMouth;
+
     if (mouthGroupRef.current) {
-      mouthGroupRef.current.visible = !isSleeping && !isDizzy;
-      if (!isSleeping && !isDizzy) {
+      mouthGroupRef.current.visible = isDefaultMouth;
+      if (isDefaultMouth) {
         if (isEating) {
           const eatT = eatingTimer.current;
           if (eatT < 0.7) {
@@ -1605,27 +1671,43 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
         } else if (isHappyFace || isBlowingBubbles || isPlayingBubbles) {
           mouthGroupRef.current.scale.set(1.18 + Math.sin(t * 8) * 0.08, 1.16, 1);
           mouthGroupRef.current.position.set(0, -0.01, 1.035);
-        } else if (expression === "hungry") {
-          // Open longing mouth
-          mouthGroupRef.current.scale.set(1.15, 1.3, 1);
-          mouthGroupRef.current.position.set(0, -0.03, 1.035);
         } else if (expression === "tired") {
           // Small panting oval
           const pant = 0.55 + Math.sin(t * 7.5) * 0.2;
           mouthGroupRef.current.scale.set(0.65, pant, 1);
           mouthGroupRef.current.position.set(0, -0.04, 1.035);
-        } else if (expression === "angry") {
-          // Grumpy inverted pout
-          mouthGroupRef.current.scale.set(0.85, -0.65, 1);
-          mouthGroupRef.current.position.set(0, -0.035, 1.035);
-        } else if (expression === "bored") {
-          // Flat horizontal line
-          mouthGroupRef.current.scale.set(0.95, 0.16, 1);
-          mouthGroupRef.current.position.set(0, -0.06, 1.035);
         } else {
+          // Content normal gentle smile
           mouthGroupRef.current.scale.set(1, 1, 1);
           mouthGroupRef.current.position.set(0, -0.01, 1.035);
         }
+      }
+    }
+
+    if (hungryMouthGroupRef.current) {
+      hungryMouthGroupRef.current.visible = isHungryMouth;
+      if (isHungryMouth) {
+        // Subtle trembling longing "o" mouth
+        const quiver = 1 + Math.sin(t * 12) * 0.08;
+        hungryMouthGroupRef.current.scale.set(quiver, quiver, 1);
+        hungryMouthGroupRef.current.position.set(0, -0.035, 1.035);
+      }
+    }
+
+    if (poutMouthGroupRef.current) {
+      poutMouthGroupRef.current.visible = isAngryMouth;
+      if (isAngryMouth) {
+        const huff = 1 + Math.sin(t * 8) * 0.05;
+        poutMouthGroupRef.current.scale.set(huff, 1, 1);
+        poutMouthGroupRef.current.position.set(0, -0.02, 1.035);
+      }
+    }
+
+    if (flatMouthGroupRef.current) {
+      flatMouthGroupRef.current.visible = isBoredMouth;
+      if (isBoredMouth) {
+        flatMouthGroupRef.current.scale.set(1, 1, 1);
+        flatMouthGroupRef.current.position.set(0, -0.02, 1.035);
       }
     }
 
@@ -2037,6 +2119,30 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
           <mesh position={[0, 0.008, 0.006]}>
             <shapeGeometry args={[tongueShape]} />
             <meshBasicMaterial color="#FB7185" side={THREE.DoubleSide} />
+          </mesh>
+        </group>
+
+        {/* === HUNGRY TREMBLING LONGING "o" MOUTH === */}
+        <group ref={hungryMouthGroupRef} position={[0, -0.035, 1.035]} visible={false}>
+          <mesh>
+            <shapeGeometry args={[hungryMouthShape]} />
+            <meshBasicMaterial color="#7C2D12" side={THREE.DoubleSide} />
+          </mesh>
+        </group>
+
+        {/* === ANGRY DOWNWARD POUT MOUTH === */}
+        <group ref={poutMouthGroupRef} position={[0, -0.02, 1.035]} visible={false}>
+          <mesh>
+            <shapeGeometry args={[poutMouthShape]} />
+            <meshBasicMaterial color="#7C2D12" side={THREE.DoubleSide} />
+          </mesh>
+        </group>
+
+        {/* === BORED FLAT LINE MOUTH === */}
+        <group ref={flatMouthGroupRef} position={[0, -0.02, 1.035]} visible={false}>
+          <mesh>
+            <shapeGeometry args={[flatMouthShape]} />
+            <meshBasicMaterial color="#7C2D12" side={THREE.DoubleSide} />
           </mesh>
         </group>
 

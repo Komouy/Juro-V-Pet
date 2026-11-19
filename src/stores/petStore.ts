@@ -128,11 +128,18 @@ export const usePetStore = create<PetState>((set, get) => ({
 
   getMood: () => {
     const { hunger, energy, cleanliness, happiness, affection } = get();
-    if (hunger < 35) return "hungry";
-    if (energy < 30) return "sleepy";
-    if (cleanliness < 30) return "dirty";
-    if (affection < 35) return "angry";
-    if (happiness < 35) return "bored";
+    // Prioritize whichever need is most depleted below 45%
+    const candidates: { mood: PetMood; val: number }[] = [
+      { mood: "hungry", val: hunger },
+      { mood: "sleepy", val: energy },
+      { mood: "dirty", val: cleanliness },
+      { mood: "angry", val: affection },
+      { mood: "bored", val: happiness },
+    ];
+    candidates.sort((a, b) => a.val - b.val);
+    if (candidates[0].val < 45) {
+      return candidates[0].mood;
+    }
     if (happiness > 80 && affection > 60) return "excited";
     if (happiness > 60) return "happy";
     return "content";
