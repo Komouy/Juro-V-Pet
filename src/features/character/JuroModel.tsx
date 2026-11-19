@@ -19,7 +19,7 @@ import { isBedtimeHour } from "../../utils/timeOfDay";
 
 // Ultra-cute terrarium/aquarium miniature scale so Juro explores a lush big world
 const JURO_BASE_SCALE = 0.36;
-const BODY_BOTTOM_LOCAL = 0.58;
+const BODY_BOTTOM_LOCAL = 0.815;
 const BODY_BOTTOM_OFFSET = BODY_BOTTOM_LOCAL * JURO_BASE_SCALE;
 const JURO_COLLISION_RADIUS = 1.14 * JURO_BASE_SCALE;
 
@@ -223,190 +223,6 @@ function createDizzyStarTexture(): THREE.CanvasTexture | null {
   return texture;
 }
 
-// 1. Sculpted caterpillar-like liquid slime body clinging to the ground
-function createCaterpillarSlimeGeometry(
-  centerColor: string,
-  midColor: string,
-  edgeColor: string
-): THREE.BufferGeometry {
-  const geo = new THREE.SphereGeometry(1.0, 80, 56);
-  const pos = geo.attributes.position;
-  const colors = new Float32Array(pos.count * 3);
-  const v = new THREE.Vector3();
-
-  const faceCenter = new THREE.Vector3(0, 0.02, 1.04);
-  const cCenter = new THREE.Color(centerColor);
-  const cMid = new THREE.Color(midColor);
-  const cEdge = new THREE.Color(edgeColor);
-  const tempColor = new THREE.Color();
-
-  for (let i = 0; i < pos.count; i++) {
-    v.fromBufferAttribute(pos, i);
-
-    // 1. Z-axis elongation: Front head is compact, rear extends into a slug/caterpillar tail
-    let z = v.z;
-    if (z >= 0) {
-      z *= 1.04;
-    } else {
-      z *= 1.42; // Elongate backwards into caterpillar body and fluid tail
-    }
-
-    // 2. Caterpillar Segmented Fluid Humps along Z
-    let hump = 0;
-    if (z > -0.95 && z < 0.35) {
-      const topWeight = Math.max(0, v.y);
-      hump = Math.sin((z + 0.12) * 6.8) * 0.062 * topWeight;
-    }
-
-    let y = v.y + hump;
-
-    // Width and height scales based on Z position
-    let sx = 1.18;
-    let sy = 0.92;
-
-    if (z < -0.35) {
-      const tailProgress = THREE.MathUtils.clamp((-z - 0.35) / 1.05, 0, 1);
-      // Tail tapers down in height to lay flat on the ground like melted liquid jelly
-      sy = THREE.MathUtils.lerp(0.92, 0.24, tailProgress);
-      sx = THREE.MathUtils.lerp(1.18, 0.65, tailProgress * 0.72);
-      // Slope the center of the tail downwards toward the ground
-      y -= tailProgress * 0.28;
-    }
-
-    let x = v.x * sx;
-    y *= sy;
-
-    // 3. Ground Adhesion & Viscous Liquid Meniscus ("menempel ke tanah seperti ulat")
-    if (y < -0.2) {
-      const depth = THREE.MathUtils.clamp((-y - 0.2) / 0.58, 0, 1);
-      const meniscusSpread = depth * depth * 0.44;
-
-      // Flatten bottom flush with ground plane (-0.46)
-      if (y < -0.42) {
-        const flat = (-y - 0.42) / 0.42;
-        y += flat * 0.18;
-      }
-      if (y < -0.46) y = -0.46;
-
-      // Flare outward horizontally to form the liquid wetting meniscus
-      x *= 1 + meniscusSpread;
-      z *= 1 + meniscusSpread * 0.68;
-
-      // Organic liquid perimeter ripples (not a sterile circle)
-      const theta = Math.atan2(z, x);
-      const fluidLip = Math.sin(7 * theta) * 0.026 * depth * depth;
-      x += Math.cos(theta) * fluidLip;
-      z += Math.sin(theta) * fluidLip;
-    }
-
-    // 4. Soft Dumpling Crown Wave on top-right (Juro's signature cute crest)
-    if (y > 0.45 && z > -0.2) {
-      const topH = (y - 0.45) / 0.45;
-      const smoothTop = topH * topH;
-      const crestWave =
-        Math.exp(-Math.pow((x - 0.28) * 2.1 + (z - 0.05) * 1.8, 2)) * 0.095 * smoothTop;
-      y += crestWave;
-    }
-
-    pos.setXYZ(i, x, y, z);
-
-    // 5. Luminous Fluid Subsurface Vertex Colors
-    const distFromFace = v.distanceTo(faceCenter);
-    const radialT = THREE.MathUtils.clamp((distFromFace - 0.12) / 1.25, 0, 1);
-    const smoothRadial = radialT * radialT * (3 - 2 * radialT);
-
-    const bottomViscous = THREE.MathUtils.clamp((-y - 0.35) / 0.38, 0, 1);
-    const tailViscous = THREE.MathUtils.clamp((-z - 0.35) / 0.95, 0, 1);
-    const topViscous = THREE.MathUtils.clamp((y - 0.52) / 0.38, 0, 1);
-
-    const t = THREE.MathUtils.clamp(
-      smoothRadial * 0.7 + bottomViscous * 0.55 + tailViscous * 0.65 + topViscous * 0.45,
-      0,
-      1
-    );
-
-    if (t < 0.48) {
-      tempColor.lerpColors(cCenter, cMid, t / 0.48);
-    } else {
-      tempColor.lerpColors(cMid, cEdge, (t - 0.48) / 0.52);
-    }
-
-    colors[i * 3] = tempColor.r;
-    colors[i * 3 + 1] = tempColor.g;
-    colors[i * 3 + 2] = tempColor.b;
-  }
-
-  geo.setAttribute("color", new THREE.BufferAttribute(colors, 3));
-  geo.computeVertexNormals();
-  return geo;
-}
-
-// 2. Trailing organic viscous jelly puddle following Juro
-function createViscousJellyPuddleGeometry(): THREE.BufferGeometry {
-  const segments = 48;
-  const rings = 16;
-  const geo = new THREE.PlaneGeometry(1.5, 1.3, segments, rings);
-  const pos = geo.attributes.position;
-  const v = new THREE.Vector3();
-
-  for (let i = 0; i < pos.count; i++) {
-    v.fromBufferAttribute(pos, i);
-
-    const theta = Math.atan2(v.y, v.x);
-    const rawR = Math.hypot(v.x, v.y);
-    const normalizedR = THREE.MathUtils.clamp(rawR / 0.75, 0, 1);
-
-    // Organic harmonic liquid puddle contour (viscous gelatin lobes, NOT simple circles)
-    const lobeMod =
-      1 +
-      0.18 * Math.sin(3 * theta + 0.3) +
-      0.12 * Math.cos(5 * theta - 0.2) +
-      0.08 * Math.sin(7 * theta + 1.1) +
-      0.05 * Math.cos(2 * theta);
-
-    const shapedR = rawR * lobeMod;
-    const nx = Math.cos(theta) * shapedR;
-    const nz = Math.sin(theta) * shapedR;
-
-    // Dome height profile with liquid surface tension meniscus
-    const domeHeight = Math.cos(normalizedR * Math.PI * 0.5);
-    const height = Math.pow(Math.max(0, domeHeight), 1.6) * 0.045;
-
-    pos.setXYZ(i, nx, height, nz);
-  }
-
-  geo.computeVertexNormals();
-  return geo;
-}
-
-// 3. Elastic fluid tendrils / gel streams connecting tail to trailing puddle
-function createFluidTendrilGeometry(): THREE.BufferGeometry {
-  const geo = new THREE.CylinderGeometry(0.045, 0.085, 0.85, 20, 16);
-  const pos = geo.attributes.position;
-  const v = new THREE.Vector3();
-
-  for (let i = 0; i < pos.count; i++) {
-    v.fromBufferAttribute(pos, i);
-    const t = (v.y + 0.425) / 0.85;
-
-    // Stretched syrup waist in the middle
-    const waist = 1 - Math.sin(t * Math.PI) * 0.42;
-    const flatBottom = Math.max(0.65, 1 - (1 - t) * 0.35);
-
-    v.x *= waist * flatBottom;
-    v.z *= waist;
-
-    // Subtle fluid droop curve
-    const sag = -Math.sin(t * Math.PI) * 0.035;
-    v.x += sag * 0.3;
-
-    pos.setXYZ(i, v.x, v.y, v.z);
-  }
-
-  geo.computeVertexNormals();
-  return geo;
-}
-
 export interface JuroScreenTarget {
   x: number;
   y: number;
@@ -450,7 +266,6 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
   onBedArrival,
 }) => {
   const groupRef = useRef<THREE.Group>(null);
-  const trailingFluidGroupRef = useRef<THREE.Group>(null);
   const leftEyeRef = useRef<THREE.Group>(null);
   const rightEyeRef = useRef<THREE.Group>(null);
   const sleepEyesRef = useRef<THREE.Group>(null);
@@ -652,28 +467,84 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
 
   const { camera, size } = useThree();
 
-  // 1. Sculpted Liquid Caterpillar Slime Body Geometry with Ground Clinging
-  const outerBodyGeometry = useMemo(
-    () =>
-      createCaterpillarSlimeGeometry(
-        skinPalette.centerColor,
-        skinPalette.midColor,
-        skinPalette.edgeColor
-      ),
-    [skinPalette.centerColor, skinPalette.midColor, skinPalette.edgeColor]
-  );
+  // 1. Sculpted Chubby Jelly Body Geometry with Smooth Vertex Colors
+  const outerBodyGeometry = useMemo(() => {
+    const geo = new THREE.SphereGeometry(1.0, 64, 48);
+    const pos = geo.attributes.position;
+    const colors = new Float32Array(pos.count * 3);
+    const v = new THREE.Vector3();
 
-  const viscousPuddleGeometry = useMemo(() => createViscousJellyPuddleGeometry(), []);
-  const fluidTendrilGeometry = useMemo(() => createFluidTendrilGeometry(), []);
+    const faceCenter = new THREE.Vector3(0, 0.02, 1.02);
+    const cCenter = new THREE.Color(skinPalette.centerColor);
+    const cMid = new THREE.Color(skinPalette.midColor);
+    const cEdge = new THREE.Color(skinPalette.edgeColor);
+    const tempColor = new THREE.Color();
 
-  // Dispose custom geometries on unmount or skin change (prevents WebGL GPU memory leak)
+    for (let i = 0; i < pos.count; i++) {
+      v.fromBufferAttribute(pos, i);
+
+      // Chubby wide cushion proportions
+      v.x *= 1.15;
+      v.y *= 0.94;
+      v.z *= 1.02;
+
+      // Smoothly flatten bottom base so Juro rests snugly like pudding
+      if (v.y < -0.44) {
+        const flat = (-v.y - 0.44) / 0.5;
+        v.y += flat * 0.13;
+        v.x *= 1 + flat * 0.05;
+        v.z *= 1 + flat * 0.05;
+      }
+
+      // Gentle soft dumpling wave on top-right crown
+      if (v.y > 0.48) {
+        const topH = (v.y - 0.48) / 0.46;
+        const smoothTop = topH * topH;
+        const crestWave =
+          Math.exp(-Math.pow((v.x - 0.28) * 2.1 + (v.z - 0.05) * 1.8, 2)) * 0.1 * smoothTop;
+        const indent =
+          Math.exp(-Math.pow((v.x + 0.15) * 2.4 + (v.z - 0.15) * 2.0, 2)) * -0.045 * smoothTop;
+        v.y += crestWave + indent;
+      }
+
+      pos.setXYZ(i, v.x, v.y, v.z);
+
+      // Luminous vertex color gradient (milky center -> glossy honey orange rim)
+      const distFromFace = v.distanceTo(faceCenter);
+      const radialT = THREE.MathUtils.clamp((distFromFace - 0.12) / 1.15, 0, 1);
+      const smoothRadial = radialT * radialT * (3 - 2 * radialT);
+
+      const bottomOrange = THREE.MathUtils.clamp((-v.y - 0.42) / 0.42, 0, 1);
+      const topOrange = THREE.MathUtils.clamp((v.y - 0.56) / 0.36, 0, 1);
+
+      const t = THREE.MathUtils.clamp(
+        smoothRadial * 0.88 + bottomOrange * 0.45 + topOrange * 0.55,
+        0,
+        1
+      );
+
+      if (t < 0.5) {
+        tempColor.lerpColors(cCenter, cMid, t * 2);
+      } else {
+        tempColor.lerpColors(cMid, cEdge, (t - 0.5) * 2);
+      }
+
+      colors[i * 3] = tempColor.r;
+      colors[i * 3 + 1] = tempColor.g;
+      colors[i * 3 + 2] = tempColor.b;
+    }
+
+    geo.setAttribute("color", new THREE.BufferAttribute(colors, 3));
+    geo.computeVertexNormals();
+    return geo;
+  }, [skinPalette.centerColor, skinPalette.midColor, skinPalette.edgeColor]);
+
+  // Dispose custom sculpted body geometry on unmount or skin change (prevents WebGL GPU memory leak)
   useEffect(() => {
     return () => {
       outerBodyGeometry.dispose();
-      viscousPuddleGeometry.dispose();
-      fluidTendrilGeometry.dispose();
     };
-  }, [outerBodyGeometry, viscousPuddleGeometry, fluidTendrilGeometry]);
+  }, [outerBodyGeometry]);
 
   // 2. Smiling Open Mouth Geometry
   const mouthShape = useMemo(() => {
@@ -907,34 +778,23 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
               groupRef.current.rotation.y = lerpAngle(groupRef.current.rotation.y, targetYaw, 0.12);
             }
 
-            // Authentic Liquid Caterpillar Crawl Animation (menempel ke tanah seperti ulat)
-            const cycle = t * 5.4;
+            // Authentic Slime Drag-Stretch Crawl (reach front forward -> drag rear body in!)
+            const cycle = t * 5.6;
             const wave = Math.sin(cycle);
             let crawlSpeed: number;
             if (wave >= 0) {
-              // Extension phase (kepala ulat menjangkau ke depan, menempel rata ke tanah)
-              crawlScaleZ = 1 + wave * 0.22 * motionScale;
+              // Reach forward: elongate along local Z, slim & lower slightly
+              crawlScaleZ = 1 + wave * 0.24 * motionScale;
               crawlScaleX = 1 - wave * 0.11 * motionScale;
-              crawlScaleY = 1 - wave * 0.14 * motionScale;
-              crawlSpeed = 0.44;
+              crawlScaleY = 1 - wave * 0.12 * motionScale;
+              crawlSpeed = 0.42;
             } else {
-              // Contraction phase (gelombang peristaltik, ekor & genangan jelly tertarik maju)
+              // Drag trailing jelly body forward in a plump surge!
               const pull = -wave;
               crawlScaleZ = 1 - pull * 0.16 * motionScale;
               crawlScaleX = 1 + pull * 0.13 * motionScale;
-              crawlScaleY = 1 + pull * 0.15 * motionScale;
-              crawlSpeed = 1.52;
-            }
-
-            // Animate trailing fluid pool with dynamic viscous stretching:
-            if (trailingFluidGroupRef.current) {
-              const stretchFactor = wave < 0 ? 1 + (-wave) * 0.38 : 1 - wave * 0.12;
-              trailingFluidGroupRef.current.scale.set(
-                1 / Math.sqrt(stretchFactor),
-                1.0,
-                stretchFactor
-              );
-              trailingFluidGroupRef.current.position.y = -0.455 + Math.sin(t * 4.2) * 0.005;
+              crawlScaleY = 1 + pull * 0.14 * motionScale;
+              crawlSpeed = 1.55;
             }
 
             // Check ahead for higher elevation (hill, stump, rock ledge, bridge) -> trigger jump!
@@ -1103,16 +963,6 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
             groupRef.current.rotation.z = THREE.MathUtils.lerp(groupRef.current.rotation.z, 0, 0.1);
             groupRef.current.rotation.x = THREE.MathUtils.lerp(groupRef.current.rotation.x, 0, 0.1);
             groupRef.current.rotation.y = lerpAngle(groupRef.current.rotation.y, 0, 0.05);
-          }
-        }
-        if (trailingFluidGroupRef.current) {
-          if (currentState === "sleep") {
-            trailingFluidGroupRef.current.scale.set(1.15, 0.82, 1.15);
-            trailingFluidGroupRef.current.position.y = -0.458;
-          } else {
-            const idlePulse = Math.sin(t * 2.2) * 0.035;
-            trailingFluidGroupRef.current.scale.set(1 + idlePulse, 1.0, 1 - idlePulse);
-            trailingFluidGroupRef.current.position.y = -0.455;
           }
         }
       }
@@ -1598,65 +1448,31 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
           />
         </mesh>
 
-        {/* === TRAILING VISCOUS JELLY FLUID & SLIME POOL (Cairan jelly yg mengikuti seperti ulat) === */}
-        <group ref={trailingFluidGroupRef} position={[0, -0.455, -1.35]}>
-          {/* Main Sculpted Viscous Jelly Puddle (Organically shaped fluid pool adhering to the ground) */}
-          <mesh geometry={viscousPuddleGeometry} rotation={[-Math.PI / 2, 0, 0]}>
-            <meshPhysicalMaterial
-              color={skinPalette.limbColor}
-              roughness={0.06}
-              metalness={0.02}
-              clearcoat={1.0}
-              clearcoatRoughness={0.03}
-              transmission={0.4}
-              ior={1.42}
-              transparent={true}
-              opacity={0.92}
-              emissive={skinPalette.emissiveColor}
-              emissiveIntensity={0.12}
-            />
-          </mesh>
+        {/* Left Jelly Droplet Arm */}
+        <mesh position={[-1.16, -0.22, 0.04]} rotation={[0, 0, 0.35]} scale={[1.22, 0.85, 0.85]}>
+          <sphereGeometry args={[0.21, 24, 24]} />
+          <meshPhysicalMaterial
+            color={skinPalette.limbColor}
+            roughness={0.12}
+            clearcoat={1.0}
+            clearcoatRoughness={0.05}
+            emissive={skinPalette.emissiveColor}
+            emissiveIntensity={0.1}
+          />
+        </mesh>
 
-          {/* Left Elastic Fluid Tendril (Viscous syrup stream stretching between rear body and puddle) */}
-          <mesh
-            geometry={fluidTendrilGeometry}
-            position={[-0.24, 0.1, 0.38]}
-            rotation={[Math.PI / 2.25, 0.18, 0]}
-          >
-            <meshPhysicalMaterial
-              color={skinPalette.limbColor}
-              roughness={0.08}
-              metalness={0.02}
-              clearcoat={1.0}
-              clearcoatRoughness={0.04}
-              transmission={0.32}
-              transparent={true}
-              opacity={0.9}
-              emissive={skinPalette.emissiveColor}
-              emissiveIntensity={0.12}
-            />
-          </mesh>
-
-          {/* Right Elastic Fluid Tendril (Viscous syrup stream stretching between rear body and puddle) */}
-          <mesh
-            geometry={fluidTendrilGeometry}
-            position={[0.24, 0.1, 0.38]}
-            rotation={[Math.PI / 2.25, -0.18, 0]}
-          >
-            <meshPhysicalMaterial
-              color={skinPalette.limbColor}
-              roughness={0.08}
-              metalness={0.02}
-              clearcoat={1.0}
-              clearcoatRoughness={0.04}
-              transmission={0.32}
-              transparent={true}
-              opacity={0.9}
-              emissive={skinPalette.emissiveColor}
-              emissiveIntensity={0.12}
-            />
-          </mesh>
-        </group>
+        {/* Right Jelly Droplet Arm */}
+        <mesh position={[1.16, -0.2, 0.02]} rotation={[0, 0, -0.35]} scale={[1.22, 0.85, 0.85]}>
+          <sphereGeometry args={[0.21, 24, 24]} />
+          <meshPhysicalMaterial
+            color={skinPalette.limbColor}
+            roughness={0.12}
+            clearcoat={1.0}
+            clearcoatRoughness={0.05}
+            emissive={skinPalette.emissiveColor}
+            emissiveIntensity={0.1}
+          />
+        </mesh>
 
         {/* === AWAKE EYES === */}
         <group ref={leftEyeRef} position={[-0.35, 0.07, 0.96]} rotation={[0, -0.24, -0.05]}>
