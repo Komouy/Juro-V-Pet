@@ -1,6 +1,6 @@
 import React, { Suspense, useRef, useState, useEffect, useCallback } from "react";
-import { Link, useNavigate } from "react-router-dom";
-import { Canvas, useThree } from "@react-three/fiber";
+import { useNavigate } from "react-router-dom";
+import { Canvas } from "@react-three/fiber";
 import { OrbitControls } from "@react-three/drei";
 import type { OrbitControls as OrbitControlsImpl } from "three-stdlib";
 import * as THREE from "three";
@@ -12,23 +12,11 @@ import {
 } from "../../features/character/JuroModel";
 import { OutdoorEnvironment } from "./OutdoorEnvironment";
 import { ItemIllustration } from "../items/ItemIllustration";
-import {
-  Utensils,
-  Gamepad2,
-  Moon,
-  Sun,
-  Droplets,
-  Heart,
-  Zap,
-  HandHeart,
-  Hand,
-  Store,
-  X,
-} from "lucide-react";
+import { Hand } from "lucide-react";
 import { usePetStore } from "../../stores/petStore";
 import { useGameStore } from "../../stores/gameStore";
 import { useUIStore } from "../../stores/uiStore";
-import { SHOP_FOODS, SHOP_TOYS } from "../../data/economyCatalog";
+import { SHOP_FOODS } from "../../data/economyCatalog";
 import { soundEffects } from "../../engine/audio/soundEffects";
 import {
   getTimePhaseFromDate,
@@ -38,51 +26,18 @@ import {
 } from "../../utils/timeOfDay";
 import { JURO_BED_POS } from "../../engine/world/mapTerrain";
 import type { FoodItem, ToyItem } from "../../types/pet";
+import { ResponsiveCamera } from "./viewport/ResponsiveCamera";
+import { StatBars } from "./viewport/StatBars";
+import { ActionTray, type DragPayload } from "./viewport/ActionTray";
+import { JuroContextMenu } from "./viewport/JuroContextMenu";
 
 type ActiveTray = "none" | "food" | "toy" | "bath";
-
-type DragPayload =
-  | { kind: "soap" }
-  | { kind: "bucket" }
-  | { kind: "food"; food: FoodItem }
-  | { kind: "toy"; toy: ToyItem };
 
 interface DragVisualState {
   payload: DragPayload;
   moved: boolean;
   overJuro: boolean;
 }
-
-// Automatically sets scenic miniature diorama valley framing for desktop widescreen & mobile portrait
-const ResponsiveCamera: React.FC<{
-  controlsRef: React.RefObject<OrbitControlsImpl | null>;
-}> = ({ controlsRef }) => {
-  const { camera, size } = useThree();
-
-  useEffect(() => {
-    const aspect = size.width / Math.max(1, size.height);
-    const fovRad = THREE.MathUtils.degToRad(
-      camera instanceof THREE.PerspectiveCamera ? camera.fov : 38
-    );
-
-    // Frame the wide miniature valley cleanly on both widescreen & mobile portrait
-    const neededZForWidth = 5.4 / (2 * Math.tan(fovRad / 2) * Math.max(0.45, aspect));
-    const targetZ = THREE.MathUtils.clamp(Math.max(6.2, neededZForWidth), 6.2, 10.6);
-    const targetY = aspect < 0.85 ? 2.45 : 1.95;
-
-    camera.position.set(0, targetY, targetZ);
-    camera.lookAt(0, -0.45, -0.35);
-    camera.updateProjectionMatrix();
-
-    if (controlsRef.current) {
-      controlsRef.current.target.set(0, -0.45, -0.35);
-      controlsRef.current.update();
-      controlsRef.current.saveState();
-    }
-  }, [camera, size.width, size.height, controlsRef]);
-
-  return null;
-};
 
 export const PetViewport: React.FC = () => {
   const navigate = useNavigate();
@@ -782,14 +737,6 @@ export const PetViewport: React.FC = () => {
     }
   };
 
-  const compactStats = [
-    { key: "hunger", label: "", value: Math.round(hunger), icon: Utensils, barColor: "bg-juro-orange", iconColor: "text-juro-orange" },
-    { key: "energy", label: "", value: Math.round(energy), icon: Zap, barColor: "bg-amber-400", iconColor: "text-amber-500" },
-    { key: "happiness", label: "", value: Math.round(happiness), icon: Heart, barColor: "bg-rose-400", iconColor: "text-rose-500" },
-    { key: "cleanliness", label: "", value: Math.round(cleanliness), icon: Droplets, barColor: "bg-sky-400", iconColor: "text-sky-500" },
-    { key: "affection", label: "", value: Math.round(affection), icon: HandHeart, barColor: "bg-purple-400", iconColor: "text-purple-500" },
-  ];
-
   const getDraggedIllustrationId = (payload: DragPayload): string => {
     switch (payload.kind) {
       case "soap":
@@ -805,15 +752,6 @@ export const PetViewport: React.FC = () => {
 
   const totalFoodStock = SHOP_FOODS.reduce((acc, f) => acc + (foodInventory[f.id] ?? 0), 0);
 
-  const stateLabel =
-    currentState === "sleep"
-      ? "Tidur"
-      : currentState === "eating"
-      ? "Makan"
-      : currentState === "play"
-      ? "Main"
-      : "Aktif";
-
   const orbitEnabled = !isGrabActive && !isDraggingPet && !isDraggingTool;
 
   return (
@@ -825,91 +763,18 @@ export const PetViewport: React.FC = () => {
       }`}
     >
       {/* Top Overlay Bar: Compact Tap-to-Peek Stat Strip */}
-      <div className="absolute top-3 left-3 z-20 pointer-events-none">
-        <div className="relative pointer-events-auto">
-          {/* Ultra-Minimal 5-Stat Strip (Consistent Horizontal Alignment Desktop & Mobile) */}
-          <button
-            type="button"
-            onClick={() => {
-              soundEffects.playClick();
-              setShowStatDetails((prev) => !prev);
-            }}
-            aria-expanded={showStatDetails}
-            aria-label="Lihat detail status Juro"
-            className="h-9 inline-flex items-center gap-2 sm:gap-2.5 px-2.5 bg-warm-white/95 dark:bg-neutral-900/90 backdrop-blur-xs border-2 border-charcoal dark:border-neutral-600 shadow-[2px_2px_0px_#171717] dark:shadow-[2px_2px_0px_#000000] hover:border-juro-orange transition-colors cursor-pointer"
-          >
-            {compactStats.map((stat) => {
-              const Icon = stat.icon;
-              const isLow = stat.value < 30;
-              return (
-                <div
-                  key={stat.key}
-                  title={`${stat.value}%`}
-                  className="flex items-center gap-1"
-                >
-                  <Icon
-                    size={12}
-                    strokeWidth={2.5}
-                    className={`${isLow ? "text-rose-500 animate-pulse" : stat.iconColor} shrink-0`}
-                  />
-                  <div className="w-5 sm:w-8 h-1.5 bg-neutral-200 dark:bg-neutral-700 border border-charcoal/40 overflow-hidden">
-                    <div
-                      className={`h-full transition-all duration-300 ${
-                        isLow ? "bg-rose-500" : stat.barColor
-                      }`}
-                      style={{ width: `${Math.max(0, Math.min(100, stat.value))}%` }}
-                    />
-                  </div>
-                </div>
-              );
-            })}
-          </button>
-
-          {/* Compact Tap-to-Peek Detail Popover (Tanpa Teks - Hanya Ikon, Bar & Nilai %) */}
-          {showStatDetails && (
-            <div className="animate-tray-enter absolute top-11 left-0 w-48 bg-warm-white/95 dark:bg-neutral-900/95 backdrop-blur-xs border-2 border-charcoal dark:border-neutral-600 shadow-[3px_3px_0px_#171717] dark:shadow-[3px_3px_0px_#000000] p-2.5 space-y-2">
-              <div className="flex items-center justify-between gap-2 pb-1.5 border-b border-charcoal/15 dark:border-neutral-700">
-                <span className="pixel-text text-[10px] font-bold text-charcoal dark:text-white truncate">
-                  {name} · Lv.{level}
-                </span>
-                <span className="pixel-text text-[8px] uppercase px-1.5 py-0.5 bg-juro-orange text-white border border-charcoal">
-                  {stateLabel}
-                </span>
-              </div>
-              <div className="space-y-2">
-                {compactStats.map((stat) => {
-                  const Icon = stat.icon;
-                  const isLow = stat.value < 30;
-                  return (
-                    <div key={stat.key} className="flex items-center justify-between gap-2">
-                      <Icon
-                        size={12}
-                        strokeWidth={2.5}
-                        className={isLow ? "text-rose-500 shrink-0" : `${stat.iconColor} shrink-0`}
-                      />
-                      <div className="flex-1 h-1.5 bg-neutral-200 dark:bg-neutral-700 border border-charcoal/40 overflow-hidden">
-                        <div
-                          className={`h-full transition-all duration-300 ${
-                            isLow ? "bg-rose-500" : stat.barColor
-                          }`}
-                          style={{ width: `${Math.max(0, Math.min(100, stat.value))}%` }}
-                        />
-                      </div>
-                      <span
-                        className={`pixel-text text-[9px] font-bold shrink-0 ${
-                          isLow ? "text-rose-500" : "text-charcoal dark:text-neutral-200"
-                        }`}
-                      >
-                        {stat.value}%
-                      </span>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
+      <StatBars
+        name={name}
+        level={level}
+        hunger={hunger}
+        energy={energy}
+        happiness={happiness}
+        cleanliness={cleanliness}
+        affection={affection}
+        currentState={currentState}
+        showStatDetails={showStatDetails}
+        onToggleStatDetails={() => setShowStatDetails((prev) => !prev)}
+      />
 
       {/* 3D Canvas (Full Stage — Mobile-Optimized DPR & GPU Settings) */}
       <Canvas
@@ -1020,300 +885,28 @@ export const PetViewport: React.FC = () => {
       )}
 
       {/* Bottom Floating Trays (Food Pantry, Toy Shelf, Bath Kit) */}
-      {activeTray !== "none" && (
-        <div
-          className={`absolute bottom-3 left-1/2 -translate-x-1/2 z-20 flex flex-col items-center gap-2 w-max max-w-[calc(100%-1.5rem)] transition-opacity duration-150 ${
-            dragVisual?.moved ? "opacity-30 pointer-events-none" : "opacity-100"
-          }`}
-        >
-        {/* Pop-Up Food Pantry Strip (Real Consumable Stock — Drag onto Juro or Tap) */}
-        {activeTray === "food" && (() => {
-          const availableFoods = SHOP_FOODS.filter((f) => (foodInventory[f.id] ?? 0) > 0);
-          return (
-            <div className="animate-tray-enter w-full bg-warm-white/95 dark:bg-neutral-900/95 backdrop-blur-xs border-2 border-charcoal dark:border-neutral-600 shadow-[4px_4px_0px_#171717] dark:shadow-[4px_4px_0px_#000000] p-2.5">
-              <div className="flex items-center justify-between gap-3 pb-1.5 mb-2 border-b border-charcoal/15 dark:border-neutral-700">
-                <span className="pixel-text text-[10px] uppercase text-charcoal dark:text-white font-bold tracking-wider">
-                  Stok Makanan
-                </span>
-                <div className="flex items-center gap-2">
-                  <Link
-                    to="/shop?tab=food"
-                    className="inline-flex items-center gap-1 pixel-text text-[8px] uppercase px-1.5 py-0.5 bg-juro-orange text-white border border-charcoal hover:bg-orange-600"
-                  >
-                    <Store size={10} strokeWidth={2.5} />
-                    <span>Toko</span>
-                  </Link>
-                  <button
-                    onClick={() => {
-                      soundEffects.playDismiss();
-                      setActiveTray("none");
-                    }}
-                    className="p-0.5 text-charcoal dark:text-neutral-300 hover:text-juro-orange cursor-pointer"
-                    aria-label="Tutup menu makanan"
-                  >
-                    <X size={14} strokeWidth={2.5} />
-                  </button>
-                </div>
-              </div>
-
-              {availableFoods.length === 0 ? (
-                <div className="py-3 px-2 text-center space-y-2">
-                  <p className="pixel-text text-[9px] text-muted uppercase">
-                    Stok makanan habis!
-                  </p>
-                  <Link
-                    to="/shop?tab=food"
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-juro-orange text-white border-2 border-charcoal shadow-[2px_2px_0px_#171717] pixel-text text-[9px] uppercase font-bold"
-                  >
-                    <Store size={12} strokeWidth={2.5} />
-                    <span>Beli Makanan di Toko</span>
-                  </Link>
-                </div>
-              ) : (
-                <div className="flex items-stretch gap-2 overflow-x-auto max-w-[92vw] pb-0.5">
-                  {availableFoods.map((food) => {
-                    const stock = foodInventory[food.id] ?? 0;
-                    return (
-                      <button
-                        key={food.id}
-                        type="button"
-                        onPointerDown={(e) => handleStartItemDrag({ kind: "food", food }, e)}
-                        className="relative group shrink-0 w-24 p-2 bg-white dark:bg-neutral-800 border-2 border-charcoal dark:border-neutral-700 shadow-[2px_2px_0px_#171717] hover:border-juro-orange hover:-translate-y-0.5 active:translate-x-[1px] active:translate-y-[1px] active:shadow-none transition-all cursor-grab active:cursor-grabbing flex flex-col items-center text-center gap-1 touch-none"
-                      >
-                        <span className="absolute top-1 right-1 pixel-text text-[8px] px-1 bg-charcoal text-white">
-                          ×{stock}
-                        </span>
-                        <ItemIllustration id={food.id} size={34} />
-                        <span className="pixel-text text-[9px] text-charcoal dark:text-white font-bold leading-tight line-clamp-2">
-                          {food.name}
-                        </span>
-                        <div className="flex items-center gap-1 text-[8px] pixel-text">
-                          <span className="text-juro-orange font-bold">+{food.hungerRestore}</span>
-                          <span className="text-muted">·</span>
-                          <span className="text-emerald-600 dark:text-emerald-400 font-bold">
-                            +{food.xpReward}XP
-                          </span>
-                        </div>
-                      </button>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-          );
-        })()}
-
-        {/* Pop-Up Toy Shelf Strip (Permanent Owned Toys — Drag onto Juro or Tap) */}
-        {activeTray === "toy" && (() => {
-          const myToys = SHOP_TOYS.filter((t) => ownedToys.includes(t.id));
-          return (
-            <div className="animate-tray-enter w-full bg-warm-white/95 dark:bg-neutral-900/95 backdrop-blur-xs border-2 border-charcoal dark:border-neutral-600 shadow-[4px_4px_0px_#171717] dark:shadow-[4px_4px_0px_#000000] p-2.5">
-              <div className="flex items-center justify-between gap-3 pb-1.5 mb-2 border-b border-charcoal/15 dark:border-neutral-700">
-                <span className="pixel-text text-[10px] uppercase text-charcoal dark:text-white font-bold tracking-wider">
-                  Mainan Dimiliki
-                </span>
-                <div className="flex items-center gap-2">
-                  {myToys.length < SHOP_TOYS.length && (
-                    <Link
-                      to="/shop?tab=toy"
-                      className="inline-flex items-center gap-1 pixel-text text-[8px] uppercase px-1.5 py-0.5 bg-juro-orange text-white border border-charcoal hover:bg-orange-600"
-                    >
-                      <Store size={10} strokeWidth={2.5} />
-                      <span>Toko</span>
-                    </Link>
-                  )}
-                  <button
-                    onClick={() => {
-                      soundEffects.playDismiss();
-                      setActiveTray("none");
-                    }}
-                    className="p-0.5 text-charcoal dark:text-neutral-300 hover:text-juro-orange cursor-pointer"
-                    aria-label="Tutup menu mainan"
-                  >
-                    <X size={14} strokeWidth={2.5} />
-                  </button>
-                </div>
-              </div>
-              <div
-                className={`grid gap-2 ${
-                  myToys.length === 1
-                    ? "grid-cols-1"
-                    : myToys.length === 2
-                    ? "grid-cols-2"
-                    : "grid-cols-3"
-                }`}
-              >
-                {myToys.map((toy) => (
-                  <button
-                    key={toy.id}
-                    type="button"
-                    onPointerDown={(e) => handleStartItemDrag({ kind: "toy", toy }, e)}
-                    className="group min-w-0 p-2 bg-white dark:bg-neutral-800 border-2 border-charcoal dark:border-neutral-700 shadow-[2px_2px_0px_#171717] hover:border-juro-orange hover:-translate-y-0.5 active:translate-x-[1px] active:translate-y-[1px] active:shadow-none transition-all cursor-grab active:cursor-grabbing flex flex-col items-center text-center gap-1.5 touch-none"
-                  >
-                    <ItemIllustration id={toy.id} size={36} />
-                    <span className="pixel-text text-[9px] text-charcoal dark:text-white font-bold leading-tight">
-                      {toy.name}
-                    </span>
-                    <div className="flex items-center gap-1 text-[8px] pixel-text">
-                      <span className="text-rose-500 font-bold">+{toy.happinessGain}</span>
-                      <span className="text-muted">·</span>
-                      <span className="text-emerald-600 dark:text-emerald-400 font-bold">
-                        +{toy.xpReward}XP
-                      </span>
-                    </div>
-                  </button>
-                ))}
-              </div>
-            </div>
-          );
-        })()}
-
-        {/* Pop-Up Interactive Bath Kit Strip: 1. Sabun Busa + 2. Ember Air */}
-        {activeTray === "bath" && (
-          <div className="animate-tray-enter w-full bg-warm-white/95 dark:bg-neutral-900/95 backdrop-blur-xs border-2 border-charcoal dark:border-neutral-600 shadow-[4px_4px_0px_#171717] dark:shadow-[4px_4px_0px_#000000] p-2.5">
-            <div className="flex items-center justify-between gap-4 pb-1.5 mb-2 border-b border-charcoal/15 dark:border-neutral-700">
-              <div className="flex items-center gap-2">
-                <span className="pixel-text text-[10px] uppercase text-charcoal dark:text-white font-bold tracking-wider">
-                  Alat Mandi
-                </span>
-              </div>
-              <button
-                onClick={() => {
-                  soundEffects.playDismiss();
-                  setActiveTray("none");
-                }}
-                className="p-0.5 text-charcoal dark:text-neutral-300 hover:text-juro-orange cursor-pointer"
-                aria-label="Tutup alat mandi"
-              >
-                <X size={14} strokeWidth={2.5} />
-              </button>
-            </div>
-
-            <div className="grid grid-cols-2 gap-2">
-              {/* Tool 1: Sabun Busa */}
-              <button
-                type="button"
-                onPointerDown={(e) => handleStartItemDrag({ kind: "soap" }, e)}
-                className={`group min-w-0 p-2 bg-white dark:bg-neutral-800 border-2 shadow-[2px_2px_0px_#171717] hover:-translate-y-0.5 active:translate-x-[1px] active:translate-y-[1px] active:shadow-none transition-all cursor-grab active:cursor-grabbing flex flex-col items-center text-center gap-1.5 touch-none`}
-              >
-                <ItemIllustration id="soap-bar" size={38} />
-                <span className="pixel-text text-[9px] text-charcoal dark:text-white font-bold">
-                  Sabun Busa
-                </span>
-              </button>
-
-              {/* Tool 2: Ember Air */}
-              <button
-                type="button"
-                onPointerDown={(e) => handleStartItemDrag({ kind: "bucket" }, e)}
-                className={`group min-w-0 p-2 bg-white dark:bg-neutral-800 border-2 shadow-[2px_2px_0px_#171717] hover:-translate-y-0.5 active:translate-x-[1px] active:translate-y-[1px] active:shadow-none transition-all cursor-grab active:cursor-grabbing flex flex-col items-center text-center gap-1.5 touch-none ${
-                  soapBadgePercent >= 40
-                    ? "border-sky-400 ring-2 ring-sky-400/40"
-                    : "border-charcoal dark:border-neutral-700 hover:border-sky-400"
-                }`}
-              >
-                <ItemIllustration id="water-bucket" size={38} />
-                <span className="pixel-text text-[9px] text-charcoal dark:text-white font-bold">
-                  Ember Air
-                </span>
-              </button>
-            </div>
-          </div>
-        )}
-
-        </div>
-      )}
+      <ActionTray
+        activeTray={activeTray}
+        onClose={() => setActiveTray("none")}
+        foodInventory={foodInventory}
+        ownedToys={ownedToys}
+        soapBadgePercent={soapBadgePercent}
+        dragVisualMoved={dragVisual?.moved}
+        onStartItemDrag={handleStartItemDrag}
+      />
 
       {/* Interactive Contextual Juro Menu (Pops up directly on Juro Tap/Click) */}
-      {juroMenu.open && (
-        <div
-          ref={juroMenuRef}
-          style={{
-            left: `${juroMenu.x}px`,
-            top: `${juroMenu.y}px`,
-          }}
-          className={`absolute z-30 pointer-events-auto -translate-x-1/2 ${
-            juroMenu.isNearTop ? "translate-y-2" : "-translate-y-full"
-          }`}
-        >
-          <div className="animate-tray-enter relative inline-flex items-center gap-1 sm:gap-1.5 p-1 sm:p-1.5 bg-warm-white/95 dark:bg-neutral-900/95 backdrop-blur-xs border-2 border-charcoal dark:border-neutral-600 shadow-[3px_3px_0px_#171717] dark:shadow-[3px_3px_0px_#000000]">
-            <div
-              ref={tailRef}
-              className={`absolute left-1/2 -translate-x-1/2 w-3 h-3 bg-warm-white dark:bg-neutral-900 rotate-45 ${
-                juroMenu.isNearTop
-                  ? "-top-1.5 border-l-2 border-t-2 border-charcoal dark:border-neutral-600"
-                  : "-bottom-1.5 border-r-2 border-b-2 border-charcoal dark:border-neutral-600"
-              }`}
-              aria-hidden="true"
-            />
-
-            {/* 1. Makan */}
-            <button
-              type="button"
-              onClick={() => handleMenuAction("food")}
-              className="relative inline-flex items-center gap-1 sm:gap-1.5 px-2 sm:px-2.5 py-1.5 bg-white dark:bg-neutral-800 text-charcoal dark:text-white border-2 border-charcoal dark:border-neutral-600 shadow-[2px_2px_0px_#171717] dark:shadow-[2px_2px_0px_#000000] hover:border-juro-orange hover:text-juro-orange active:translate-x-[1px] active:translate-y-[1px] active:shadow-none pixel-text text-[9px] sm:text-[10px] uppercase font-bold tracking-wider transition-all cursor-pointer"
-            >
-              <Utensils size={13} strokeWidth={2.5} className="shrink-0 text-juro-orange" />
-              <span>Makan</span>
-              {totalFoodStock === 0 && (
-                <span
-                  className="absolute -top-1 -right-1 w-2 h-2 bg-rose-500 border border-charcoal"
-                  aria-hidden="true"
-                />
-              )}
-            </button>
-
-            {/* 2. Main */}
-            <button
-              type="button"
-              onClick={() => handleMenuAction("toy")}
-              className="inline-flex items-center gap-1 sm:gap-1.5 px-2 sm:px-2.5 py-1.5 bg-white dark:bg-neutral-800 text-charcoal dark:text-white border-2 border-charcoal dark:border-neutral-600 shadow-[2px_2px_0px_#171717] dark:shadow-[2px_2px_0px_#000000] hover:border-juro-orange hover:text-juro-orange active:translate-x-[1px] active:translate-y-[1px] active:shadow-none pixel-text text-[9px] sm:text-[10px] uppercase font-bold tracking-wider transition-all cursor-pointer"
-            >
-              <Gamepad2 size={13} strokeWidth={2.5} className="shrink-0 text-rose-500" />
-              <span>Main</span>
-            </button>
-
-            {/* 3. Tidur / Bangun */}
-            <button
-              type="button"
-              onClick={() => handleMenuAction("sleep")}
-              className="inline-flex items-center gap-1 sm:gap-1.5 px-2 sm:px-2.5 py-1.5 bg-white dark:bg-neutral-800 text-charcoal dark:text-white border-2 border-charcoal dark:border-neutral-600 shadow-[2px_2px_0px_#171717] dark:shadow-[2px_2px_0px_#000000] hover:border-juro-orange hover:text-juro-orange active:translate-x-[1px] active:translate-y-[1px] active:shadow-none pixel-text text-[9px] sm:text-[10px] uppercase font-bold tracking-wider transition-all cursor-pointer"
-            >
-              {currentState === "sleep" ? (
-                <>
-                  <Sun size={13} strokeWidth={2.5} className="text-amber-500 shrink-0" />
-                  <span>Bangun</span>
-                </>
-              ) : (
-                <>
-                  <Moon size={13} strokeWidth={2.5} className="text-purple-500 shrink-0" />
-                  <span>Tidur</span>
-                </>
-              )}
-            </button>
-
-            {/* 4. Mandi */}
-            <button
-              type="button"
-              onClick={() => handleMenuAction("bath")}
-              className="inline-flex items-center gap-1 sm:gap-1.5 px-2 sm:px-2.5 py-1.5 bg-white dark:bg-neutral-800 text-charcoal dark:text-white border-2 border-charcoal dark:border-neutral-600 shadow-[2px_2px_0px_#171717] dark:shadow-[2px_2px_0px_#000000] hover:border-sky-400 hover:text-sky-500 active:translate-x-[1px] active:translate-y-[1px] active:shadow-none pixel-text text-[9px] sm:text-[10px] uppercase font-bold tracking-wider transition-all cursor-pointer"
-            >
-              <Droplets size={13} strokeWidth={2.5} className="text-sky-500 shrink-0" />
-              <span>Mandi</span>
-            </button>
-
-            {/* 5. Pegang */}
-            <button
-              type="button"
-              onClick={() => handleMenuAction("grab")}
-              className="inline-flex items-center gap-1 sm:gap-1.5 px-2 sm:px-2.5 py-1.5 bg-white dark:bg-neutral-800 text-charcoal dark:text-white border-2 border-charcoal dark:border-neutral-600 shadow-[2px_2px_0px_#171717] dark:shadow-[2px_2px_0px_#000000] hover:border-juro-orange hover:text-juro-orange active:translate-x-[1px] active:translate-y-[1px] active:shadow-none pixel-text text-[9px] sm:text-[10px] uppercase font-bold tracking-wider transition-all cursor-pointer"
-            >
-              <Hand size={13} strokeWidth={2.5} className="text-juro-orange shrink-0" />
-              <span>Pegang</span>
-            </button>
-          </div>
-        </div>
-      )}
+      <JuroContextMenu
+        open={juroMenu.open}
+        x={juroMenu.x}
+        y={juroMenu.y}
+        isNearTop={juroMenu.isNearTop}
+        currentState={currentState}
+        totalFoodStock={totalFoodStock}
+        onAction={handleMenuAction}
+        menuRef={juroMenuRef}
+        tailRef={tailRef}
+      />
 
       {/* Floating Grab Guide Pill when Juro is actively held */}
       {isGrabActive && (
