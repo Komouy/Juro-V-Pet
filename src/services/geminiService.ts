@@ -413,7 +413,7 @@ export function buildJuroSystemPrompt(context?: PetChatContext): string {
     ? "Waktu malam hari."
     : "Cuaca cerah.";
 
-  const cognitiveInfo = `PERKEMBANGAN KOGNITIF OTAK AI (TIER ${tier.tier} - ${tier.name}): ${tier.archetype}. Tingkat kosa kata: ${tier.vocabularyLevel}. PANDUAN BICARA SESUAI TINGKAT PERTUMBUHAN KOGNITIF: ${tier.speechGuidance}`;
+  const cognitiveInfo = `PERKEMBANGAN PIKIRAN & KESADARAN JURO (FASE ${tier.tier} - ${tier.name}): ${tier.archetype}. Tingkat kosa kata: ${tier.vocabularyLevel}. PANDUAN BICARA SESUAI TINGKAT PERTUMBUHAN PIKIRAN: ${tier.speechGuidance}`;
   const emotionalInfo = `KONDISI EMOSIONAL & KESADARAN DIRI SAAT INI: Emosi utama: "${emotionalState.primaryEmotion}". Intensitas perasaan: "${emotionalState.moodIntensity}". Resonansi emosi: ${emotionalState.resonanceScore}%. Pikiran batin: "${emotionalState.thoughtSummary}". Jika pemilik bertanya tentang perasaan, emosi, atau pikiranmu, ceritakan kondisi emosionalmu ini dengan jujur dan hangat!`;
 
   const spontaneousDirective = context?.isSpontaneous
@@ -441,7 +441,7 @@ export function buildJuroSystemPrompt(context?: PetChatContext): string {
     `- Ekspresi wajah & perasaan: ${expression}.`,
     spontaneousDirective,
     `ATURAN GAYA BICARA:`,
-    `- Gunakan Bahasa Indonesia yang santai, imut, ramah, dan sedikit jenaka/lucu sesuai dengan TIER PERKEMBANGAN KOGNITIF OTAK AI.`,
+    `- Gunakan Bahasa Indonesia yang santai, imut, ramah, dan sedikit jenaka/lucu sesuai dengan FASE PERKEMBANGAN PIKIRAN JURO.`,
     `- WAJIB SESUAIKAN ISI JAWABAN DENGAN KONDISI / EKSPRESI:`,
     `  * Jika sedang tidur / mengantuk: bicaralah dengan nada mengantuk, menguap ("Hwaaam... Zzz..."), setengah mengigau atau sebut kasur/mimpimu.`,
     `  * Jika sedang duduk santai di bangku: sebut suasana damai angin bukit dan indahnya pemandangan lembah.`,

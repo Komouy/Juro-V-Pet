@@ -12,7 +12,7 @@ import {
 } from "../../features/character/JuroModel";
 import { OutdoorEnvironment } from "./OutdoorEnvironment";
 import { ItemIllustration } from "../items/ItemIllustration";
-import { Heart, CloudRain, Sun, Moon, Armchair, Footprints, X, Brain } from "lucide-react";
+import { Heart, CloudRain, Sun, Moon, Armchair, Footprints, X } from "lucide-react";
 import { usePetStore } from "../../stores/petStore";
 import { useGameStore } from "../../stores/gameStore";
 import { useUIStore } from "../../stores/uiStore";
@@ -32,7 +32,6 @@ import { StatBars } from "./viewport/StatBars";
 import { ActionTray, type DragPayload } from "./viewport/ActionTray";
 import { JuroContextMenu } from "./viewport/JuroContextMenu";
 import { JuroSpeechBubble } from "./viewport/JuroSpeechBubble";
-import { AICoreModal } from "./viewport/AICoreModal";
 import {
   chatWithJuro,
   computePetExpression,
@@ -90,8 +89,6 @@ export const PetViewport: React.FC = () => {
 
   const [activeTray, setActiveTray] = useState<ActiveTray>("none");
   const [showStatDetails, setShowStatDetails] = useState(false);
-  const [showAICoreModal, setShowAICoreModal] = useState(false);
-  const [aiCoreContext, setAiCoreContext] = useState<PetChatContext | null>(null);
   const [juroMenu, setJuroMenu] = useState<{
     open: boolean;
     x: number;
@@ -275,7 +272,6 @@ export const PetViewport: React.FC = () => {
     if (
       activeTray === "none" &&
       !showStatDetails &&
-      !showAICoreModal &&
       !juroMenu.open &&
       !benchMenu?.open &&
       !isPettingActive &&
@@ -287,7 +283,6 @@ export const PetViewport: React.FC = () => {
         if (isPettingActive) setIsPettingActive(false);
         setActiveTray("none");
         setShowStatDetails(false);
-        setShowAICoreModal(false);
         setJuroMenu({ open: false, x: 0, y: 0, isNearTop: false });
         setBenchMenu(null);
         setSpeechBubble((s) => ({ ...s, visible: false }));
@@ -295,7 +290,7 @@ export const PetViewport: React.FC = () => {
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [activeTray, showStatDetails, showAICoreModal, juroMenu.open, benchMenu?.open, isPettingActive, speechBubble.visible]);
+  }, [activeTray, showStatDetails, juroMenu.open, benchMenu?.open, isPettingActive, speechBubble.visible]);
 
   // Dynamically assemble pet context: activities, emotions, sensations & environmental state
   const getLiveChatContext = useCallback(
@@ -1157,12 +1152,6 @@ export const PetViewport: React.FC = () => {
     setActiveTray("none");
   }, [currentState, wakeUp, addLog, isSittingOnBench]);
 
-  const handleOpenAICore = useCallback(() => {
-    soundEffects.playClick();
-    setAiCoreContext(getLiveChatContext());
-    setShowAICoreModal(true);
-  }, [getLiveChatContext]);
-
   const handleToggleWeather = useCallback(() => {
     const nextWeather = weather === "clear" ? "rain" : "clear";
     soundEffects.playWeatherChange(nextWeather === "rain");
@@ -1316,20 +1305,8 @@ export const PetViewport: React.FC = () => {
         onToggleStatDetails={() => setShowStatDetails((prev) => !prev)}
       />
 
-      {/* Top Right Controls: Otak AI (Core) & Atmospheric Weather Indicator */}
-      <div className="absolute top-3 right-3 z-20 pointer-events-auto flex items-center gap-2">
-        <button
-          type="button"
-          onClick={handleOpenAICore}
-          aria-label="Buka Otak AI Juro"
-          className="h-10 inline-flex items-center gap-1.5 sm:gap-2 px-3 bg-warm-white/95 dark:bg-neutral-900/90 backdrop-blur-xs border-2 border-charcoal dark:border-neutral-600 shadow-[2px_2px_0px_#171717] dark:shadow-[2px_2px_0px_#000000] hover:border-purple-500 transition-all active:translate-x-[1px] active:translate-y-[1px] cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple-500"
-        >
-          <Brain size={14} className="text-purple-600 dark:text-purple-400 animate-pulse shrink-0" />
-          <span className="pixel-text text-[9px] sm:text-[10px] font-bold text-purple-700 dark:text-purple-300 uppercase">
-            Otak AI · Lv.{level}
-          </span>
-        </button>
-
+      {/* Atmospheric Weather Indicator & Toggle Pill (Clear <-> Pixel Rain) */}
+      <div className="absolute top-3 right-3 z-20 pointer-events-auto">
         <button
           type="button"
           onClick={handleToggleWeather}
@@ -1702,24 +1679,6 @@ export const PetViewport: React.FC = () => {
           </div>
         </div>
       )}
-
-      {/* Juro AI Brain Core & Emotional Awareness Modal */}
-      <AICoreModal
-        open={showAICoreModal}
-        onClose={() => setShowAICoreModal(false)}
-        level={level}
-        attributes={{
-          hunger,
-          energy,
-          happiness,
-          cleanliness,
-          affection,
-        }}
-        context={aiCoreContext ?? undefined}
-        onAskFeelings={(prompt) => {
-          handleSendMessage(prompt || "Bagaimana perasaanmu sekarang?");
-        }}
-      />
     </div>
   );
 };

@@ -31,9 +31,9 @@ describe("Cognitive AI Core & Developmental Progression", () => {
     expect(getCognitiveTier(7).name).toBe("Akal Cendikia");
     expect(getCognitiveTier(8).tier).toBe(4);
 
-    // Level 9-10+: Kesadaran Purba
+    // Level 9-10+: Kesadaran Bijak
     expect(getCognitiveTier(9).tier).toBe(5);
-    expect(getCognitiveTier(9).name).toBe("Kesadaran Purba");
+    expect(getCognitiveTier(9).name).toBe("Kesadaran Bijak");
     expect(getCognitiveTier(12).tier).toBe(5);
   });
 
@@ -81,7 +81,7 @@ describe("Cognitive AI Core & Developmental Progression", () => {
     });
 
     expect(prompt).toContain("Pikiran Adaptif");
-    expect(prompt).toContain("PERKEMBANGAN KOGNITIF OTAK AI");
+    expect(prompt).toContain("PERKEMBANGAN PIKIRAN & KESADARAN JURO");
     expect(prompt).toContain("KONDISI EMOSIONAL & KESADARAN DIRI SAAT INI");
     expect(prompt).toContain("Damai & Kontemplatif");
   });
