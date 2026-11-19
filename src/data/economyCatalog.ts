@@ -184,7 +184,7 @@ export const SHOP_FOODS: ShopFoodItem[] = [
     happinessGain: 8,
     energyGain: 5,
     xpReward: 15,
-    price: 15,
+    price: 22,
   },
   {
     id: "biscuit",
@@ -194,7 +194,7 @@ export const SHOP_FOODS: ShopFoodItem[] = [
     happinessGain: 10,
     energyGain: 8,
     xpReward: 18,
-    price: 20,
+    price: 28,
   },
   {
     id: "orange-slice",
@@ -204,7 +204,7 @@ export const SHOP_FOODS: ShopFoodItem[] = [
     happinessGain: 12,
     energyGain: 10,
     xpReward: 25,
-    price: 28,
+    price: 40,
   },
   {
     id: "warm-milk",
@@ -214,7 +214,7 @@ export const SHOP_FOODS: ShopFoodItem[] = [
     happinessGain: 15,
     energyGain: 18,
     xpReward: 30,
-    price: 36,
+    price: 52,
   },
   {
     id: "melon-cubes",
@@ -224,7 +224,7 @@ export const SHOP_FOODS: ShopFoodItem[] = [
     happinessGain: 20,
     energyGain: 15,
     xpReward: 38,
-    price: 48,
+    price: 68,
   },
 ];
 
@@ -247,7 +247,7 @@ export const SHOP_TOYS: ShopToyItem[] = [
     affectionGain: 12,
     energyCost: 14,
     xpReward: 30,
-    price: 90,
+    price: 130,
   },
   {
     id: "music-box",
@@ -257,7 +257,7 @@ export const SHOP_TOYS: ShopToyItem[] = [
     affectionGain: 16,
     energyCost: 15,
     xpReward: 42,
-    price: 160,
+    price: 240,
   },
 ];
 
@@ -277,7 +277,7 @@ export const PICKAXE_TIERS: PickaxeTier[] = [
     name: "Beliung Batu",
     power: 2,
     bonusChance: 0.15,
-    price: 80,
+    price: 120,
     desc: "Memecah batu 2× lebih cepat dengan peluang +15% bonus kristal.",
   },
   {
@@ -286,7 +286,7 @@ export const PICKAXE_TIERS: PickaxeTier[] = [
     name: "Beliung Besi",
     power: 3,
     bonusChance: 0.25,
-    price: 180,
+    price: 260,
     desc: "Kuat menembus lapisan tambang dalam dengan +25% bonus kristal.",
   },
   {
@@ -295,7 +295,7 @@ export const PICKAXE_TIERS: PickaxeTier[] = [
     name: "Beliung Emas",
     power: 4,
     bonusChance: 0.4,
-    price: 360,
+    price: 520,
     desc: "Kilau emas menarik urat permata langka (+40% bonus kristal).",
   },
   {
@@ -304,7 +304,7 @@ export const PICKAXE_TIERS: PickaxeTier[] = [
     name: "Beliung Kristal",
     power: 6,
     bonusChance: 0.6,
-    price: 680,
+    price: 960,
     desc: "Beliung legendaris penghancur batu keras seketika (+60% bonus kristal).",
   },
 ];

@@ -59,13 +59,14 @@ describe("Economy, Mining & Shop System", () => {
   });
 
   it("buys consumable food stock and decrements stock when feeding Juro", () => {
-    // Biscuit costs 20 coins; starter coins = 50
+    // Biscuit costs 28 coins; setting coins = 70 gives enough to buy 2 (costs 56, leaves 14)
+    useGameStore.setState({ coins: 70 });
     const bought = useGameStore.getState().buyFood("biscuit", 2);
     expect(bought).toBe(true);
-    expect(useGameStore.getState().coins).toBe(10);
+    expect(useGameStore.getState().coins).toBe(14);
     expect(useGameStore.getState().foodInventory.biscuit).toBe(2);
 
-    // Cannot buy more when coins are insufficient
+    // Cannot buy more when coins are insufficient (14 < 28)
     expect(useGameStore.getState().buyFood("biscuit", 1)).toBe(false);
 
     // Consuming food decrements stock until empty
@@ -79,30 +80,31 @@ describe("Economy, Mining & Shop System", () => {
   it("purchases permanent toys only once", () => {
     useGameStore.setState({ coins: 200 });
 
-    // Bubble blower costs 90 coins
+    // Bubble blower costs 130 coins
     expect(useGameStore.getState().buyToy("bubble-blower")).toBe(true);
-    expect(useGameStore.getState().coins).toBe(110);
+    expect(useGameStore.getState().coins).toBe(70);
     expect(useGameStore.getState().ownedToys).toContain("bubble-blower");
 
     // Purchasing again does nothing and costs 0
     expect(useGameStore.getState().buyToy("bubble-blower")).toBe(false);
-    expect(useGameStore.getState().coins).toBe(110);
+    expect(useGameStore.getState().coins).toBe(70);
   });
 
   it("upgrades pickaxe sequentially when player has enough coins", () => {
-    // Lv.2 costs 80 coins; starting with 50 should fail
+    // Lv.2 costs 120 coins; starting with 50 should fail
     expect(useGameStore.getState().upgradePickaxe()).toBe(false);
     expect(useGameStore.getState().pickaxeLevel).toBe(1);
 
-    useGameStore.setState({ coins: 300 });
+    useGameStore.setState({ coins: 400 });
+    // Lv.2 costs 120 coins
     expect(useGameStore.getState().upgradePickaxe()).toBe(true);
     expect(useGameStore.getState().pickaxeLevel).toBe(2);
-    expect(useGameStore.getState().coins).toBe(220);
+    expect(useGameStore.getState().coins).toBe(280);
 
-    // Lv.3 costs 180 coins
+    // Lv.3 costs 260 coins
     expect(useGameStore.getState().upgradePickaxe()).toBe(true);
     expect(useGameStore.getState().pickaxeLevel).toBe(3);
-    expect(useGameStore.getState().coins).toBe(40);
+    expect(useGameStore.getState().coins).toBe(20);
   });
 
   it("unlocks and equips collection skins persistently using mined crystals without charging coins", () => {
