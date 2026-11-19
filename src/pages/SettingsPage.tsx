@@ -19,7 +19,11 @@ import {
   Bot,
   Key,
 } from "lucide-react";
-import { getGeminiApiKey, setGeminiApiKey } from "../services/geminiService";
+import {
+  setGeminiApiKey,
+  getGeminiKeySource,
+  getCustomGeminiApiKey,
+} from "../services/geminiService";
 
 export const SettingsPage: React.FC = () => {
   const { name } = usePetStore();
@@ -28,8 +32,9 @@ export const SettingsPage: React.FC = () => {
   const [savedSuccess, setSavedSuccess] = useState(false);
   const [confirmingReset, setConfirmingReset] = useState(false);
 
-  const [geminiKeyInput, setGeminiKeyInput] = useState(() => getGeminiApiKey() || "");
+  const [geminiKeyInput, setGeminiKeyInput] = useState(() => getCustomGeminiApiKey());
   const [geminiSavedSuccess, setGeminiSavedSuccess] = useState(false);
+  const [keySource, setKeySource] = useState(() => getGeminiKeySource());
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const savedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -45,10 +50,11 @@ export const SettingsPage: React.FC = () => {
   const handleSaveGeminiKey = (e: React.FormEvent) => {
     e.preventDefault();
     setGeminiApiKey(geminiKeyInput);
+    setKeySource(getGeminiKeySource());
     setGeminiSavedSuccess(true);
     soundEffects.playSuccess();
     showToast(
-      geminiKeyInput.trim() ? "API Key Gemini tersimpan" : "API Key Gemini dihapus",
+      geminiKeyInput.trim() ? "Kunci pribadi tersimpan" : "Kunci pribadi dihapus (pakai bawaan jika ada)",
       "success"
     );
     if (geminiTimerRef.current) clearTimeout(geminiTimerRef.current);
@@ -189,13 +195,25 @@ export const SettingsPage: React.FC = () => {
               <Bot size={13} strokeWidth={2.5} className="text-juro-orange" />
               <span>Gemini AI Pet Chat</span>
             </h2>
-            <span className="pixel-text text-[8px] sm:text-[9px] text-neutral-500 uppercase">
-              {geminiKeyInput.trim() ? "Kunci Terpasang" : "Mode Standar / Offline"}
+            <span
+              className={`pixel-text text-[8px] sm:text-[9px] uppercase font-bold ${
+                keySource === "custom"
+                  ? "text-emerald-600 dark:text-emerald-400"
+                  : keySource === "env"
+                  ? "text-juro-orange"
+                  : "text-neutral-500"
+              }`}
+            >
+              {keySource === "custom"
+                ? "Kunci Pribadi Aktif"
+                : keySource === "env"
+                ? "Kunci Bawaan Web Aktif (Semua Pengunjung Bisa Chat)"
+                : "Mode Standar / Offline"}
             </span>
           </div>
 
           <p className="pixel-text text-[8px] sm:text-[9px] text-neutral-600 dark:text-neutral-400 leading-relaxed">
-            Masukkan Google Gemini API Key agar Juro bisa membalas obrolanmu secara cerdas menggunakan model Gemini 2.5 Flash. Kunci disimpan lokal di browser.
+            Agar <strong>semua pengunjung web</strong> bisa langsung ngobrol dengan Juro tanpa memasukkan kunci, isi <code className="px-1 py-0.5 bg-neutral-200 dark:bg-neutral-800 text-charcoal dark:text-neutral-200 font-mono">VITE_GEMINI_API_KEY</code> di file <code className="px-1 py-0.5 bg-neutral-200 dark:bg-neutral-800 text-charcoal dark:text-neutral-200 font-mono">.env.local</code> atau di Pengaturan Environment Variables hosting (Vercel). Anda juga bisa memasukkan kunci pribadi di bawah ini untuk menimpanya khusus di browser ini.
           </p>
 
           <form onSubmit={handleSaveGeminiKey} className="flex flex-col sm:flex-row sm:items-end gap-2.5">
@@ -205,7 +223,7 @@ export const SettingsPage: React.FC = () => {
                 value={geminiKeyInput}
                 onChange={(e) => setGeminiKeyInput(e.target.value)}
                 onClear={() => setGeminiKeyInput("")}
-                placeholder="AIzaSy..."
+                placeholder={keySource === "env" ? "Menimpa kunci bawaan web (opsional)..." : "AIzaSy..."}
                 isSuccess={geminiSavedSuccess}
               />
             </div>

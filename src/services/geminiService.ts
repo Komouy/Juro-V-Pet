@@ -30,7 +30,8 @@ export const JURO_FALLBACK_REPLIES = [
 ];
 
 /**
- * Retrieve the Gemini API key from localStorage or Vite environment variable
+ * Retrieve the active Gemini API key:
+ * Prioritizes user's custom personal key (localStorage), then falls back to global site key (import.meta.env.VITE_GEMINI_API_KEY)
  */
 export function getGeminiApiKey(): string | null {
   try {
@@ -42,13 +43,48 @@ export function getGeminiApiKey(): string | null {
     // LocalStorage unavailable (e.g. sandboxed test)
   }
 
-  // Fallback to Vite environment variable
-  const fromEnv = (import.meta as unknown as { env?: { VITE_GEMINI_API_KEY?: string } }).env?.VITE_GEMINI_API_KEY;
+  // Fallback to Vite environment variable (literal for build-time replacement by Vite)
+  const fromEnv = import.meta.env.VITE_GEMINI_API_KEY;
   if (fromEnv && fromEnv.trim().length > 0) {
     return fromEnv.trim();
   }
 
   return null;
+}
+
+/**
+ * Determine the source of the active Gemini API key:
+ * - "custom": personal key stored in this browser's localStorage
+ * - "env": global site key provided via VITE_GEMINI_API_KEY in .env / Vercel
+ * - "none": no key set, running in offline/default fallback mode
+ */
+export function getGeminiKeySource(): "custom" | "env" | "none" {
+  try {
+    const fromStorage = localStorage.getItem(STORAGE_KEY);
+    if (fromStorage && fromStorage.trim().length > 0) {
+      return "custom";
+    }
+  } catch {
+    // Ignored
+  }
+
+  const fromEnv = import.meta.env.VITE_GEMINI_API_KEY;
+  if (fromEnv && fromEnv.trim().length > 0) {
+    return "env";
+  }
+
+  return "none";
+}
+
+/**
+ * Retrieve only the user's custom personal key from localStorage
+ */
+export function getCustomGeminiApiKey(): string {
+  try {
+    return localStorage.getItem(STORAGE_KEY) || "";
+  } catch {
+    return "";
+  }
 }
 
 /**

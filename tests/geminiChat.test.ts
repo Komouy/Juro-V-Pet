@@ -5,6 +5,8 @@ import {
   sanitizeJuroReply,
   getGeminiApiKey,
   setGeminiApiKey,
+  getGeminiKeySource,
+  getCustomGeminiApiKey,
   chatWithJuro,
   JURO_FALLBACK_REPLIES,
 } from "../src/services/geminiService";
@@ -102,8 +104,13 @@ describe("Gemini AI Chat Service", () => {
   describe("API Key storage", () => {
     it("stores and retrieves the Gemini API key from localStorage", () => {
       expect(getGeminiApiKey()).toBeNull();
+      expect(getGeminiKeySource()).toBe("none");
+      expect(getCustomGeminiApiKey()).toBe("");
+
       setGeminiApiKey("AIzaSyTest12345");
       expect(getGeminiApiKey()).toBe("AIzaSyTest12345");
+      expect(getGeminiKeySource()).toBe("custom");
+      expect(getCustomGeminiApiKey()).toBe("AIzaSyTest12345");
     });
 
     it("removes the API key when set to empty string", () => {
@@ -111,6 +118,7 @@ describe("Gemini AI Chat Service", () => {
       expect(getGeminiApiKey()).toBe("AIzaSyTest12345");
       setGeminiApiKey("   ");
       expect(getGeminiApiKey()).toBeNull();
+      expect(getGeminiKeySource()).toBe("none");
     });
   });
 
