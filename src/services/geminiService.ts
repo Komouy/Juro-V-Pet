@@ -5,7 +5,7 @@
 
 import {
   addChatMessage,
-  extractMemoriesFromMessage,
+  handleMemoryCommands,
   getFormattedGeminiHistory,
   getPetMemories,
 } from "./petMemoryService";
@@ -408,9 +408,9 @@ export async function chatWithJuro(
     return "Bloop? Pemilikku mau ngomong apa nih ke Juro? Slimey~";
   }
 
-  // Record user message & extract facts into long-term memory
+  // Record user message & process autonomous memory adding/forgetting
   if (trimmedInput) {
-    extractMemoriesFromMessage(trimmedInput);
+    handleMemoryCommands(trimmedInput);
     addChatMessage("user", trimmedInput);
   }
 

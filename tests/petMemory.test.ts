@@ -9,6 +9,7 @@ import {
   removePetMemory,
   clearPetMemories,
   extractMemoriesFromMessage,
+  handleMemoryCommands,
   getFormattedGeminiHistory,
 } from "../src/services/petMemoryService";
 import { buildJuroSystemPrompt } from "../src/services/geminiService";
@@ -113,6 +114,47 @@ describe("Pet Memory & Conversation History Service", () => {
       const extracted = extractMemoriesFromMessage("ingat ya: Juro adalah slime paling lucu!");
       expect(extracted.length).toBe(1);
       expect(extracted[0].text).toBe("Juro adalah slime paling lucu");
+    });
+
+    it("automatically deletes memory when user asks to forget name", () => {
+      addPetMemory("Nama pemilik adalah Dhavi", "profile");
+      expect(getPetMemories().length).toBe(1);
+
+      const res = handleMemoryCommands("juro, tolong lupakan namaku ya");
+      expect(res.action).toBe("forgot");
+      expect(getPetMemories().some((m) => m.text.includes("Dhavi"))).toBe(false);
+    });
+
+    it("automatically deletes memory when user asks to forget a specific topic", () => {
+      addPetMemory("Pemilik menyukai memancing", "preference");
+      addPetMemory("Makanan favorit pemilik adalah stroberi", "preference");
+      expect(getPetMemories().length).toBe(2);
+
+      const res = handleMemoryCommands("lupakan tentang memancing");
+      expect(res.action).toBe("forgot");
+      expect(getPetMemories().length).toBe(1);
+      expect(getPetMemories()[0].text).toContain("stroberi");
+    });
+
+    it("automatically forgets recent memory when user says 'lupakan yang tadi'", () => {
+      addPetMemory("Fakta Lama");
+      addPetMemory("Fakta Baru");
+      expect(getPetMemories().length).toBe(2);
+
+      const res = handleMemoryCommands("eh lupakan yang tadi deh");
+      expect(res.action).toBe("forgot");
+      expect(getPetMemories().length).toBe(1);
+      expect(getPetMemories()[0].text).toBe("Fakta Lama");
+    });
+
+    it("automatically clears all memories when user says 'lupakan semuanya'", () => {
+      addPetMemory("Fakta 1");
+      addPetMemory("Fakta 2");
+      expect(getPetMemories().length).toBe(2);
+
+      const res = handleMemoryCommands("lupakan semuanya!");
+      expect(res.action).toBe("cleared");
+      expect(getPetMemories().length).toBe(0);
     });
   });
 

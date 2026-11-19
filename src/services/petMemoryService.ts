@@ -1,6 +1,8 @@
 /**
  * Pet Memory & Conversation History Service for Juro
- * Handles multi-turn chat history persistence and long-term remembered facts about the user.
+ * Handles multi-turn chat history persistence and autonomous AI-driven long-term memories.
+ * Automatically learns facts as conversations progress, and automatically removes/forgets
+ * memories when the user requests or expresses dislike.
  */
 
 export interface ChatMessage {
@@ -99,7 +101,6 @@ export function getFormattedGeminiHistory(
 
     // Gemini API requires strict role alternation
     if (formatted.length > 0 && formatted[formatted.length - 1].role === role) {
-      // Append text to the existing turn if same role repeated
       formatted[formatted.length - 1].parts[0].text += ` ${msg.text}`;
     } else {
       formatted.push({
@@ -183,6 +184,101 @@ export function clearPetMemories(): void {
 }
 
 /**
+ * Automatic Memory Controller:
+ * Automatically processes conversational requests to either REMOVE / FORGET memories
+ * or ADD new facts seamlessly during natural chats.
+ */
+export function handleMemoryCommands(userMessage: string): {
+  action: "added" | "forgot" | "cleared" | "none";
+  count?: number;
+} {
+  const text = userMessage.trim().toLowerCase();
+  if (!text) return { action: "none" };
+
+  // 1. Clear all memories request
+  if (
+    /^(?:lupakan\s+semuanya|lupakan\s+semua|hapus\s+semua\s+ingatan|hapus\s+semua\s+memori|reset\s+ingatan|reset\s+memori)(?:[.,!?]|$)/i.test(
+      text
+    )
+  ) {
+    clearPetMemories();
+    return { action: "cleared" };
+  }
+
+  // 2. Forget name: "lupakan namaku", "lupakan nama aku", "hapus namaku"
+  if (/(?:lupakan\s+namaku|lupakan\s+nama\s+aku|hapus\s+namaku)/i.test(text)) {
+    const current = getPetMemories();
+    const remaining = current.filter((m) => !/nama\s+pemilik/i.test(m.text));
+    const removedCount = current.length - remaining.length;
+    writeStorage(MEMORIES_STORAGE_KEY, remaining);
+    return { action: "forgot", count: removedCount };
+  }
+
+  // 3. Forget recent memory: "lupakan yang tadi", "jangan ingat yang tadi", "hapus yang barusan"
+  if (
+    /(?:lupakan|jangan\s+ingat|hapus).*?(?:yang\s+tadi|yang\s+barusan)/i.test(text) ||
+    /(?:yang\s+tadi|yang\s+barusan).*?(?:lupakan|jangan|hapus)/i.test(text)
+  ) {
+    const current = getPetMemories();
+    if (current.length > 0) {
+      writeStorage(MEMORIES_STORAGE_KEY, current.slice(1));
+      return { action: "forgot", count: 1 };
+    }
+    return { action: "none" };
+  }
+
+  // 4. Forget specific topic or item:
+  // "lupakan tentang X", "lupakan X", "jangan ingat tentang X", "jangan ingat X", "hapus ingatan tentang X"
+  const forgetMatch = text.match(
+    /(?:lupakan\s+tentang|lupakan|jangan\s+ingat\s+tentang|jangan\s+ingat|hapus\s+ingatan\s+tentang|hapus\s+ingatan|hapus\s+memori\s+tentang|hapus\s+memori)\s+([a-zA-Z0-9\s]+?)(?:[.,!?]|$)/i
+  );
+
+  if (forgetMatch && forgetMatch[1]) {
+    const rawTarget = forgetMatch[1]
+      .trim()
+      .replace(/\s+(?:deh|dong|ya|sih|lah|aja)$/i, "")
+      .trim();
+
+    if (rawTarget && !/^(semua|itu)$/i.test(rawTarget)) {
+      const current = getPetMemories();
+      const remaining = current.filter(
+        (m) => !m.text.toLowerCase().includes(rawTarget)
+      );
+      const removedCount = current.length - remaining.length;
+      if (removedCount > 0) {
+        writeStorage(MEMORIES_STORAGE_KEY, remaining);
+        return { action: "forgot", count: removedCount };
+      }
+    }
+  }
+
+  // 5. Dislike request: "aku gak suka kamu ingat X", "aku gak suka X diingat"
+  const dislikeMatch = text.match(
+    /(?:aku\s+(?:gak|tidak)\s+suka\s+kamu\s+ingat|jangan\s+sebut-sebut\s+lagi)\s+([a-zA-Z0-9\s]+?)(?:[.,!?]|$)/i
+  );
+  if (dislikeMatch && dislikeMatch[1]) {
+    const target = dislikeMatch[1].trim();
+    const current = getPetMemories();
+    const remaining = current.filter(
+      (m) => !m.text.toLowerCase().includes(target)
+    );
+    const removedCount = current.length - remaining.length;
+    if (removedCount > 0) {
+      writeStorage(MEMORIES_STORAGE_KEY, remaining);
+      return { action: "forgot", count: removedCount };
+    }
+  }
+
+  // 5. Otherwise, extract new memories from conversation
+  const added = extractMemoriesFromMessage(userMessage);
+  if (added.length > 0) {
+    return { action: "added", count: added.length };
+  }
+
+  return { action: "none" };
+}
+
+/**
  * Automatic Memory Extractor:
  * Analyzes the user's message for personal details (name, favorites, hobbies, moods)
  * and automatically saves them as remembered facts.
@@ -197,7 +293,7 @@ export function extractMemoriesFromMessage(userMessage: string): PetMemoryItem[]
   const nameMatch = text.match(/(?:namaku|nama\s+aku|panggil\s+aku)\s+([A-Za-z0-9_-]+)/i);
   if (nameMatch && nameMatch[1]) {
     const rawName = nameMatch[1].trim();
-    if (rawName.length > 1 && !/^(siapa|apa|ya|deh|nih|dong)$/i.test(rawName)) {
+    if (rawName.length > 1 && !/^(siapa|apa|ya|deh|nih|dong|lupa)$/i.test(rawName)) {
       const mem = addPetMemory(`Nama pemilik adalah ${rawName}`, "profile");
       if (mem) extracted.push(mem);
     }
@@ -217,14 +313,23 @@ export function extractMemoriesFromMessage(userMessage: string): PetMemoryItem[]
   const likeMatch = text.match(/(?:aku\s+suka|aku\s+menyukai|hobiku|hobi\s+aku)\s+(.+?)(?:[.,!?]|$)/i);
   if (likeMatch && likeMatch[1]) {
     const thing = likeMatch[1].trim();
-    // Exclude generic short phrases like "kamu", "juro"
     if (thing.length > 2 && !/^(kamu|juro|ini|itu)$/i.test(thing)) {
       const mem = addPetMemory(`Pemilik menyukai ${thing}`, "preference");
       if (mem) extracted.push(mem);
     }
   }
 
-  // 4. Explicit memory instruction: "ingat ya: X", "ingat ini: X"
+  // 4. Dislikes: "aku gak suka X", "aku tidak suka X", "aku benci X"
+  const hateMatch = text.match(/(?:aku\s+(?:gak|tidak)\s+suka|aku\s+benci)\s+(.+?)(?:[.,!?]|$)/i);
+  if (hateMatch && hateMatch[1]) {
+    const thing = hateMatch[1].trim();
+    if (thing.length > 2 && !/^(kamu|juro|ini|itu)$/i.test(thing)) {
+      const mem = addPetMemory(`Pemilik tidak menyukai ${thing}`, "preference");
+      if (mem) extracted.push(mem);
+    }
+  }
+
+  // 5. Explicit memory instruction: "ingat ya: X", "ingat ini: X"
   const explicitMatch = text.match(/(?:ingat\s+ya|ingat\s+ini|tolong\s+ingat)[:\s]+(.+?)(?:[.,!?]|$)/i);
   if (explicitMatch && explicitMatch[1]) {
     const fact = explicitMatch[1].trim();
