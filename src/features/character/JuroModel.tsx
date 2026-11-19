@@ -515,10 +515,11 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
     };
   }, [sleepZTexture, softShadowTexture, dizzyEyeTexture, dizzyMouthTexture, dizzyStarTexture]);
 
-  // 3D Spring oscillator for realistic gelatin physics (resting on valley terrain or cozy bed)
+  // 3D Spring oscillator for realistic gelatin physics (persists across all behavior states)
   const spring = useMemo(() => {
     const isNight = isBedtimeHour(new Date());
-    if (isNight || storeState === "sleep") {
+    const initialSleep = isNight || usePetStore.getState().currentState === "sleep";
+    if (initialSleep) {
       const bedGroundY = getTerrainHeightAt(JURO_BED_POS.x, JURO_BED_POS.z);
       return new SpringOscillator3D(
         new THREE.Vector3(JURO_BED_POS.x, bedGroundY + BODY_BOTTOM_OFFSET, JURO_BED_POS.z),
@@ -534,7 +535,7 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
       damping: 10,
       mass: 1,
     });
-  }, [storeState]);
+  }, []);
 
   // Parabolic jump-up / hop-down state when climbing hills, bridges & stumps
   const jumpRef = useRef({
@@ -1541,10 +1542,14 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
       <group
         ref={groupRef}
         position={[0, -0.1, 0]}
+        onPointerDown={(e) => {
+          e.stopPropagation();
+        }}
         onClick={(e) => {
           e.stopPropagation();
           if (isDragging || isGrabActive) return;
           if (fsm.currentState === "wander") {
+            jumpRef.current.active = false;
             fsm.transitionTo("idle", true);
             setBehaviorState("idle");
           }
