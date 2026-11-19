@@ -14,11 +14,13 @@ import {
 describe("Gemini AI Chat Service", () => {
   beforeEach(() => {
     localStorage.clear();
+    vi.stubEnv("VITE_GEMINI_API_KEY", "");
     vi.restoreAllMocks();
   });
 
   afterEach(() => {
     localStorage.clear();
+    vi.unstubAllEnvs();
     vi.restoreAllMocks();
   });
 
@@ -102,6 +104,12 @@ describe("Gemini AI Chat Service", () => {
   });
 
   describe("API Key storage", () => {
+    it("prioritizes VITE_GEMINI_API_KEY environment variable if defined", () => {
+      vi.stubEnv("VITE_GEMINI_API_KEY", "AQ.EnvKeyFromVercel");
+      expect(getGeminiApiKey()).toBe("AQ.EnvKeyFromVercel");
+      expect(getGeminiKeySource()).toBe("env");
+    });
+
     it("stores and retrieves the Gemini API key from localStorage", () => {
       expect(getGeminiApiKey()).toBeNull();
       expect(getGeminiKeySource()).toBe("none");

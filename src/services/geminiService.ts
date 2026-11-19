@@ -16,7 +16,7 @@ export interface PetChatContext {
 }
 
 const STORAGE_KEY = "juro_gemini_api_key";
-const GEMINI_MODEL = "gemini-2.5-flash";
+const GEMINI_MODEL = "gemini-3.5-flash-lite";
 
 // Canned in-character witty fallbacks when offline or before API key is provided
 export const JURO_FALLBACK_REPLIES = [

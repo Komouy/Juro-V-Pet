@@ -16,14 +16,7 @@ import {
   Upload,
   Database,
   Settings,
-  Bot,
-  Key,
 } from "lucide-react";
-import {
-  setGeminiApiKey,
-  getGeminiKeySource,
-  getCustomGeminiApiKey,
-} from "../services/geminiService";
 
 export const SettingsPage: React.FC = () => {
   const { name } = usePetStore();
@@ -32,37 +25,14 @@ export const SettingsPage: React.FC = () => {
   const [savedSuccess, setSavedSuccess] = useState(false);
   const [confirmingReset, setConfirmingReset] = useState(false);
 
-  const [geminiKeyInput, setGeminiKeyInput] = useState(() => getCustomGeminiApiKey());
-  const [geminiSavedSuccess, setGeminiSavedSuccess] = useState(false);
-  const [keySource, setKeySource] = useState(() => getGeminiKeySource());
-
   const fileInputRef = useRef<HTMLInputElement>(null);
   const savedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const geminiTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     return () => {
       if (savedTimerRef.current) clearTimeout(savedTimerRef.current);
-      if (geminiTimerRef.current) clearTimeout(geminiTimerRef.current);
     };
   }, []);
-
-  const handleSaveGeminiKey = (e: React.FormEvent) => {
-    e.preventDefault();
-    setGeminiApiKey(geminiKeyInput);
-    setKeySource(getGeminiKeySource());
-    setGeminiSavedSuccess(true);
-    soundEffects.playSuccess();
-    showToast(
-      geminiKeyInput.trim() ? "Kunci pribadi tersimpan" : "Kunci pribadi dihapus (pakai bawaan jika ada)",
-      "success"
-    );
-    if (geminiTimerRef.current) clearTimeout(geminiTimerRef.current);
-    geminiTimerRef.current = setTimeout(() => {
-      setGeminiSavedSuccess(false);
-      geminiTimerRef.current = null;
-    }, 2200);
-  };
 
   const petNameInput = draftName ?? name;
   const trimmedName = petNameInput.trim();
@@ -188,54 +158,6 @@ export const SettingsPage: React.FC = () => {
           </div>
         </Card>
 
-        {/* Gemini AI Settings */}
-        <Card shadowOffset="sm" className="p-4 md:col-span-2 space-y-3">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <h2 className="pixel-text text-[11px] text-charcoal dark:text-white uppercase flex items-center gap-2">
-              <Bot size={13} strokeWidth={2.5} className="text-juro-orange" />
-              <span>Gemini AI Pet Chat</span>
-            </h2>
-            <span
-              className={`pixel-text text-[8px] sm:text-[9px] uppercase font-bold ${
-                keySource === "custom"
-                  ? "text-emerald-600 dark:text-emerald-400"
-                  : keySource === "env"
-                  ? "text-juro-orange"
-                  : "text-neutral-500"
-              }`}
-            >
-              {keySource === "custom"
-                ? "Kunci Pribadi Aktif"
-                : keySource === "env"
-                ? "Kunci Bawaan Web Aktif (Semua Pengunjung Bisa Chat)"
-                : "Mode Standar / Offline"}
-            </span>
-          </div>
-
-          <p className="pixel-text text-[8px] sm:text-[9px] text-neutral-600 dark:text-neutral-400 leading-relaxed">
-            Agar <strong>semua pengunjung web</strong> selalu bisa langsung ngobrol dengan Juro tanpa perlu memasukkan kunci, isi <code className="px-1 py-0.5 bg-neutral-200 dark:bg-neutral-800 text-charcoal dark:text-neutral-200 font-mono">VITE_GEMINI_API_KEY</code> di file <code className="px-1 py-0.5 bg-neutral-200 dark:bg-neutral-800 text-charcoal dark:text-neutral-200 font-mono">.env.local</code> atau di Pengaturan Environment Variables hosting (Vercel). Kunci dapat berawalan <code className="font-mono">AQ...</code> atau <code className="font-mono">AIzaSy...</code>.
-          </p>
-
-          <form onSubmit={handleSaveGeminiKey} className="flex flex-col sm:flex-row sm:items-end gap-2.5">
-            <div className="flex-1">
-              <PixelInput
-                type="password"
-                value={geminiKeyInput}
-                onChange={(e) => setGeminiKeyInput(e.target.value)}
-                onClear={() => setGeminiKeyInput("")}
-                placeholder={keySource === "env" ? "Kunci bawaan web aktif (selalu dipakai)" : "AQ... atau AIzaSy..."}
-                isSuccess={geminiSavedSuccess}
-              />
-            </div>
-            <Button
-              label={geminiSavedSuccess ? "Tersimpan" : "Simpan Kunci"}
-              icon={geminiSavedSuccess ? Check : Key}
-              size="sm"
-              variant="primary"
-              type="submit"
-            />
-          </form>
-        </Card>
 
         {/* Backup & Reset */}
         <Card shadowOffset="sm" className="p-4 md:col-span-2 space-y-4">
