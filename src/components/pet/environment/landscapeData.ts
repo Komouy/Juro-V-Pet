@@ -446,3 +446,108 @@ export function generateWaterShimmersData() {
     { pos: [2.45, -0.902, -0.68] as [number, number, number], width: 0.24, phase: 5.5 },
   ];
 }
+
+// 12. Magical Glowing Night Fireflies (Kunang-Kunang Berpendar) across grassy meadows, banks & knolls
+export interface FireflyItem {
+  base: [number, number, number];
+  radius: number;
+  speed: number;
+  phase: number;
+  pulseSpeed: number;
+  pulsePhase: number;
+  color: string;
+}
+
+export function generateFirefliesData(): FireflyItem[] {
+  return [
+    // Near pond reeds & pond bank
+    { base: [2.2, BASE_GROUND_Y + 0.38, -0.65], radius: 0.42, speed: 0.95, phase: 0.2, pulseSpeed: 2.4, pulsePhase: 0.1, color: "#FEF08A" },
+    { base: [2.8, BASE_GROUND_Y + 0.45, -1.35], radius: 0.48, speed: 1.15, phase: 1.8, pulseSpeed: 2.8, pulsePhase: 1.2, color: "#A3E635" },
+    { base: [1.8, BASE_GROUND_Y + 0.32, -1.05], radius: 0.38, speed: 0.85, phase: 3.4, pulseSpeed: 2.1, pulsePhase: 2.5, color: "#FACC15" },
+    { base: [3.1, BASE_GROUND_Y + 0.42, -0.75], radius: 0.45, speed: 1.05, phase: 4.6, pulseSpeed: 2.6, pulsePhase: 3.8, color: "#FEF08A" },
+
+    // Grassy central meadow valley
+    { base: [-0.6, BASE_GROUND_Y + 0.35, 0.45], radius: 0.55, speed: 0.9, phase: 0.7, pulseSpeed: 2.2, pulsePhase: 0.5, color: "#A3E635" },
+    { base: [0.75, BASE_GROUND_Y + 0.32, -0.25], radius: 0.45, speed: 1.2, phase: 2.3, pulseSpeed: 3.0, pulsePhase: 1.9, color: "#FACC15" },
+    { base: [-1.25, BASE_GROUND_Y + 0.4, 0.95], radius: 0.52, speed: 0.8, phase: 3.9, pulseSpeed: 2.0, pulsePhase: 2.8, color: "#FEF08A" },
+    { base: [0.25, BASE_GROUND_Y + 0.36, 1.25], radius: 0.46, speed: 1.0, phase: 5.1, pulseSpeed: 2.5, pulsePhase: 4.2, color: "#A3E635" },
+    { base: [-0.2, BASE_GROUND_Y + 0.42, -1.2], radius: 0.4, speed: 1.1, phase: 1.3, pulseSpeed: 2.7, pulsePhase: 0.9, color: "#FACC15" },
+
+    // West Knoll slope & near sofa bed
+    { base: [-2.4, BASE_GROUND_Y + 0.46, 0.35], radius: 0.5, speed: 0.95, phase: 2.7, pulseSpeed: 2.3, pulsePhase: 1.7, color: "#FEF08A" },
+    { base: [-3.1, BASE_GROUND_Y + 0.62, -0.1], radius: 0.42, speed: 0.75, phase: 4.1, pulseSpeed: 1.9, pulsePhase: 3.1, color: "#A3E635" },
+    { base: [-2.0, BASE_GROUND_Y + 0.38, -0.8], radius: 0.48, speed: 1.05, phase: 0.5, pulseSpeed: 2.8, pulsePhase: 4.5, color: "#FACC15" },
+    { base: [-3.6, BASE_GROUND_Y + 0.68, 0.55], radius: 0.38, speed: 0.88, phase: 5.5, pulseSpeed: 2.1, pulsePhase: 0.3, color: "#FEF08A" },
+
+    // East Knoll & Wooden Bench
+    { base: [2.35, BASE_GROUND_Y + 0.45, 0.75], radius: 0.46, speed: 1.0, phase: 1.5, pulseSpeed: 2.4, pulsePhase: 2.1, color: "#A3E635" },
+    { base: [3.2, BASE_GROUND_Y + 0.58, 0.2], radius: 0.4, speed: 0.85, phase: 3.1, pulseSpeed: 2.0, pulsePhase: 3.5, color: "#FEF08A" },
+    { base: [1.85, BASE_GROUND_Y + 0.36, 1.45], radius: 0.52, speed: 1.1, phase: 4.7, pulseSpeed: 2.9, pulsePhase: 1.0, color: "#FACC15" },
+
+    // Near brook banks & wooden bridge
+    { base: [-1.65, BASE_GROUND_Y + 0.32, -2.1], radius: 0.44, speed: 0.92, phase: 0.9, pulseSpeed: 2.2, pulsePhase: 0.6, color: "#FEF08A" },
+    { base: [0.85, BASE_GROUND_Y + 0.34, -1.85], radius: 0.42, speed: 1.08, phase: 2.5, pulseSpeed: 2.6, pulsePhase: 2.3, color: "#A3E635" },
+    { base: [-0.45, BASE_GROUND_Y + 0.38, -2.85], radius: 0.38, speed: 0.82, phase: 3.7, pulseSpeed: 2.0, pulsePhase: 3.9, color: "#FACC15" },
+
+    // Forest borders
+    { base: [-3.8, BASE_GROUND_Y + 0.36, -1.8], radius: 0.48, speed: 0.95, phase: 1.1, pulseSpeed: 2.4, pulsePhase: 1.4, color: "#FEF08A" },
+    { base: [3.6, BASE_GROUND_Y + 0.38, -1.9], radius: 0.45, speed: 1.02, phase: 2.9, pulseSpeed: 2.5, pulsePhase: 2.7, color: "#A3E635" },
+    { base: [-1.7, BASE_GROUND_Y + 0.35, 1.6], radius: 0.5, speed: 0.88, phase: 4.3, pulseSpeed: 2.1, pulsePhase: 4.0, color: "#FACC15" },
+  ];
+}
+
+// 13. Dynamic Pixel Rain Streaks (Rintik Hujan Pixel Vertikal)
+export interface PixelRainStreak {
+  x: number;
+  z: number;
+  speed: number;
+  offset: number;
+  height: number;
+}
+
+export function generatePixelRainData(): PixelRainStreak[] {
+  const list: PixelRainStreak[] = [];
+  const count = 150;
+  for (let i = 0; i < count; i++) {
+    const x = (seeded(i * 17 + 3) - 0.5) * 14.0;
+    const z = (seeded(i * 17 + 7) - 0.5) * 12.0;
+    const speed = 7.2 + seeded(i * 17 + 11) * 3.6;
+    const offset = seeded(i * 17 + 13) * 6.0;
+    const height = 0.22 + seeded(i * 17 + 19) * 0.12;
+    list.push({ x, z, speed, offset, height });
+  }
+  return list;
+}
+
+// 14. Water Ripples on River & Pond (Riak Air di Sungai & Kolam)
+export interface RiverRippleItem {
+  x: number;
+  z: number;
+  speed: number;
+  phase: number;
+  maxRadius: number;
+}
+
+export function generateRiverRipplesData(): RiverRippleItem[] {
+  return [
+    // Winding brook ripples along the stream curve (avoiding dry rock ledge & wooden bridge)
+    { x: -5.2, z: -4.8, speed: 1.1, phase: 0.1, maxRadius: 0.32 },
+    { x: -4.4, z: -4.3, speed: 0.9, phase: 0.8, maxRadius: 0.36 },
+    { x: -3.7, z: -3.85, speed: 1.25, phase: 1.5, maxRadius: 0.34 },
+    { x: -3.0, z: -3.45, speed: 1.0, phase: 2.2, maxRadius: 0.38 },
+    { x: 0.25, z: -2.2, speed: 1.05, phase: 5.0, maxRadius: 0.34 },
+    { x: 0.6, z: -2.05, speed: 0.92, phase: 5.7, maxRadius: 0.35 },
+    { x: 1.15, z: -1.85, speed: 1.12, phase: 0.2, maxRadius: 0.33 },
+    { x: 1.55, z: -1.65, speed: 0.98, phase: 0.8, maxRadius: 0.35 },
+    { x: 1.9, z: -1.45, speed: 1.0, phase: 1.2, maxRadius: 0.34 },
+
+    // Lily pond ripples
+    { x: 2.45, z: -1.05, speed: 1.1, phase: 1.9, maxRadius: 0.42 },
+    { x: 2.15, z: -0.85, speed: 0.95, phase: 2.6, maxRadius: 0.35 },
+    { x: 2.75, z: -1.25, speed: 1.2, phase: 3.3, maxRadius: 0.38 },
+    { x: 2.3, z: -1.35, speed: 1.05, phase: 4.0, maxRadius: 0.34 },
+    { x: 2.8, z: -0.85, speed: 0.88, phase: 4.7, maxRadius: 0.36 },
+    { x: 1.95, z: -1.1, speed: 1.15, phase: 5.4, maxRadius: 0.32 },
+    { x: 2.6, z: -0.65, speed: 1.02, phase: 0.3, maxRadius: 0.35 },
+  ];
+}

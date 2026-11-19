@@ -432,6 +432,67 @@ class SoundSystem {
     }
   }
 
+  // Cozy weather atmosphere change chime
+  playWeatherChange(isRain: boolean) {
+    if (!this.isEnabled()) return;
+    const ctx = this.initCtx();
+    if (!ctx) return;
+
+    try {
+      const now = ctx.currentTime;
+      // Rain: soothing descending water-drop tones; Clear: cheerful ascending melody
+      const notes = isRain ? [880, 784, 587.33] : [587.33, 784, 987.77];
+
+      notes.forEach((freq, i) => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+
+        osc.type = "sine";
+        osc.frequency.setValueAtTime(freq, now + i * 0.08);
+
+        gain.gain.setValueAtTime(0.12, now + i * 0.08);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + i * 0.08 + 0.28);
+
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+
+        osc.start(now + i * 0.08);
+        osc.stop(now + i * 0.08 + 0.3);
+      });
+    } catch {
+      // Audio safety
+    }
+  }
+
+  // Gentle raindrop water plop sound
+  playRainDrop() {
+    if (!this.isEnabled()) return;
+    const ctx = this.initCtx();
+    if (!ctx) return;
+
+    try {
+      const now = ctx.currentTime;
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+
+      osc.type = "sine";
+      const baseFreq = 950 + Math.random() * 350;
+      osc.frequency.setValueAtTime(baseFreq, now);
+      osc.frequency.exponentialRampToValueAtTime(320, now + 0.08);
+
+      gain.gain.setValueAtTime(0.06, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.09);
+
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+
+      osc.start(now);
+      osc.stop(now + 0.1);
+    } catch {
+      // Audio safety
+    }
+  }
+
   // === 3. GENERAL UI & NAVIGATION SOUNDS ===
 
   // Crisp subtle UI button click

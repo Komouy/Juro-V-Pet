@@ -7,6 +7,9 @@ import { PetSofaBed } from "./environment/PetSofaBed";
 import { ParkBench } from "./environment/ParkBench";
 import { ShopBuildingLandmark } from "./environment/ShopBuildingLandmark";
 import { MineCaveLandmark } from "./environment/MineCaveLandmark";
+import { PixelRain } from "./environment/PixelRain";
+import { NightFireflies } from "./environment/NightFireflies";
+import type { WeatherMode } from "../../types/ui";
 import {
   createSignTexture,
   createOrganicPondShape,
@@ -28,6 +31,7 @@ import {
 
 interface OutdoorEnvironmentProps {
   theme: TimeThemeConfig;
+  weather?: WeatherMode;
   onWalkPointSelect?: (x: number, z: number) => void;
   onOpenShop?: () => void;
   onOpenMine?: () => void;
@@ -39,7 +43,7 @@ const _dummy = new THREE.Object3D();
 const _color = new THREE.Color();
 
 export const OutdoorEnvironment: React.FC<OutdoorEnvironmentProps> = React.memo(
-  ({ theme, onWalkPointSelect, onOpenShop, onOpenMine, onBedClick }) => {
+  ({ theme, weather = "clear", onWalkPointSelect, onOpenShop, onOpenMine, onBedClick }) => {
     const [hoveredLandmark, setHoveredLandmark] = useState<"none" | "shop" | "mine" | "bed">("none");
 
     // Signboard textures for interactive 3D Shop ("TOKO") & Mine Cave ("TAMBANG")
@@ -426,6 +430,8 @@ export const OutdoorEnvironment: React.FC<OutdoorEnvironmentProps> = React.memo(
     const woodColor = theme.isNight ? "#451A03" : "#92400E";
     const woodDarkColor = theme.isNight ? "#2D1002" : "#78350F";
     const cliffSoilColor = theme.isNight ? "#3B2618" : "#8D6E63";
+    const cloudColor = weather === "rain" ? (theme.isNight ? "#1E293B" : "#94A3B8") : theme.cloudColor;
+    const cloudOpacity = weather === "rain" ? Math.min(0.98, theme.cloudOpacity + 0.12) : theme.cloudOpacity;
 
     return (
       <group>
@@ -458,6 +464,12 @@ export const OutdoorEnvironment: React.FC<OutdoorEnvironmentProps> = React.memo(
             <meshBasicMaterial color="#FFFFFF" />
           </instancedMesh>
         )}
+
+        {/* Luminous Meadow Fireflies (Kunang-Kunang Berpendar saat Malam) */}
+        <NightFireflies isNight={theme.isNight} />
+
+        {/* Dynamic Vertical Pixel Rain & River Water Ripples */}
+        <PixelRain isRaining={weather === "rain"} />
 
         {/* 3. Layered Distant Mountains & Rolling Green Horizon Hills */}
         <mesh position={[-3.8, -1.4, -10.5]} scale={[3.8, 2.4, 0.7]}>
@@ -522,18 +534,18 @@ export const OutdoorEnvironment: React.FC<OutdoorEnvironmentProps> = React.memo(
         {/* 6. Drifting Fluffy Clouds */}
         <group ref={cloudsGroupRef} position={[0, 1.9, -6.2]}>
           <group position={[-3.8, 0.35, 0]}>
-            <mesh><sphereGeometry args={[0.54, 12, 10]} /><meshBasicMaterial color={theme.cloudColor} transparent opacity={theme.cloudOpacity} /></mesh>
-            <mesh position={[0.44, -0.08, 0]}><sphereGeometry args={[0.4, 10, 8]} /><meshBasicMaterial color={theme.cloudColor} transparent opacity={theme.cloudOpacity} /></mesh>
-            <mesh position={[-0.44, -0.1, 0]}><sphereGeometry args={[0.36, 10, 8]} /><meshBasicMaterial color={theme.cloudColor} transparent opacity={theme.cloudOpacity} /></mesh>
+            <mesh><sphereGeometry args={[0.54, 12, 10]} /><meshBasicMaterial color={cloudColor} transparent opacity={cloudOpacity} /></mesh>
+            <mesh position={[0.44, -0.08, 0]}><sphereGeometry args={[0.4, 10, 8]} /><meshBasicMaterial color={cloudColor} transparent opacity={cloudOpacity} /></mesh>
+            <mesh position={[-0.44, -0.1, 0]}><sphereGeometry args={[0.36, 10, 8]} /><meshBasicMaterial color={cloudColor} transparent opacity={cloudOpacity} /></mesh>
           </group>
           <group position={[3.8, 0.68, -0.4]}>
-            <mesh><sphereGeometry args={[0.58, 12, 10]} /><meshBasicMaterial color={theme.cloudColor} transparent opacity={theme.cloudOpacity} /></mesh>
-            <mesh position={[0.5, -0.1, 0]}><sphereGeometry args={[0.44, 10, 8]} /><meshBasicMaterial color={theme.cloudColor} transparent opacity={theme.cloudOpacity} /></mesh>
-            <mesh position={[-0.48, -0.1, 0]}><sphereGeometry args={[0.4, 10, 8]} /><meshBasicMaterial color={theme.cloudColor} transparent opacity={theme.cloudOpacity} /></mesh>
+            <mesh><sphereGeometry args={[0.58, 12, 10]} /><meshBasicMaterial color={cloudColor} transparent opacity={cloudOpacity} /></mesh>
+            <mesh position={[0.5, -0.1, 0]}><sphereGeometry args={[0.44, 10, 8]} /><meshBasicMaterial color={cloudColor} transparent opacity={cloudOpacity} /></mesh>
+            <mesh position={[-0.48, -0.1, 0]}><sphereGeometry args={[0.4, 10, 8]} /><meshBasicMaterial color={cloudColor} transparent opacity={cloudOpacity} /></mesh>
           </group>
           <group position={[0.15, 1.15, -1.2]} scale={0.76}>
-            <mesh><sphereGeometry args={[0.48, 10, 8]} /><meshBasicMaterial color={theme.cloudColor} transparent opacity={theme.cloudOpacity * 0.85} /></mesh>
-            <mesh position={[0.38, -0.06, 0]}><sphereGeometry args={[0.34, 10, 8]} /><meshBasicMaterial color={theme.cloudColor} transparent opacity={theme.cloudOpacity * 0.85} /></mesh>
+            <mesh><sphereGeometry args={[0.48, 10, 8]} /><meshBasicMaterial color={cloudColor} transparent opacity={cloudOpacity * 0.85} /></mesh>
+            <mesh position={[0.38, -0.06, 0]}><sphereGeometry args={[0.34, 10, 8]} /><meshBasicMaterial color={cloudColor} transparent opacity={cloudOpacity * 0.85} /></mesh>
           </group>
         </group>
 

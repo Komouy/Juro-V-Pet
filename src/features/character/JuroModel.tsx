@@ -76,6 +76,7 @@ export interface JuroModelProps {
   isHeadingToBedRef?: React.RefObject<boolean>;
   onBedArrival?: () => void;
   isBlowingBubbles?: boolean;
+  isRaining?: boolean;
 }
 
 export const JuroModel: React.FC<JuroModelProps> = React.memo(({
@@ -89,6 +90,7 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
   isHeadingToBedRef,
   onBedArrival,
   isBlowingBubbles = false,
+  isRaining = false,
 }) => {
   const groupRef = useRef<THREE.Group>(null);
   const leftEyeRef = useRef<THREE.Group>(null);
@@ -100,6 +102,7 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
   const sleepMouthGroupRef = useRef<THREE.Group>(null);
   const sleepBubbleRef = useRef<THREE.Mesh>(null);
   const shadowRef = useRef<THREE.Mesh>(null);
+  const leafUmbrellaRef = useRef<THREE.Group>(null);
   const zzzGroupRef = useRef<THREE.Group>(null);
   const zSpriteRefs = useRef<(THREE.Sprite | null)[]>([]);
 
@@ -1806,6 +1809,17 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
       }
     }
 
+    // 9.5 Cute Leaf Umbrella Swaying & Bobbing in the Rain
+    if (leafUmbrellaRef.current) {
+      leafUmbrellaRef.current.visible = isRaining;
+      if (isRaining) {
+        const rainSway = Math.sin(t * 3.4) * 0.05 + Math.cos(t * 2.1) * 0.03;
+        leafUmbrellaRef.current.rotation.z = -0.06 + rainSway;
+        leafUmbrellaRef.current.rotation.x = 0.08 + Math.sin(t * 4.2) * 0.035;
+        leafUmbrellaRef.current.position.y = 0.52 + Math.sin(t * 3.6) * 0.015;
+      }
+    }
+
     // 10. 3D Soap Foam Bubbles Clinging to Juro (InstancedMesh)
     if (soapFoamInstRef.current) {
       soapFoamInstRef.current.visible = soapLevelNow > 0.01;
@@ -2363,6 +2377,73 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
                 />
               </sprite>
             ))}
+        </group>
+
+        {/* === 3D COZY LEAF PARASOL / UMBRELLA (Worn during Pixel Rain) === */}
+        <group
+          ref={leafUmbrellaRef}
+          visible={false}
+          position={[0.22, 0.52, 0.08]}
+        >
+          {/* Stem reaching up from right flank */}
+          <group position={[-0.04, -0.16, 0.02]} rotation={[0.12, 0, -0.28]}>
+            {/* Lower stalk */}
+            <mesh position={[0, 0.16, 0]}>
+              <cylinderGeometry args={[0.024, 0.028, 0.36, 7]} />
+              <meshLambertMaterial color="#15803D" />
+            </mesh>
+            {/* Upper arching stem */}
+            <mesh position={[0.04, 0.38, 0.02]} rotation={[0, 0, 0.36]}>
+              <cylinderGeometry args={[0.018, 0.024, 0.24, 7]} />
+              <meshLambertMaterial color="#166534" />
+            </mesh>
+          </group>
+
+          {/* Broad organic leaf canopy sheltering Juro's head */}
+          <group position={[0.04, 0.46, 0.05]} rotation={[0.22, 0.12, -0.22]}>
+            {/* Main leaf blade: gentle domed disc */}
+            <mesh scale={[1.45, 0.14, 1.7]}>
+              <sphereGeometry args={[0.36, 16, 12]} />
+              <meshStandardMaterial
+                color="#22C55E"
+                roughness={0.28}
+                metalness={0.06}
+              />
+            </mesh>
+            {/* Dark green leaf rim */}
+            <mesh scale={[1.5, 0.06, 1.76]}>
+              <sphereGeometry args={[0.355, 14, 10]} />
+              <meshBasicMaterial color="#16A34A" />
+            </mesh>
+            {/* Leaf central spine / vein */}
+            <mesh position={[0, 0.022, 0]} scale={[0.038, 0.038, 0.88]}>
+              <boxGeometry args={[1, 1, 1]} />
+              <meshLambertMaterial color="#15803D" />
+            </mesh>
+            {/* Left lateral leaf vein */}
+            <mesh position={[-0.15, 0.018, -0.06]} rotation={[0, 0.65, 0]} scale={[0.26, 0.024, 0.02]}>
+              <boxGeometry args={[1, 1, 1]} />
+              <meshLambertMaterial color="#166534" />
+            </mesh>
+            {/* Right lateral leaf vein */}
+            <mesh position={[0.15, 0.018, -0.06]} rotation={[0, -0.65, 0]} scale={[0.26, 0.024, 0.02]}>
+              <boxGeometry args={[1, 1, 1]} />
+              <meshLambertMaterial color="#166534" />
+            </mesh>
+            {/* Glistening rain dewdrop sitting on leaf tip */}
+            <mesh position={[0, 0.035, 0.5]}>
+              <sphereGeometry args={[0.042, 8, 8]} />
+              <meshStandardMaterial
+                color="#E0F2FE"
+                roughness={0.05}
+                metalness={0.2}
+                transparent
+                opacity={0.88}
+                emissive="#BAE6FD"
+                emissiveIntensity={0.25}
+              />
+            </mesh>
+          </group>
         </group>
 
         {/* === 3D SOAP FOAM BUBBLES CLINGING TO JURO (1 Draw Call) === */}

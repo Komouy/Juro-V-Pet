@@ -12,7 +12,7 @@ import {
 } from "../../features/character/JuroModel";
 import { OutdoorEnvironment } from "./OutdoorEnvironment";
 import { ItemIllustration } from "../items/ItemIllustration";
-import { HandHeart, Heart } from "lucide-react";
+import { HandHeart, Heart, CloudRain, Sun, Moon } from "lucide-react";
 import { usePetStore } from "../../stores/petStore";
 import { useGameStore } from "../../stores/gameStore";
 import { useUIStore } from "../../stores/uiStore";
@@ -753,6 +753,35 @@ export const PetViewport: React.FC = () => {
     setActiveTray("none");
   }, [currentState, wakeUp, addLog]);
 
+  const weather = useUIStore((s) => s.weather);
+  const toggleWeather = useUIStore((s) => s.toggleWeather);
+  const showToast = useUIStore((s) => s.showToast);
+
+  const handleToggleWeather = useCallback(() => {
+    const nextWeather = weather === "clear" ? "rain" : "clear";
+    soundEffects.playWeatherChange(nextWeather === "rain");
+    toggleWeather();
+    if (nextWeather === "rain") {
+      showToast("Cuaca berganti: Hujan Pixel!", "info");
+      addLog(
+        "interaction",
+        "Langit menurunkan rintik hujan pixel yang menyejukkan. Juro memakai daun kecil sebagai payung!"
+      );
+    } else {
+      showToast("Cuaca berganti: Cerah!", "info");
+      addLog("interaction", "Awan hujan berlalu, cuaca kembali cerah dan hangat.");
+    }
+  }, [weather, toggleWeather, showToast, addLog]);
+
+  // Gentle ambient raindrop sound while pixel rain is falling
+  useEffect(() => {
+    if (weather !== "rain") return;
+    const interval = setInterval(() => {
+      soundEffects.playRainDrop();
+    }, 2800);
+    return () => clearInterval(interval);
+  }, [weather]);
+
   // Circadian rhythm controller: sleep at 19:00 - 06:00, wake at 06:00
   const isNightSleep = isBedtimeHour(now);
   const prevHourRef = useRef<number>(now.getHours());
@@ -880,6 +909,39 @@ export const PetViewport: React.FC = () => {
         onToggleStatDetails={() => setShowStatDetails((prev) => !prev)}
       />
 
+      {/* Atmospheric Weather Indicator & Toggle Pill (Clear <-> Pixel Rain) */}
+      <div className="absolute top-3 right-3 z-20 pointer-events-auto">
+        <button
+          type="button"
+          onClick={handleToggleWeather}
+          aria-label={`Ganti cuaca (saat ini: ${weather === "rain" ? "Hujan Pixel" : "Cerah"})`}
+          className="h-9 inline-flex items-center gap-1.5 sm:gap-2 px-2.5 bg-warm-white/95 dark:bg-neutral-900/90 backdrop-blur-xs border-2 border-charcoal dark:border-neutral-600 shadow-[2px_2px_0px_#171717] dark:shadow-[2px_2px_0px_#000000] hover:border-juro-orange transition-all active:translate-x-[1px] active:translate-y-[1px] cursor-pointer"
+        >
+          {weather === "rain" ? (
+            <>
+              <CloudRain size={14} className="text-sky-500 animate-bounce shrink-0" />
+              <span className="pixel-text text-[9px] sm:text-[10px] font-bold text-sky-600 dark:text-sky-400 uppercase">
+                Hujan Pixel
+              </span>
+            </>
+          ) : activeTheme.isNight ? (
+            <>
+              <Moon size={14} className="text-amber-300 shrink-0" />
+              <span className="pixel-text text-[9px] sm:text-[10px] font-bold text-amber-500 dark:text-amber-300 uppercase">
+                Malam
+              </span>
+            </>
+          ) : (
+            <>
+              <Sun size={14} className="text-amber-500 shrink-0" />
+              <span className="pixel-text text-[9px] sm:text-[10px] font-bold text-amber-600 dark:text-amber-400 uppercase">
+                Cerah
+              </span>
+            </>
+          )}
+        </button>
+      </div>
+
       {/* 3D Canvas (Full Stage — Mobile-Optimized DPR & GPU Settings) */}
       <Canvas
         camera={{ position: [0, 1.95, 6.2], fov: 38 }}
@@ -927,6 +989,7 @@ export const PetViewport: React.FC = () => {
           {/* Outdoor Nature Environment (Memoized, Clickable Map, Interactive Shop & Mine Cave!) */}
           <OutdoorEnvironment
             theme={activeTheme}
+            weather={weather}
             onWalkPointSelect={handleWalkPointSelect}
             onOpenShop={handleOpenShopFromMap}
             onOpenMine={handleOpenMineFromMap}
@@ -944,6 +1007,7 @@ export const PetViewport: React.FC = () => {
             isPettingActive={isPettingActive}
             isHeadingToBedRef={isHeadingToBedRef}
             onBedArrival={handleBedArrival}
+            isRaining={weather === "rain"}
             isBlowingBubbles={
               dragVisual !== null &&
               dragVisual.moved &&
