@@ -211,28 +211,38 @@ export const ActionTray: React.FC<ActionTrayProps> = ({
             <button
               type="button"
               onPointerDown={(e) => onStartItemDrag({ kind: "soap" }, e)}
-              className="group min-w-0 p-2 bg-white dark:bg-neutral-800 border-2 shadow-[2px_2px_0px_#171717] hover:-translate-y-0.5 active:translate-x-[1px] active:translate-y-[1px] active:shadow-none transition-all cursor-grab active:cursor-grabbing flex flex-col items-center text-center gap-1.5 touch-none"
+              className="group min-w-0 p-2 bg-white dark:bg-neutral-800 border-2 border-charcoal dark:border-neutral-700 hover:border-sky-400 shadow-[2px_2px_0px_#171717] dark:shadow-[2px_2px_0px_#000000] hover:-translate-y-0.5 active:translate-x-[1px] active:translate-y-[1px] active:shadow-none transition-all cursor-grab active:cursor-grabbing flex flex-col items-center text-center gap-1.5 touch-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400"
             >
               <ItemIllustration id="soap-bar" size={38} />
-              <span className="pixel-text text-[9px] text-charcoal dark:text-white font-bold">
-                Sabun Busa
-              </span>
+              <div className="flex flex-col items-center">
+                <span className="pixel-text text-[9px] text-charcoal dark:text-white font-bold">
+                  Sabun Busa
+                </span>
+                <span className="pixel-text text-[8px] text-sky-600 dark:text-sky-400">
+                  Tarik ke Juro
+                </span>
+              </div>
             </button>
 
             {/* Tool 2: Ember Air */}
             <button
               type="button"
               onPointerDown={(e) => onStartItemDrag({ kind: "bucket" }, e)}
-              className={`group min-w-0 p-2 bg-white dark:bg-neutral-800 border-2 shadow-[2px_2px_0px_#171717] hover:-translate-y-0.5 active:translate-x-[1px] active:translate-y-[1px] active:shadow-none transition-all cursor-grab active:cursor-grabbing flex flex-col items-center text-center gap-1.5 touch-none ${
+              className={`group min-w-0 p-2 bg-white dark:bg-neutral-800 border-2 shadow-[2px_2px_0px_#171717] dark:shadow-[2px_2px_0px_#000000] hover:-translate-y-0.5 active:translate-x-[1px] active:translate-y-[1px] active:shadow-none transition-all cursor-grab active:cursor-grabbing flex flex-col items-center text-center gap-1.5 touch-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400 ${
                 soapBadgePercent >= 40
                   ? "border-sky-400 ring-2 ring-sky-400/40"
                   : "border-charcoal dark:border-neutral-700 hover:border-sky-400"
               }`}
             >
               <ItemIllustration id="water-bucket" size={38} />
-              <span className="pixel-text text-[9px] text-charcoal dark:text-white font-bold">
-                Ember Air
-              </span>
+              <div className="flex flex-col items-center">
+                <span className="pixel-text text-[9px] text-charcoal dark:text-white font-bold">
+                  Ember Air
+                </span>
+                <span className="pixel-text text-[8px] text-sky-600 dark:text-sky-400">
+                  {soapBadgePercent >= 40 ? "Bilas busa!" : "Siram air"}
+                </span>
+              </div>
             </button>
           </div>
         </div>

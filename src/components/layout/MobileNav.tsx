@@ -33,11 +33,13 @@ export const MobileNav: React.FC = () => {
             <Link
               key={path}
               to={path}
+              aria-label={label}
               onClick={() => {
                 if (!isActive) soundEffects.playTab();
               }}
               className={`
                 flex flex-col items-center justify-center flex-1 h-full py-1 transition-all select-none
+                focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-juro-orange focus-visible:ring-inset
                 ${
                   isActive
                     ? "text-juro-orange border-t-2 border-juro-orange -mt-[2px] font-bold"
@@ -46,7 +48,7 @@ export const MobileNav: React.FC = () => {
               `}
             >
               <span className="relative inline-flex">
-                <Icon size={18} strokeWidth={2.5} />
+                <Icon size={18} strokeWidth={isActive ? 2.8 : 2.2} />
                 {showDot && (
                   <span
                     className="absolute -top-0.5 -right-1 w-2 h-2 bg-sky-400 border border-charcoal"
@@ -54,7 +56,7 @@ export const MobileNav: React.FC = () => {
                   />
                 )}
               </span>
-              <span className="pixel-text text-[8px] uppercase tracking-tighter mt-1">
+              <span className="pixel-text text-[8.5px] uppercase tracking-tight mt-1">
                 {label}
               </span>
             </Link>

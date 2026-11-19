@@ -79,6 +79,7 @@ export const Navbar: React.FC = () => {
                 }}
                 className={`
                   relative pixel-text text-[11px] px-3 py-1.5 border-2 transition-all duration-75 select-none
+                  focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-juro-orange
                   ${
                     isActive
                       ? "bg-juro-orange text-white border-charcoal dark:border-neutral-600 shadow-[2px_2px_0px_#171717] dark:shadow-[2px_2px_0px_#000000]"

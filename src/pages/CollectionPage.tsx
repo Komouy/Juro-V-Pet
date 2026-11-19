@@ -4,14 +4,14 @@ import { Card } from "../components/ui/Card";
 import { Button } from "../components/ui/Button";
 import { Badge } from "../components/ui/Badge";
 import { ItemIllustration } from "../components/items/ItemIllustration";
-import { Check, Gem, Palette, Pickaxe } from "lucide-react";
+import { Check, Coins, Gem, Palette, Pickaxe } from "lucide-react";
 import { useGameStore } from "../stores/gameStore";
 import { useUIStore } from "../stores/uiStore";
 import { SKIN_CATALOG, getCrystalById } from "../data/economyCatalog";
 import { soundEffects } from "../engine/audio/soundEffects";
 
 export const CollectionPage: React.FC = () => {
-  const { crystals, unlockedSkins, activeSkin, unlockSkin, equipSkin, addLog } = useGameStore();
+  const { coins, crystals, unlockedSkins, activeSkin, unlockSkin, equipSkin, addLog } = useGameStore();
   const showToast = useUIStore((s) => s.showToast);
 
   const handleEquip = (skinId: string, name: string) => {
@@ -42,6 +42,15 @@ export const CollectionPage: React.FC = () => {
         </h1>
 
         <div className="flex items-center gap-1.5 sm:gap-2">
+          <div
+            title="Koin"
+            className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-white dark:bg-dark-surface border-2 border-charcoal dark:border-neutral-600 shadow-[2px_2px_0px_#171717] dark:shadow-[2px_2px_0px_#000000]"
+          >
+            <Coins size={13} strokeWidth={2.5} className="text-amber-500" />
+            <span className="pixel-text text-[10px] font-bold text-charcoal dark:text-white">
+              {coins}
+            </span>
+          </div>
           <div
             title="Kristal Zamrud"
             className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-white dark:bg-dark-surface border-2 border-charcoal dark:border-neutral-600 shadow-[2px_2px_0px_#171717] dark:shadow-[2px_2px_0px_#000000]"

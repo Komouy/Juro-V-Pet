@@ -1132,7 +1132,7 @@ export const PetViewport: React.FC = () => {
           type="button"
           onClick={handleToggleWeather}
           aria-label={`Ganti cuaca (saat ini: ${weather === "rain" ? "Hujan" : "Cerah"})`}
-          className="h-9 inline-flex items-center gap-1.5 sm:gap-2 px-2.5 bg-warm-white/95 dark:bg-neutral-900/90 backdrop-blur-xs border-2 border-charcoal dark:border-neutral-600 shadow-[2px_2px_0px_#171717] dark:shadow-[2px_2px_0px_#000000] hover:border-juro-orange transition-all active:translate-x-[1px] active:translate-y-[1px] cursor-pointer"
+          className="h-10 inline-flex items-center gap-1.5 sm:gap-2 px-3 bg-warm-white/95 dark:bg-neutral-900/90 backdrop-blur-xs border-2 border-charcoal dark:border-neutral-600 shadow-[2px_2px_0px_#171717] dark:shadow-[2px_2px_0px_#000000] hover:border-juro-orange transition-all active:translate-x-[1px] active:translate-y-[1px] cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-juro-orange"
         >
           {weather === "rain" ? (
             <>
@@ -1324,9 +1324,9 @@ export const PetViewport: React.FC = () => {
         petName={name}
       />
 
-      {/* Floating Petting Guide Pill when Petting Mode is active */}
+      {/* Floating Petting Guide Pill when Petting Mode is active (Positioned above MobileNav on mobile) */}
       {isPettingActive && (
-        <div className="animate-tray-enter fixed sm:absolute bottom-6 inset-x-0 mx-auto w-fit z-30 flex items-center gap-2 px-3 py-1.5 bg-warm-white/95 dark:bg-neutral-900/95 border-2 border-charcoal dark:border-neutral-600 shadow-[3px_3px_0px_#171717] dark:shadow-[3px_3px_0px_#000000]">
+        <div className="animate-tray-enter fixed sm:absolute bottom-18 md:bottom-6 inset-x-0 mx-auto w-fit z-30 flex items-center gap-2 px-3 py-1.5 bg-warm-white/95 dark:bg-neutral-900/95 border-2 border-charcoal dark:border-neutral-600 shadow-[3px_3px_0px_#171717] dark:shadow-[3px_3px_0px_#000000]">
           <HandHeart size={14} className="text-rose-500 animate-pulse shrink-0" />
           <span className="pixel-text text-[9px] sm:text-[10px] uppercase font-bold text-charcoal dark:text-white flex items-center gap-1.5">
             Elus Tubuh Juro

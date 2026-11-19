@@ -67,9 +67,9 @@ export const JuroContextMenu: React.FC<JuroContextMenuProps> = ({
         {/* AI Chat Input Box atop the 5 action buttons */}
         <form
           onSubmit={handleChatSubmit}
-          className="flex items-center gap-1.5 w-full bg-white dark:bg-neutral-800 border-2 border-charcoal dark:border-neutral-600 px-2 py-1 shadow-[2px_2px_0px_#171717] dark:shadow-[2px_2px_0px_#000000]"
+          className="flex items-center gap-2 w-full bg-white dark:bg-neutral-800 border-2 border-charcoal dark:border-neutral-600 px-2.5 py-1.5 shadow-[2px_2px_0px_#171717] dark:shadow-[2px_2px_0px_#000000] focus-within:border-juro-orange"
         >
-          <MessageSquare size={13} className="text-juro-orange shrink-0" />
+          <MessageSquare size={14} className="text-juro-orange shrink-0" />
           <input
             type="text"
             value={chatInput}
@@ -77,20 +77,20 @@ export const JuroContextMenu: React.FC<JuroContextMenuProps> = ({
             placeholder="Tulis pesan untuk Juro..."
             maxLength={100}
             disabled={isChatLoading}
-            className="pixel-text text-[7.5px] sm:text-[9px] bg-transparent text-charcoal dark:text-white placeholder:text-neutral-400 dark:placeholder:text-neutral-500 focus:outline-none flex-1 min-w-0 font-medium"
+            className="pixel-text text-[9px] sm:text-[10px] bg-transparent text-charcoal dark:text-white placeholder:text-neutral-400 dark:placeholder:text-neutral-500 focus:outline-none flex-1 min-w-0 font-medium"
           />
           <button
             type="submit"
             disabled={!chatInput.trim() || isChatLoading}
-            className={`p-1 border border-charcoal dark:border-neutral-600 transition-all ${
+            className={`p-1.5 border-2 border-charcoal dark:border-neutral-600 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-juro-orange ${
               chatInput.trim() && !isChatLoading
-                ? "bg-juro-orange text-white hover:bg-orange-600 active:translate-x-[1px] active:translate-y-[1px] cursor-pointer"
+                ? "bg-juro-orange text-white hover:bg-orange-600 active:translate-x-[1px] active:translate-y-[1px] cursor-pointer shadow-[1px_1px_0px_#171717]"
                 : "bg-neutral-200 dark:bg-neutral-700 text-neutral-400 dark:text-neutral-500 cursor-not-allowed opacity-60"
             }`}
-            aria-label="Kirim pesan"
+            aria-label="Kirim pesan ke Juro"
             title="Kirim pesan"
           >
-            <Send size={10} strokeWidth={2.5} />
+            <Send size={11} strokeWidth={2.5} />
           </button>
         </form>
 
@@ -100,7 +100,7 @@ export const JuroContextMenu: React.FC<JuroContextMenuProps> = ({
           <button
             type="button"
             onClick={() => onAction("food")}
-            className="relative flex flex-col sm:flex-row items-center justify-center gap-0.5 sm:gap-1.5 px-1.5 sm:px-2.5 py-1.5 bg-white dark:bg-neutral-800 text-charcoal dark:text-white border-2 border-charcoal dark:border-neutral-600 shadow-[2px_2px_0px_#171717] dark:shadow-[2px_2px_0px_#000000] hover:border-juro-orange hover:text-juro-orange active:translate-x-[1px] active:translate-y-[1px] active:shadow-none pixel-text text-[7.5px] sm:text-[9.5px] uppercase font-bold tracking-tight sm:tracking-wider transition-all cursor-pointer select-none min-w-[48px] sm:min-w-0"
+            className="relative flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-2 min-h-[42px] sm:min-h-0 bg-white dark:bg-neutral-800 text-charcoal dark:text-white border-2 border-charcoal dark:border-neutral-600 shadow-[2px_2px_0px_#171717] dark:shadow-[2px_2px_0px_#000000] hover:border-juro-orange hover:text-juro-orange active:translate-x-[1px] active:translate-y-[1px] active:shadow-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-juro-orange pixel-text text-[8.5px] sm:text-[9.5px] uppercase font-bold tracking-tight sm:tracking-wider transition-all cursor-pointer select-none min-w-[50px] sm:min-w-0"
           >
             <Utensils size={14} strokeWidth={2.5} className="shrink-0 text-juro-orange" />
             <span className="leading-none">Makan</span>
@@ -116,7 +116,7 @@ export const JuroContextMenu: React.FC<JuroContextMenuProps> = ({
           <button
             type="button"
             onClick={() => onAction("toy")}
-            className="relative flex flex-col sm:flex-row items-center justify-center gap-0.5 sm:gap-1.5 px-1.5 sm:px-2.5 py-1.5 bg-white dark:bg-neutral-800 text-charcoal dark:text-white border-2 border-charcoal dark:border-neutral-600 shadow-[2px_2px_0px_#171717] dark:shadow-[2px_2px_0px_#000000] hover:border-rose-500 hover:text-rose-500 active:translate-x-[1px] active:translate-y-[1px] active:shadow-none pixel-text text-[7.5px] sm:text-[9.5px] uppercase font-bold tracking-tight sm:tracking-wider transition-all cursor-pointer select-none min-w-[48px] sm:min-w-0"
+            className="relative flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-2 min-h-[42px] sm:min-h-0 bg-white dark:bg-neutral-800 text-charcoal dark:text-white border-2 border-charcoal dark:border-neutral-600 shadow-[2px_2px_0px_#171717] dark:shadow-[2px_2px_0px_#000000] hover:border-rose-500 hover:text-rose-500 active:translate-x-[1px] active:translate-y-[1px] active:shadow-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-500 pixel-text text-[8.5px] sm:text-[9.5px] uppercase font-bold tracking-tight sm:tracking-wider transition-all cursor-pointer select-none min-w-[50px] sm:min-w-0"
           >
             <Gamepad2 size={14} strokeWidth={2.5} className="shrink-0 text-rose-500" />
             <span className="leading-none">Main</span>
@@ -126,7 +126,7 @@ export const JuroContextMenu: React.FC<JuroContextMenuProps> = ({
           <button
             type="button"
             onClick={() => onAction("sleep")}
-            className="relative flex flex-col sm:flex-row items-center justify-center gap-0.5 sm:gap-1.5 px-1.5 sm:px-2.5 py-1.5 bg-white dark:bg-neutral-800 text-charcoal dark:text-white border-2 border-charcoal dark:border-neutral-600 shadow-[2px_2px_0px_#171717] dark:shadow-[2px_2px_0px_#000000] hover:border-purple-500 hover:text-purple-500 active:translate-x-[1px] active:translate-y-[1px] active:shadow-none pixel-text text-[7.5px] sm:text-[9.5px] uppercase font-bold tracking-tight sm:tracking-wider transition-all cursor-pointer select-none min-w-[48px] sm:min-w-0"
+            className="relative flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-2 min-h-[42px] sm:min-h-0 bg-white dark:bg-neutral-800 text-charcoal dark:text-white border-2 border-charcoal dark:border-neutral-600 shadow-[2px_2px_0px_#171717] dark:shadow-[2px_2px_0px_#000000] hover:border-purple-500 hover:text-purple-500 active:translate-x-[1px] active:translate-y-[1px] active:shadow-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple-500 pixel-text text-[8.5px] sm:text-[9.5px] uppercase font-bold tracking-tight sm:tracking-wider transition-all cursor-pointer select-none min-w-[50px] sm:min-w-0"
           >
             {currentState === "sleep" ? (
               <>
@@ -145,7 +145,7 @@ export const JuroContextMenu: React.FC<JuroContextMenuProps> = ({
           <button
             type="button"
             onClick={() => onAction("bath")}
-            className="relative flex flex-col sm:flex-row items-center justify-center gap-0.5 sm:gap-1.5 px-1.5 sm:px-2.5 py-1.5 bg-white dark:bg-neutral-800 text-charcoal dark:text-white border-2 border-charcoal dark:border-neutral-600 shadow-[2px_2px_0px_#171717] dark:shadow-[2px_2px_0px_#000000] hover:border-sky-400 hover:text-sky-500 active:translate-x-[1px] active:translate-y-[1px] active:shadow-none pixel-text text-[7.5px] sm:text-[9.5px] uppercase font-bold tracking-tight sm:tracking-wider transition-all cursor-pointer select-none min-w-[48px] sm:min-w-0"
+            className="relative flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-2 min-h-[42px] sm:min-h-0 bg-white dark:bg-neutral-800 text-charcoal dark:text-white border-2 border-charcoal dark:border-neutral-600 shadow-[2px_2px_0px_#171717] dark:shadow-[2px_2px_0px_#000000] hover:border-sky-400 hover:text-sky-500 active:translate-x-[1px] active:translate-y-[1px] active:shadow-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400 pixel-text text-[8.5px] sm:text-[9.5px] uppercase font-bold tracking-tight sm:tracking-wider transition-all cursor-pointer select-none min-w-[50px] sm:min-w-0"
           >
             <Droplets size={14} strokeWidth={2.5} className="text-sky-500 shrink-0" />
             <span className="leading-none">Mandi</span>
@@ -155,7 +155,7 @@ export const JuroContextMenu: React.FC<JuroContextMenuProps> = ({
           <button
             type="button"
             onClick={() => onAction("pet")}
-            className="relative flex flex-col sm:flex-row items-center justify-center gap-0.5 sm:gap-1.5 px-1.5 sm:px-2.5 py-1.5 bg-white dark:bg-neutral-800 text-charcoal dark:text-white border-2 border-charcoal dark:border-neutral-600 shadow-[2px_2px_0px_#171717] dark:shadow-[2px_2px_0px_#000000] hover:border-rose-500 hover:text-rose-500 active:translate-x-[1px] active:translate-y-[1px] active:shadow-none pixel-text text-[7.5px] sm:text-[9.5px] uppercase font-bold tracking-tight sm:tracking-wider transition-all cursor-pointer select-none min-w-[48px] sm:min-w-0"
+            className="relative flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-2 min-h-[42px] sm:min-h-0 bg-white dark:bg-neutral-800 text-charcoal dark:text-white border-2 border-charcoal dark:border-neutral-600 shadow-[2px_2px_0px_#171717] dark:shadow-[2px_2px_0px_#000000] hover:border-rose-500 hover:text-rose-500 active:translate-x-[1px] active:translate-y-[1px] active:shadow-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-500 pixel-text text-[8.5px] sm:text-[9.5px] uppercase font-bold tracking-tight sm:tracking-wider transition-all cursor-pointer select-none min-w-[50px] sm:min-w-0"
           >
             <HandHeart size={14} strokeWidth={2.5} className="text-rose-500 shrink-0" />
             <span className="leading-none">Elus</span>
