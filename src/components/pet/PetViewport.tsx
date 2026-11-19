@@ -13,9 +13,6 @@ import {
 import { OutdoorEnvironment } from "./OutdoorEnvironment";
 import { ItemIllustration } from "../items/ItemIllustration";
 import {
-  ZoomIn,
-  ZoomOut,
-  RotateCcw,
   Utensils,
   Gamepad2,
   Moon,
@@ -30,6 +27,7 @@ import {
 } from "lucide-react";
 import { usePetStore } from "../../stores/petStore";
 import { useGameStore } from "../../stores/gameStore";
+import { useUIStore } from "../../stores/uiStore";
 import { SHOP_FOODS, SHOP_TOYS } from "../../data/economyCatalog";
 import { soundEffects } from "../../engine/audio/soundEffects";
 import {
@@ -628,31 +626,14 @@ export const PetViewport: React.FC = () => {
     };
   }, [isDraggingTool, checkOverJuro, startRinseLoop, stopRinseLoop, triggerFeed, triggerPlay, wakeUp]);
 
-  const handleZoomIn = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    soundEffects.playClick();
-    if (controlsRef.current) {
-      controlsRef.current.dollyIn(0.84);
-      controlsRef.current.update();
-    }
-  };
-
-  const handleZoomOut = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    soundEffects.playClick();
-    if (controlsRef.current) {
-      controlsRef.current.dollyOut(0.84);
-      controlsRef.current.update();
-    }
-  };
-
-  const handleResetCamera = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    soundEffects.playClick();
+  // Synchronize camera reset triggered globally from Navbar
+  const cameraResetNonce = useUIStore((s) => s.cameraResetNonce);
+  useEffect(() => {
+    if (cameraResetNonce === 0) return;
     if (controlsRef.current) {
       controlsRef.current.reset();
     }
-  };
+  }, [cameraResetNonce]);
 
   const handleToggleSleep = () => {
     if (currentState === "sleep") {
@@ -734,8 +715,8 @@ export const PetViewport: React.FC = () => {
         isGrabActive || isDraggingPet ? "cursor-grabbing" : "cursor-default"
       }`}
     >
-      {/* Top Overlay Bar: Compact Tap-to-Peek Stat Strip (Left) + Camera Zoom Dock (Right) */}
-      <div className="absolute top-3 left-3 right-3 z-20 flex items-start justify-between gap-2 pointer-events-none">
+      {/* Top Overlay Bar: Compact Tap-to-Peek Stat Strip */}
+      <div className="absolute top-3 left-3 z-20 pointer-events-none">
         <div className="relative pointer-events-auto">
           {/* Ultra-Minimal 5-Stat Strip (Consistent Horizontal Alignment Desktop & Mobile) */}
           <button
@@ -813,39 +794,6 @@ export const PetViewport: React.FC = () => {
               </div>
             </div>
           )}
-        </div>
-
-        {/* Camera Zoom Controls Dock (Ergonomic 36x36 Touch Targets) */}
-        <div className="flex items-center gap-1.5 pointer-events-auto shrink-0">
-          <button
-            type="button"
-            onClick={handleZoomIn}
-            className="w-9 h-9 inline-flex items-center justify-center bg-warm-white/95 dark:bg-neutral-900/90 text-charcoal dark:text-neutral-100 border-2 border-charcoal dark:border-neutral-600 shadow-[2px_2px_0px_#171717] dark:shadow-[2px_2px_0px_#000000] hover:border-juro-orange active:translate-x-[1px] active:translate-y-[1px] cursor-pointer"
-            title="Perbesar Kamera (Zoom In)"
-            aria-label="Perbesar Kamera"
-          >
-            <ZoomIn size={14} strokeWidth={2.5} />
-          </button>
-
-          <button
-            type="button"
-            onClick={handleZoomOut}
-            className="w-9 h-9 inline-flex items-center justify-center bg-warm-white/95 dark:bg-neutral-900/90 text-charcoal dark:text-neutral-100 border-2 border-charcoal dark:border-neutral-600 shadow-[2px_2px_0px_#171717] dark:shadow-[2px_2px_0px_#000000] hover:border-juro-orange active:translate-x-[1px] active:translate-y-[1px] cursor-pointer"
-            title="Perkecil Kamera (Zoom Out)"
-            aria-label="Perkecil Kamera"
-          >
-            <ZoomOut size={14} strokeWidth={2.5} />
-          </button>
-
-          <button
-            type="button"
-            onClick={handleResetCamera}
-            className="w-9 h-9 inline-flex items-center justify-center bg-warm-white/95 dark:bg-neutral-900/90 text-charcoal dark:text-neutral-100 border-2 border-charcoal dark:border-neutral-600 shadow-[2px_2px_0px_#171717] dark:shadow-[2px_2px_0px_#000000] hover:border-juro-orange active:translate-x-[1px] active:translate-y-[1px] cursor-pointer"
-            title="Reset Sudut Pandang"
-            aria-label="Reset Sudut Pandang"
-          >
-            <RotateCcw size={14} strokeWidth={2.5} />
-          </button>
         </div>
       </div>
 

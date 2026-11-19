@@ -1,6 +1,6 @@
 import React from "react";
-import { Link, useLocation } from "react-router-dom";
-import { Settings, Sun, Moon, Volume2, VolumeX } from "lucide-react";
+import { Link, useLocation, useNavigate } from "react-router-dom";
+import { Settings, Sun, Moon, Volume2, VolumeX, RotateCcw } from "lucide-react";
 import { IconButton } from "../ui/IconButton";
 import { useUIStore } from "../../stores/uiStore";
 import { useGameStore } from "../../stores/gameStore";
@@ -15,7 +15,8 @@ const NAV_LINKS = [
 
 export const Navbar: React.FC = () => {
   const location = useLocation();
-  const { theme, soundEnabled, toggleTheme, toggleSound } = useUIStore();
+  const navigate = useNavigate();
+  const { theme, soundEnabled, toggleTheme, toggleSound, triggerCameraReset } = useUIStore();
   const hasCrystals = useGameStore(
     (s) =>
       (s.crystals.quartz ?? 0) +
@@ -24,6 +25,13 @@ export const Navbar: React.FC = () => {
         (s.crystals.amethyst ?? 0) >
       0
   );
+
+  const handleResetCamera = () => {
+    triggerCameraReset();
+    if (location.pathname !== "/") {
+      navigate("/");
+    }
+  };
 
   return (
     <header className="sticky top-0 z-50 bg-white/95 dark:bg-dark-surface/95 border-b-2 border-charcoal dark:border-neutral-700 backdrop-blur-xs">
@@ -72,6 +80,13 @@ export const Navbar: React.FC = () => {
 
         {/* Action Controls */}
         <div className="flex items-center gap-2">
+          <IconButton
+            icon={RotateCcw}
+            label="Reset sudut pandang kamera"
+            size="sm"
+            onClick={handleResetCamera}
+          />
+
           <IconButton
             icon={soundEnabled ? Volume2 : VolumeX}
             label={soundEnabled ? "Nonaktifkan suara" : "Aktifkan suara"}

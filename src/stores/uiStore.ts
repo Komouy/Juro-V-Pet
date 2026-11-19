@@ -16,11 +16,13 @@ interface UIState {
   soundEnabled: boolean;
   isMobileNavOpen: boolean;
   toast: UIToast | null;
+  cameraResetNonce: number;
   toggleTheme: () => void;
   toggleSound: () => void;
   setMobileNav: (open: boolean) => void;
   showToast: (text: string, tone?: ToastTone) => void;
   clearToast: () => void;
+  triggerCameraReset: () => void;
 }
 
 export const useUIStore = create<UIState>((set) => ({
@@ -28,6 +30,7 @@ export const useUIStore = create<UIState>((set) => ({
   soundEnabled: true,
   isMobileNavOpen: false,
   toast: null,
+  cameraResetNonce: 0,
   toggleTheme: () =>
     set((s) => {
       const next = s.theme === "light" ? "dark" : "light";
@@ -49,4 +52,5 @@ export const useUIStore = create<UIState>((set) => ({
       },
     }),
   clearToast: () => set({ toast: null }),
+  triggerCameraReset: () => set((s) => ({ cameraResetNonce: s.cameraResetNonce + 1 })),
 }));

@@ -10,6 +10,7 @@ describe("UI Store & Theme Mode", () => {
       soundEnabled: true,
       isMobileNavOpen: false,
       toast: null,
+      cameraResetNonce: 0,
     });
   });
 
@@ -56,5 +57,13 @@ describe("UI Store & Theme Mode", () => {
 
     useUIStore.getState().clearToast();
     expect(useUIStore.getState().toast).toBeNull();
+  });
+
+  it("increments cameraResetNonce when triggerCameraReset is called", () => {
+    expect(useUIStore.getState().cameraResetNonce).toBe(0);
+    useUIStore.getState().triggerCameraReset();
+    expect(useUIStore.getState().cameraResetNonce).toBe(1);
+    useUIStore.getState().triggerCameraReset();
+    expect(useUIStore.getState().cameraResetNonce).toBe(2);
   });
 });
