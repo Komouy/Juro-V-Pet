@@ -772,11 +772,11 @@ export const PetViewport: React.FC = () => {
   };
 
   const compactStats = [
-    { key: "hunger", label: "Lapar", value: Math.round(hunger), icon: Utensils, barColor: "bg-juro-orange", iconColor: "text-juro-orange" },
-    { key: "energy", label: "Energi", value: Math.round(energy), icon: Zap, barColor: "bg-amber-400", iconColor: "text-amber-500" },
-    { key: "happiness", label: "Senang", value: Math.round(happiness), icon: Heart, barColor: "bg-rose-400", iconColor: "text-rose-500" },
-    { key: "cleanliness", label: "Bersih", value: Math.round(cleanliness), icon: Droplets, barColor: "bg-sky-400", iconColor: "text-sky-500" },
-    { key: "affection", label: "Sayang", value: Math.round(affection), icon: HandHeart, barColor: "bg-purple-400", iconColor: "text-purple-500" },
+    { key: "hunger", label: "", value: Math.round(hunger), icon: Utensils, barColor: "bg-juro-orange", iconColor: "text-juro-orange" },
+    { key: "energy", label: "", value: Math.round(energy), icon: Zap, barColor: "bg-amber-400", iconColor: "text-amber-500" },
+    { key: "happiness", label: "", value: Math.round(happiness), icon: Heart, barColor: "bg-rose-400", iconColor: "text-rose-500" },
+    { key: "cleanliness", label: "", value: Math.round(cleanliness), icon: Droplets, barColor: "bg-sky-400", iconColor: "text-sky-500" },
+    { key: "affection", label: "", value: Math.round(affection), icon: HandHeart, barColor: "bg-purple-400", iconColor: "text-purple-500" },
   ];
 
   const getDraggedIllustrationId = (payload: DragPayload): string => {
@@ -833,7 +833,7 @@ export const PetViewport: React.FC = () => {
               return (
                 <div
                   key={stat.key}
-                  title={`${stat.label}: ${stat.value}%`}
+                  title={`${stat.value}%`}
                   className="flex items-center gap-1"
                 >
                   <Icon
@@ -854,9 +854,9 @@ export const PetViewport: React.FC = () => {
             })}
           </button>
 
-          {/* Compact Tap-to-Peek Detail Popover */}
+          {/* Compact Tap-to-Peek Detail Popover (Tanpa Teks - Hanya Ikon, Bar & Nilai %) */}
           {showStatDetails && (
-            <div className="animate-tray-enter absolute top-11 left-0 w-56 bg-warm-white/95 dark:bg-neutral-900/95 backdrop-blur-xs border-2 border-charcoal dark:border-neutral-600 shadow-[3px_3px_0px_#171717] dark:shadow-[3px_3px_0px_#000000] p-2.5 space-y-2">
+            <div className="animate-tray-enter absolute top-11 left-0 w-48 bg-warm-white/95 dark:bg-neutral-900/95 backdrop-blur-xs border-2 border-charcoal dark:border-neutral-600 shadow-[3px_3px_0px_#171717] dark:shadow-[3px_3px_0px_#000000] p-2.5 space-y-2">
               <div className="flex items-center justify-between gap-2 pb-1.5 border-b border-charcoal/15 dark:border-neutral-700">
                 <span className="pixel-text text-[10px] font-bold text-charcoal dark:text-white truncate">
                   {name} · Lv.{level}
@@ -865,22 +865,27 @@ export const PetViewport: React.FC = () => {
                   {stateLabel}
                 </span>
               </div>
-              <div className="space-y-1.5">
+              <div className="space-y-2">
                 {compactStats.map((stat) => {
                   const Icon = stat.icon;
                   const isLow = stat.value < 30;
                   return (
                     <div key={stat.key} className="flex items-center justify-between gap-2">
-                      <span className="inline-flex items-center gap-1.5 pixel-text text-[9px] text-charcoal dark:text-neutral-200">
-                        <Icon
-                          size={11}
-                          strokeWidth={2.5}
-                          className={isLow ? "text-rose-500" : stat.iconColor}
+                      <Icon
+                        size={12}
+                        strokeWidth={2.5}
+                        className={isLow ? "text-rose-500 shrink-0" : `${stat.iconColor} shrink-0`}
+                      />
+                      <div className="flex-1 h-1.5 bg-neutral-200 dark:bg-neutral-700 border border-charcoal/40 overflow-hidden">
+                        <div
+                          className={`h-full transition-all duration-300 ${
+                            isLow ? "bg-rose-500" : stat.barColor
+                          }`}
+                          style={{ width: `${Math.max(0, Math.min(100, stat.value))}%` }}
                         />
-                        <span>{stat.label}</span>
-                      </span>
+                      </div>
                       <span
-                        className={`pixel-text text-[9px] font-bold ${
+                        className={`pixel-text text-[9px] font-bold shrink-0 ${
                           isLow ? "text-rose-500" : "text-charcoal dark:text-neutral-200"
                         }`}
                       >

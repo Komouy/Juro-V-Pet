@@ -31,7 +31,7 @@ export const MAP_OBSTACLES: SolidObstacle[] = [
   { x: 3.5, z: 0.82, radius: 0.28, topY: BASE_GROUND_Y + 0.9 },
   { x: 3.8, z: 1.08, radius: 0.28, topY: BASE_GROUND_Y + 0.9 },
   // Nightstand & Bed Headboard atop West Knoll (keeps mattress clear for sleeping)
-  { x: -3.64, z: -0.76, radius: 0.22, topY: BASE_GROUND_Y + 0.85 },
+  { x: -3.88, z: -0.52, radius: 0.18, topY: BASE_GROUND_Y + 0.85 },
   // Two Glowing Meadow Lantern Posts
   { x: -1.45, z: -1.65, radius: 0.16, topY: 0.5 },
   { x: 2.25, z: 0.22, radius: 0.16, topY: 0.5 },

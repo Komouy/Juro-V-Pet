@@ -29,6 +29,7 @@ const _projEdge = new THREE.Vector3();
 const _bathDummy = new THREE.Object3D();
 const _camDir = new THREE.Vector3();
 const _targetVec = new THREE.Vector3();
+const _bedTargetVec = new THREE.Vector3();
 const _intersectVec = new THREE.Vector3();
 const _activePointerVec = new THREE.Vector2();
 
@@ -403,7 +404,7 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
     const ty = getTerrainHeightAt(targetX, targetZ);
     fsm.wanderTarget.set(targetX, ty, targetZ);
     fsm.transitionTo("wander", true);
-    fsm.stateDuration = isBedTarget ? 14.0 : 9.0;
+    fsm.stateDuration = isBedTarget ? 24.0 : 9.0;
     fsm.timeInState = 0;
     setBehaviorState("wander");
   }, [walkCommand, fsm, setBehaviorState, isHeadingToBedRef]);
@@ -609,9 +610,19 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
 
     // 1. Update Autonomous Behavior Engine
     if (!isDragging) {
-      const activeState = fsm.update(delta, attributes, mood);
-      if (activeState !== storeState) {
-        setBehaviorState(activeState);
+      if (isHeadingToBedRef?.current) {
+        // Keep Juro locked into wander mode moving towards bed without autonomous distraction
+        if (fsm.currentState !== "wander") {
+          fsm.transitionTo("wander", true);
+          setBehaviorState("wander");
+        }
+        fsm.stateDuration = 24.0;
+        fsm.timeInState = 0;
+      } else {
+        const activeState = fsm.update(delta, attributes, mood);
+        if (activeState !== storeState) {
+          setBehaviorState(activeState);
+        }
       }
     }
 
@@ -703,7 +714,7 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
           spring.position.x - JURO_BED_POS.x,
           spring.position.z - JURO_BED_POS.z
         );
-        if (distToBed < 0.32) {
+        if (distToBed < 0.45) {
           onBedArrival?.();
         }
       }
@@ -744,7 +755,13 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
             j.active = false;
           }
         } else {
-          const currentTarget = fsm.wanderTarget;
+          const currentTarget = isHeadingToBedRef?.current
+            ? _bedTargetVec.set(
+                JURO_BED_POS.x,
+                getTerrainHeightAt(JURO_BED_POS.x, JURO_BED_POS.z),
+                JURO_BED_POS.z
+              )
+            : fsm.wanderTarget;
           const dx = currentTarget.x - spring.position.x;
           const dz = currentTarget.z - spring.position.z;
           const dist = Math.hypot(dx, dz);
@@ -792,36 +809,40 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
             );
             const aheadGroundY = getTerrainHeightAt(probeX, probeZ);
 
-            if (aheadGroundY > currGroundY + 0.08 || aheadGroundY < currGroundY - 0.14) {
-              const safeLanding = resolveHorizontalCollisions(
-                probeX,
-                probeZ,
-                aheadGroundY,
-                JURO_COLLISION_RADIUS,
-                true
-              );
+            if (aheadGroundY > currGroundY + 0.05 || aheadGroundY < currGroundY - 0.14) {
+              const safeLanding = isHeadingToBedRef?.current
+                ? { x: probeX, z: probeZ }
+                : resolveHorizontalCollisions(
+                    probeX,
+                    probeZ,
+                    aheadGroundY,
+                    JURO_COLLISION_RADIUS,
+                    true
+                  );
               const landSurfaceY = getTerrainHeightAt(safeLanding.x, safeLanding.z);
               j.active = true;
               j.elapsed = 0;
-              j.duration = 0.54;
+              j.duration = 0.52;
               j.startX = spring.position.x;
               j.startY = spring.position.y;
               j.startZ = spring.position.z;
               j.endX = safeLanding.x;
               j.endZ = safeLanding.z;
               j.endY = landSurfaceY + BODY_BOTTOM_OFFSET;
-              j.peakY = Math.max(currGroundY, landSurfaceY) + BODY_BOTTOM_OFFSET + 0.44;
+              j.peakY = Math.max(currGroundY, landSurfaceY) + BODY_BOTTOM_OFFSET + 0.42;
             } else {
               const step = Math.min(dist, crawlSpeed * delta * motionScale);
               const rawNextX = spring.position.x + dirX * step;
               const rawNextZ = spring.position.z + dirZ * step;
-              const resolvedStep = resolveHorizontalCollisions(
-                rawNextX,
-                rawNextZ,
-                currGroundY,
-                JURO_COLLISION_RADIUS,
-                false
-              );
+              const resolvedStep = isHeadingToBedRef?.current
+                ? { x: rawNextX, z: rawNextZ, hitObstacle: false }
+                : resolveHorizontalCollisions(
+                    rawNextX,
+                    rawNextZ,
+                    currGroundY,
+                    JURO_COLLISION_RADIUS,
+                    false
+                  );
 
               // If grazing an obstacle, add subtle tangential slide so Juro curves around rocks/trees!
               let finalX = resolvedStep.x;
@@ -901,7 +922,7 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
           }
         } else if (currentState === "sleep") {
           const isAtBed =
-            Math.hypot(spring.position.x - JURO_BED_POS.x, spring.position.z - JURO_BED_POS.z) < 0.55;
+            Math.hypot(spring.position.x - JURO_BED_POS.x, spring.position.z - JURO_BED_POS.z) < 0.75;
           const targetX = isAtBed ? JURO_BED_POS.x : spring.position.x;
           const targetZ = isAtBed ? JURO_BED_POS.z : spring.position.z;
           const targetGroundY = getTerrainHeightAt(targetX, targetZ);
