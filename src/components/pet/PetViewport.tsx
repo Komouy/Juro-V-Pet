@@ -328,6 +328,9 @@ export const PetViewport: React.FC = () => {
   // AI Pet Chat message handler (triggers Gemini API or fallback & shows speech bubble)
   const handleSendMessage = useCallback(
     async (userMessage: string) => {
+      // Close context menu immediately so it doesn't obstruct the view or speech bubble
+      setJuroMenu({ open: false, x: 0, y: 0, isNearTop: false });
+
       if (speechTimerRef.current) {
         clearTimeout(speechTimerRef.current);
         speechTimerRef.current = null;
