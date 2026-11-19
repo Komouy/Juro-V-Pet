@@ -418,9 +418,10 @@ export const PetViewport: React.FC = () => {
       isHeadingToBedRef.current = false;
       playWithItem(toy);
       soundEffects.playHappy();
+      const actionVerb = toy.id === "bounce-ball" ? "Melempar" : "Bermain menggunakan";
       addLog(
         "play",
-        `Bermain menggunakan ${toy.name}. (+${toy.happinessGain} Bahagia, +${toy.xpReward} XP)`
+        `${actionVerb} ${toy.name}. (+${toy.happinessGain} Bahagia, +${toy.xpReward} XP)`
       );
       setActiveTray("none");
     },
@@ -628,17 +629,17 @@ export const PetViewport: React.FC = () => {
       const totalDist = Math.hypot(finalMeta.x - finalMeta.startX, finalMeta.y - finalMeta.startY);
       const isTap = totalDist < 28 || !finalMeta.moved;
 
-      if (finalMeta.moved && !finalMeta.overJuro && !isTap) {
+      if (finalMeta.moved && !finalMeta.overJuro && !isTap && finalMeta.payload.kind !== "toy") {
         soundEffects.playDrop();
       }
 
-      // Food & Toy support BOTH manual drag-and-drop onto Juro AND quick tap
+      // Food & Toy support BOTH manual drag-and-drop onto Juro AND quick tap (or throwing toy anywhere)
       if (finalMeta.payload.kind === "food") {
         if (finalMeta.overJuro || isTap) {
           triggerFeed(finalMeta.payload.food);
         }
       } else if (finalMeta.payload.kind === "toy") {
-        if (finalMeta.overJuro || isTap) {
+        if (finalMeta.overJuro || isTap || finalMeta.moved) {
           triggerPlay(finalMeta.payload.toy);
         }
       }

@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { usePetStore, DEFAULT_TOYS } from "../src/stores/petStore";
+import { useGameStore } from "../src/stores/gameStore";
 
 describe("Dynamic Expressions & Toy Play System", () => {
   beforeEach(() => {
@@ -50,5 +51,25 @@ describe("Dynamic Expressions & Toy Play System", () => {
 
     usePetStore.getState().clearToyBeingPlayed();
     expect(usePetStore.getState().currentToyBeingPlayed).toBeNull();
+  });
+
+  it("retains fetch ball in inventory after retrieval so user can throw it again", () => {
+    const ball = DEFAULT_TOYS.find((t) => t.id === "bounce-ball")!;
+    expect(ball).toBeDefined();
+
+    // Throw / play with ball
+    usePetStore.getState().playWithItem(ball);
+    expect(usePetStore.getState().currentToyBeingPlayed?.id).toBe("bounce-ball");
+
+    // After Juro catches and returns it to inventory
+    usePetStore.getState().clearToyBeingPlayed();
+    usePetStore.getState().setBehaviorState("happy");
+
+    const finalState = usePetStore.getState();
+    expect(finalState.currentToyBeingPlayed).toBeNull();
+    expect(finalState.currentState).toBe("happy");
+    // Ball remains in owned toys list
+    const hasBall = useGameStore.getState().ownedToys.includes("bounce-ball");
+    expect(hasBall).toBe(true);
   });
 });

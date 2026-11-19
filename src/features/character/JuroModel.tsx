@@ -22,6 +22,8 @@ import {
   JURO_BED_POS,
   getTerrainHeightAt,
   resolveHorizontalCollisions,
+  isWaterAt,
+  isInsideObstacle,
 } from "../../engine/world/mapTerrain";
 import { isBedtimeHour } from "../../utils/timeOfDay";
 
@@ -115,10 +117,30 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
   const eatingTimer = useRef(0);
   const lastBiteSoundRef = useRef(-1);
 
-  // Toy playing animation refs
-  const toyPropRef = useRef<THREE.Group>(null);
+  // 3D Fetch Ball & Interactive World Toy Refs
+  const worldToyRef = useRef<THREE.Group>(null);
+  const worldToyMeshRef = useRef<THREE.Group>(null);
+  const worldToyShadowRef = useRef<THREE.Mesh>(null);
   const playTimer = useRef(0);
-  const lastPlayHopSoundRef = useRef(-1);
+
+  const fetchBallRef = useRef({
+    active: false,
+    stage: "throwing" as "throwing" | "bouncing" | "ground" | "caught" | "returning",
+    timer: 0,
+    startX: 0,
+    startY: 0,
+    startZ: 0,
+    targetX: 0,
+    targetY: 0,
+    targetZ: 0,
+    ballX: 0,
+    ballY: 0,
+    ballZ: 0,
+    rotX: 0,
+    rotZ: 0,
+    bouncesPlayed: 0,
+    scale: 1,
+  });
 
   // Dynamic Expressions & Need-State Refs
   const bodyMeshRef = useRef<THREE.Mesh>(null);
@@ -687,7 +709,7 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
               0.08
             );
           }
-        } else if (currentState === "happy" || currentState === "play") {
+        } else if (currentState === "happy") {
           const bounceY = restY + Math.abs(Math.sin(t * 7)) * 0.24 * motionScale;
           _targetVec.set(spring.position.x, bounceY, spring.position.z);
           spring.setTarget(_targetVec);
@@ -695,6 +717,87 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
           if (groupRef.current) {
             groupRef.current.rotation.z = Math.sin(t * 7) * 0.07 * motionScale;
             groupRef.current.rotation.y = lerpAngle(groupRef.current.rotation.y, 0, 0.08);
+          }
+        } else if (currentState === "play") {
+          const isBounceBall = currentToyBeingPlayed?.id === "bounce-ball";
+          if (isBounceBall) {
+            const fb = fetchBallRef.current;
+            if (fb.stage === "throwing") {
+              // Watch the ball flying across the meadow in excitement!
+              const lookAngle = Math.atan2(fb.ballX - spring.position.x, fb.ballZ - spring.position.z);
+              if (groupRef.current) {
+                groupRef.current.rotation.y = lerpAngle(groupRef.current.rotation.y, lookAngle, 0.2);
+              }
+              const anticipHop = restY + Math.abs(Math.sin(t * 8)) * 0.08 * motionScale;
+              _targetVec.set(spring.position.x, anticipHop, spring.position.z);
+              spring.setTarget(_targetVec);
+            } else if (fb.stage === "bouncing" || fb.stage === "ground") {
+              // Chase & fetch the ball!
+              const dx = fb.targetX - spring.position.x;
+              const dz = fb.targetZ - spring.position.z;
+              const dist = Math.hypot(dx, dz);
+              if (dist > 0.42) {
+                const dirX = dx / dist;
+                const dirZ = dz / dist;
+                const targetYaw = Math.atan2(dirX, dirZ);
+                if (groupRef.current) {
+                  groupRef.current.rotation.y = lerpAngle(groupRef.current.rotation.y, targetYaw, 0.22);
+                }
+
+                const cycle = t * 7.5;
+                const wave = Math.sin(cycle);
+                const stepSpeed = wave >= 0 ? 1.8 : 2.5;
+                const step = Math.min(dist, stepSpeed * delta * motionScale);
+                const rawNextX = spring.position.x + dirX * step;
+                const rawNextZ = spring.position.z + dirZ * step;
+                const resolved = resolveHorizontalCollisions(
+                  rawNextX,
+                  rawNextZ,
+                  currGroundY,
+                  JURO_COLLISION_RADIUS,
+                  true,
+                  false
+                );
+
+                crawlScaleZ = 1 + wave * 0.22 * motionScale;
+                crawlScaleX = 1 - wave * 0.12 * motionScale;
+                crawlScaleY = 1 - wave * 0.10 * motionScale;
+
+                const nextGroundY = getTerrainHeightAt(resolved.x, resolved.z);
+                _targetVec.set(resolved.x, nextGroundY + BODY_BOTTOM_OFFSET, resolved.z);
+                spring.setTarget(_targetVec);
+              } else {
+                // Reached the ball! Catch it!
+                fb.stage = "caught";
+                fb.timer = 0;
+                soundEffects.playHappy();
+                soundEffects.playHop();
+                spring.applyImpulse(new THREE.Vector3(0, 2.8, 0));
+                _targetVec.set(spring.position.x, restY, spring.position.z);
+                spring.setTarget(_targetVec);
+              }
+            } else if (fb.stage === "caught") {
+              // Hold ball happily and celebrate with hops & wiggles!
+              const happyHop = restY + Math.abs(Math.sin(t * 8)) * 0.18 * motionScale;
+              _targetVec.set(spring.position.x, happyHop, spring.position.z);
+              spring.setTarget(_targetVec);
+              if (groupRef.current) {
+                groupRef.current.rotation.z = Math.sin(t * 10) * 0.08 * motionScale;
+              }
+            } else {
+              // Returning ball to inventory
+              _targetVec.set(spring.position.x, restY, spring.position.z);
+              spring.setTarget(_targetVec);
+            }
+          } else {
+            // Other toys: music-box / bubble-blower
+            const bounceY = restY + Math.abs(Math.sin(t * 7)) * 0.24 * motionScale;
+            _targetVec.set(spring.position.x, bounceY, spring.position.z);
+            spring.setTarget(_targetVec);
+            if (groupRef.current) {
+              groupRef.current.rotation.z = Math.sin(t * 7) * 0.07 * motionScale;
+              groupRef.current.rotation.y = lerpAngle(groupRef.current.rotation.y, 0, 0.08);
+            }
           }
         } else if (currentState === "sleep") {
           const isAtBed =
@@ -957,66 +1060,257 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
       if (heartBubbleRef.current) heartBubbleRef.current.visible = false;
     }
 
-    // 6.5 Interactive Toy Playing Sequence with 3D Toy Prop
+    // 6.5 Interactive 3D World Toy Playing Sequence (Fetch Ball & Props)
     const isPlayingToy = currentState === "play" && Boolean(currentToyBeingPlayed);
     if (isPlayingToy) {
       playTimer.current += delta;
-      const playT = playTimer.current;
       const toyId = currentToyBeingPlayed?.id ?? "bounce-ball";
 
-      if (toyPropRef.current) {
-        toyPropRef.current.visible = true;
+      if (worldToyRef.current) {
+        worldToyRef.current.visible = true;
 
         if (toyId === "bounce-ball") {
-          // Bouncy striped rubber ball
-          const bounceCycle = (playT * 3.6) % 1;
-          const bounceArc = Math.sin(bounceCycle * Math.PI);
-          const bounceY = -0.1 + bounceArc * 0.72;
-          toyPropRef.current.position.set(0.42, bounceY, 0.95);
-          toyPropRef.current.rotation.x = playT * 8;
-          toyPropRef.current.rotation.z = playT * 6;
+          const fb = fetchBallRef.current;
+          if (!fb.active) {
+            fb.active = true;
+            fb.stage = "throwing";
+            fb.timer = 0;
+            fb.bouncesPlayed = 0;
+            fb.scale = 1;
+            fb.startX = spring.position.x - 0.2;
+            fb.startY = spring.position.y + 1.8;
+            fb.startZ = spring.position.z + 1.2;
 
-          const hopBucket = Math.floor(playT * 3.6);
-          if (bounceArc < 0.12 && lastPlayHopSoundRef.current !== hopBucket) {
-            lastPlayHopSoundRef.current = hopBucket;
-            soundEffects.playHop();
+            // Pick random safe landing point on the meadow
+            const forwardAngle = groupRef.current ? groupRef.current.rotation.y : 0;
+            let bestX = spring.position.x;
+            let bestZ = spring.position.z;
+            let found = false;
+
+            for (let attempt = 0; attempt < 12; attempt++) {
+              const throwAngle = forwardAngle + (Math.random() - 0.5) * Math.PI * 0.9;
+              const throwDist = 2.4 + Math.random() * 1.5;
+              const candX = THREE.MathUtils.clamp(
+                spring.position.x + Math.sin(throwAngle) * throwDist,
+                MAP_BOUNDS.minX + 0.6,
+                MAP_BOUNDS.maxX - 0.6
+              );
+              const candZ = THREE.MathUtils.clamp(
+                spring.position.z + Math.cos(throwAngle) * throwDist,
+                MAP_BOUNDS.minZ + 0.6,
+                MAP_BOUNDS.maxZ - 0.6
+              );
+              if (!isWaterAt(candX, candZ) && !isInsideObstacle(candX, candZ, 0.45)) {
+                bestX = candX;
+                bestZ = candZ;
+                found = true;
+                break;
+              }
+            }
+
+            if (!found) {
+              bestX = 0;
+              bestZ = 0.2;
+            }
+
+            const safeTarget = resolveHorizontalCollisions(
+              bestX,
+              bestZ,
+              BASE_GROUND_Y,
+              0.42,
+              false,
+              false
+            );
+            fb.targetX = safeTarget.x;
+            fb.targetZ = safeTarget.z;
+            fb.targetY = getTerrainHeightAt(safeTarget.x, safeTarget.z);
+            fb.ballX = fb.startX;
+            fb.ballY = fb.startY;
+            fb.ballZ = fb.startZ;
+            fb.rotX = 0;
+            fb.rotZ = 0;
+            soundEffects.playBoing();
           }
 
-          if (groupRef.current) {
-            const juroHop = Math.sin(bounceCycle * Math.PI * 2) * 0.08;
-            groupRef.current.position.y = -0.1 + Math.max(0, juroHop);
-          }
-        } else if (toyId === "bubble-blower") {
-          toyPropRef.current.position.set(0.55, 0.05 + Math.sin(playT * 3) * 0.04, 0.85);
-          toyPropRef.current.rotation.z = -0.3 + Math.sin(playT * 2.5) * 0.1;
+          fb.timer += delta;
 
-          if (groupRef.current) {
-            groupRef.current.position.y = -0.1 + Math.abs(Math.sin(playT * 6)) * 0.07;
+          if (fb.stage === "throwing") {
+            const p = Math.min(1, fb.timer / 0.85);
+            const arcY = Math.sin(p * Math.PI) * 1.5;
+            fb.ballX = THREE.MathUtils.lerp(fb.startX, fb.targetX, p);
+            fb.ballZ = THREE.MathUtils.lerp(fb.startZ, fb.targetZ, p);
+            fb.ballY = THREE.MathUtils.lerp(fb.startY, fb.targetY + 0.12, p) + arcY;
+            fb.rotX += delta * 12;
+            fb.rotZ += delta * 8;
+
+            if (p >= 1) {
+              fb.stage = "bouncing";
+              fb.timer = 0;
+              fb.bouncesPlayed = 1;
+              soundEffects.playHop();
+            }
+          } else if (fb.stage === "bouncing") {
+            fb.rotX += delta * 6;
+            let bounceY = 0;
+            if (fb.timer < 0.45) {
+              const b1 = fb.timer / 0.45;
+              bounceY = Math.sin(b1 * Math.PI) * 0.38;
+            } else if (fb.timer < 0.75) {
+              if (fb.bouncesPlayed === 1) {
+                fb.bouncesPlayed = 2;
+                soundEffects.playHop();
+              }
+              const b2 = (fb.timer - 0.45) / 0.3;
+              bounceY = Math.sin(b2 * Math.PI) * 0.15;
+            } else {
+              fb.stage = "ground";
+              fb.timer = 0;
+              soundEffects.playPlop();
+            }
+            fb.ballX = fb.targetX;
+            fb.ballZ = fb.targetZ;
+            fb.ballY = fb.targetY + 0.12 + Math.max(0, bounceY);
+          } else if (fb.stage === "ground") {
+            // Ball rests waiting on the grass
+            fb.ballX = fb.targetX;
+            fb.ballZ = fb.targetZ;
+            fb.ballY = fb.targetY + 0.12 + Math.sin(t * 3) * 0.008;
+          } else if (fb.stage === "caught") {
+            // Held happily in front of Juro's mouth with heart celebration
+            fb.timer += delta;
+            const yaw = groupRef.current ? groupRef.current.rotation.y : 0;
+            fb.ballX = spring.position.x + Math.sin(yaw) * 0.36;
+            fb.ballY = spring.position.y - 0.02 + Math.sin(t * 10) * 0.04;
+            fb.ballZ = spring.position.z + Math.cos(yaw) * 0.36;
+            fb.rotX = 0;
+            fb.rotZ = 0;
+
+            if (heartBubbleRef.current) {
+              heartBubbleRef.current.visible = true;
+              heartBubbleRef.current.position.y = 0.95 + (fb.timer / 1.4) * 0.45;
+              heartBubbleRef.current.scale.setScalar(Math.sin((fb.timer / 1.4) * Math.PI) * 1.15);
+            }
+
+            if (fb.timer >= 1.4) {
+              fb.stage = "returning";
+              fb.timer = 0;
+              soundEffects.playPop();
+              if (heartBubbleRef.current) heartBubbleRef.current.visible = false;
+            }
+          } else if (fb.stage === "returning") {
+            // Returning to inventory: ball pops & shrinks to 0
+            fb.timer += delta;
+            const p = Math.min(1, fb.timer / 0.4);
+            fb.scale = 1 - p;
+            const yaw = groupRef.current ? groupRef.current.rotation.y : 0;
+            fb.ballX = spring.position.x + Math.sin(yaw) * 0.36;
+            fb.ballY = spring.position.y - 0.02 + p * 0.2;
+            fb.ballZ = spring.position.z + Math.cos(yaw) * 0.36;
+
+            if (p >= 1) {
+              fb.active = false;
+              clearToyBeingPlayed();
+              fsm.transitionTo("happy", true);
+              setBehaviorState("happy");
+              playTimer.current = 0;
+            }
+          }
+
+          // Position the 3D ball in world space
+          worldToyRef.current.position.set(fb.ballX, fb.ballY, fb.ballZ);
+          worldToyRef.current.scale.setScalar(fb.scale);
+          if (worldToyMeshRef.current) {
+            worldToyMeshRef.current.rotation.set(fb.rotX, 0, fb.rotZ);
+            if (fb.stage === "bouncing") {
+              const bounceDist = fb.ballY - fb.targetY - 0.12;
+              const isSquash = bounceDist < 0.05;
+              if (isSquash) {
+                worldToyMeshRef.current.scale.set(1.35, 0.68, 1.35);
+              } else {
+                worldToyMeshRef.current.scale.set(0.92, 1.12, 0.92);
+              }
+            } else {
+              worldToyMeshRef.current.scale.set(1, 1, 1);
+            }
+          }
+
+          // Ball contact shadow on the ground
+          if (worldToyShadowRef.current) {
+            worldToyShadowRef.current.visible = true;
+            const groundY = getTerrainHeightAt(fb.ballX, fb.ballZ);
+            worldToyShadowRef.current.position.set(fb.ballX, groundY + 0.005, fb.ballZ);
+            const heightAboveGround = Math.max(0, fb.ballY - 0.12 - groundY);
+            const shadowScale = Math.max(0.15, 1 / (1 + heightAboveGround * 1.5)) * fb.scale;
+            worldToyShadowRef.current.scale.setScalar(shadowScale);
+            const mat = worldToyShadowRef.current.material as THREE.MeshBasicMaterial;
+            if (mat) {
+              mat.opacity = Math.max(0.06, 0.35 / (1 + heightAboveGround * 1.2)) * fb.scale;
+            }
           }
         } else if (toyId === "music-box") {
-          toyPropRef.current.position.set(0.58, -0.15, 0.78);
-          toyPropRef.current.rotation.y = -0.4;
+          const radioX = spring.position.x + 0.52;
+          const radioZ = spring.position.z + 0.28;
+          const groundY = getTerrainHeightAt(radioX, radioZ);
+          worldToyRef.current.position.set(radioX, groundY + 0.14, radioZ);
+          worldToyRef.current.scale.setScalar(1);
+
+          if (worldToyShadowRef.current) {
+            worldToyShadowRef.current.visible = true;
+            worldToyShadowRef.current.position.set(radioX, groundY + 0.005, radioZ);
+            worldToyShadowRef.current.scale.set(1.4, 0.9, 1);
+            const mat = worldToyShadowRef.current.material as THREE.MeshBasicMaterial;
+            if (mat) mat.opacity = 0.35;
+          }
 
           if (groupRef.current) {
-            groupRef.current.rotation.z = Math.sin(playT * 9) * 0.16;
-            groupRef.current.scale.x = 1 + Math.sin(playT * 18) * 0.08;
-            groupRef.current.scale.y = 1 - Math.sin(playT * 18) * 0.08;
+            groupRef.current.rotation.z = Math.sin(playTimer.current * 9) * 0.16;
+            groupRef.current.scale.x = 1 + Math.sin(playTimer.current * 18) * 0.08;
+            groupRef.current.scale.y = 1 - Math.sin(playTimer.current * 18) * 0.08;
+          }
+
+          if (playTimer.current >= 4.5) {
+            soundEffects.playHappy();
+            clearToyBeingPlayed();
+            fsm.transitionTo("happy", true);
+            setBehaviorState("happy");
+            playTimer.current = 0;
+          }
+        } else if (toyId === "bubble-blower") {
+          const yaw = groupRef.current ? groupRef.current.rotation.y : 0;
+          const wandX = spring.position.x + Math.sin(yaw + 0.4) * 0.48;
+          const wandZ = spring.position.z + Math.cos(yaw + 0.4) * 0.48;
+          worldToyRef.current.position.set(
+            wandX,
+            spring.position.y + 0.12 + Math.sin(t * 3) * 0.04,
+            wandZ
+          );
+          worldToyRef.current.scale.setScalar(1);
+
+          if (worldToyShadowRef.current) {
+            worldToyShadowRef.current.visible = false;
+          }
+
+          if (groupRef.current) {
+            groupRef.current.position.y = -0.1 + Math.abs(Math.sin(playTimer.current * 6)) * 0.07;
+          }
+
+          if (playTimer.current >= 4.5) {
+            soundEffects.playHappy();
+            clearToyBeingPlayed();
+            fsm.transitionTo("happy", true);
+            setBehaviorState("happy");
+            playTimer.current = 0;
           }
         }
       }
-
-      if (playT >= 4.2) {
-        soundEffects.playHappy();
-        clearToyBeingPlayed();
-        fsm.transitionTo("happy", true);
-        setBehaviorState("happy");
-        playTimer.current = 0;
-        lastPlayHopSoundRef.current = -1;
-      }
     } else {
       playTimer.current = 0;
-      lastPlayHopSoundRef.current = -1;
-      if (toyPropRef.current) toyPropRef.current.visible = false;
+      fetchBallRef.current.active = false;
+      if (worldToyRef.current) worldToyRef.current.visible = false;
+      if (worldToyShadowRef.current) worldToyShadowRef.current.visible = false;
+      if (!isCurrentlyEating && heartBubbleRef.current) {
+        heartBubbleRef.current.visible = false;
+      }
     }
 
     // 7. Dynamic Need-State Facial Expressions
@@ -1053,7 +1347,13 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
     const dizzyFade = isDizzy ? Math.min(1, dizzyRef.current.timer / 0.65) : 0;
     const isChewing = isEating && eatingTimer.current > 0.7 && eatingTimer.current < 2.6;
     const isBathSquint = isScrubbingNow || isRinsingNow;
-    const isHappyFace = isPlayingToy || currentState === "happy" || isPettingActive;
+    const isChasingBall =
+      isPlayingToy &&
+      currentToyBeingPlayed?.id === "bounce-ball" &&
+      (fetchBallRef.current.stage === "throwing" ||
+        fetchBallRef.current.stage === "bouncing" ||
+        fetchBallRef.current.stage === "ground");
+    const isHappyFace = (isPlayingToy && !isChasingBall) || currentState === "happy" || isPettingActive;
 
     const blinkScaleY = isRinsingNow
       ? 0.16
@@ -1073,7 +1373,14 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
         let lookX = state.pointer.x * 0.08;
         let lookY = state.pointer.y * 0.06;
 
-        if (isEating) {
+        if (isChasingBall) {
+          const fb = fetchBallRef.current;
+          const dx = fb.ballX - spring.position.x;
+          const dz = fb.ballZ - spring.position.z;
+          const distXZ = Math.hypot(dx, dz) || 1;
+          lookX = THREE.MathUtils.clamp((dx / distXZ) * 0.06, -0.06, 0.06);
+          lookY = THREE.MathUtils.clamp((fb.ballY - spring.position.y) * 0.05, -0.04, 0.08);
+        } else if (isEating) {
           lookX = 0;
           lookY = -0.05;
         } else if (currentState === "curious") {
@@ -1776,33 +2083,6 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
           </group>
         )}
 
-        {/* Interactive 3D Toy Prop and Play Accessories */}
-        {isPlayingToy && currentToyBeingPlayed && (
-          <group ref={toyPropRef}>
-            <ToyProp3D
-              toyId={currentToyBeingPlayed.id}
-              bounceHeight={playTimer.current}
-            />
-            {currentToyBeingPlayed.id === "music-box" && (
-              <>
-                <MusicalNote3D progress={playTimer.current * 0.8} offset={0} />
-                <MusicalNote3D progress={playTimer.current * 0.8} offset={0.33} />
-                <MusicalNote3D progress={playTimer.current * 0.8} offset={0.66} />
-              </>
-            )}
-            {currentToyBeingPlayed.id === "bubble-blower" && (
-              <>
-                {[0, 1, 2, 3, 4, 5].map((idx) => (
-                  <PlayBubble3D
-                    key={idx}
-                    index={idx}
-                    progress={playTimer.current * 0.75}
-                  />
-                ))}
-              </>
-            )}
-          </group>
-        )}
 
         {/* Pleading Hungry Droplet at mouth corner */}
         <group ref={salivaDripRef} position={[-0.08, -0.15, 1.05]} visible={false}>
@@ -2027,6 +2307,55 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
           depthWrite={false}
         />
       </mesh>
+
+      {/* 3D World Toy Prop (Rendered in true World Coordinates, never attached to Juro's head) */}
+      {isPlayingToy && currentToyBeingPlayed && (
+        <group ref={worldToyRef} visible={false}>
+          <group ref={worldToyMeshRef}>
+            <ToyProp3D
+              toyId={currentToyBeingPlayed.id}
+              bounceHeight={playTimer.current}
+            />
+          </group>
+          {currentToyBeingPlayed.id === "music-box" && (
+            <>
+              <MusicalNote3D progress={playTimer.current * 0.8} offset={0} />
+              <MusicalNote3D progress={playTimer.current * 0.8} offset={0.33} />
+              <MusicalNote3D progress={playTimer.current * 0.8} offset={0.66} />
+            </>
+          )}
+          {currentToyBeingPlayed.id === "bubble-blower" && (
+            <>
+              {[0, 1, 2, 3, 4, 5].map((idx) => (
+                <PlayBubble3D
+                  key={idx}
+                  index={idx}
+                  progress={playTimer.current * 0.75}
+                />
+              ))}
+            </>
+          )}
+        </group>
+      )}
+
+      {/* 3D World Toy Ground Shadow */}
+      {isPlayingToy && currentToyBeingPlayed && (
+        <mesh
+          ref={worldToyShadowRef}
+          position={[0, 0, 0]}
+          rotation={[-Math.PI / 2, 0, 0]}
+          visible={false}
+        >
+          <planeGeometry args={[0.36, 0.36]} />
+          <meshBasicMaterial
+            map={softShadowTexture ?? undefined}
+            color={softShadowTexture ? "#FFFFFF" : "#1C1410"}
+            transparent
+            opacity={0.35}
+            depthWrite={false}
+          />
+        </mesh>
+      )}
     </>
   );
 });
