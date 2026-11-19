@@ -118,8 +118,8 @@ export const MAP_BOUNDS = {
 
 // Cozy sleep bed location atop the West Knoll
 export const JURO_BED_POS = {
-  x: -3.25,
-  z: -0.55,
+  x: -3.24,
+  z: -0.52,
   platformId: "west-knoll",
 } as const;
 
@@ -247,15 +247,23 @@ export function getTerrainHeightAt(x: number, z: number): number {
 }
 
 // Check if (x, z) collides with any solid world obstacle
-export function isInsideObstacle(x: number, z: number, pad = 0.35): boolean {
+export function isInsideObstacle(
+  x: number,
+  z: number,
+  pad = 0.35,
+  isSleepingOrHeading = false
+): boolean {
   for (let i = 0; i < MAP_OBSTACLES.length; i++) {
     const obs = MAP_OBSTACLES[i];
+    if (isSleepingOrHeading && (obs.tag === "bed-frame" || Math.hypot(obs.x - JURO_BED_POS.x, obs.z - JURO_BED_POS.z) < 0.95)) {
+      continue;
+    }
     if (Math.hypot(x - obs.x, z - obs.z) < obs.radius + pad) {
       return true;
     }
   }
   // Check bed mattress
-  if (Math.hypot(x - JURO_BED_POS.x, z - JURO_BED_POS.z) < 0.44 + pad) {
+  if (!isSleepingOrHeading && Math.hypot(x - JURO_BED_POS.x, z - JURO_BED_POS.z) < 0.44 + pad) {
     return true;
   }
   return false;
@@ -279,7 +287,12 @@ export function resolveHorizontalCollisions(
     // 1. Push out of solid props (trees, bench, sofa bed frame, lanterns, boulders, shop, mine, bushes, fences)
     for (let i = 0; i < MAP_OBSTACLES.length; i++) {
       const obs = MAP_OBSTACLES[i];
-      if (isSleepingOrHeadingToBed && obs.tag === "bed-frame") continue;
+      if (
+        isSleepingOrHeadingToBed &&
+        (obs.tag === "bed-frame" || Math.hypot(obs.x - JURO_BED_POS.x, obs.z - JURO_BED_POS.z) < 0.95)
+      ) {
+        continue;
+      }
       if (bottomY >= obs.topY) continue;
       const dx = rx - obs.x;
       const dz = rz - obs.z;
@@ -312,6 +325,7 @@ export function resolveHorizontalCollisions(
     // 2. Prevent clipping sideways into elevated terrace/stump/rock walls
     for (let i = 0; i < MAP_PLATFORMS.length; i++) {
       const p = MAP_PLATFORMS[i];
+      if (isSleepingOrHeadingToBed && p.id === "west-knoll") continue;
       const platformTopY = BASE_GROUND_Y + p.height;
       // If Juro's bottom is below the platform top rim, treat the wall as solid even during early jump arc
       const threshold = allowClimbing ? platformTopY - 0.06 : platformTopY - 0.14;

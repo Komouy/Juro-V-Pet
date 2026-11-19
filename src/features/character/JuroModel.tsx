@@ -516,7 +516,9 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
         spring.position.x - JURO_BED_POS.x,
         spring.position.z - JURO_BED_POS.z
       );
-      if (distToBed < 0.45) {
+      if (distToBed < 0.22) {
+        spring.position.x = JURO_BED_POS.x;
+        spring.position.z = JURO_BED_POS.z;
         onBedArrival?.();
       }
     }
@@ -817,9 +819,14 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
           }
         } else if (currentState === "sleep") {
           const isAtBed =
-            Math.hypot(spring.position.x - JURO_BED_POS.x, spring.position.z - JURO_BED_POS.z) < 0.75;
+            Math.hypot(spring.position.x - JURO_BED_POS.x, spring.position.z - JURO_BED_POS.z) < 0.85;
           const targetX = isAtBed ? JURO_BED_POS.x : spring.position.x;
           const targetZ = isAtBed ? JURO_BED_POS.z : spring.position.z;
+          if (isAtBed) {
+            // Anchor Juro snugly in the center of the sofa mattress
+            spring.position.x = THREE.MathUtils.lerp(spring.position.x, JURO_BED_POS.x, 0.15);
+            spring.position.z = THREE.MathUtils.lerp(spring.position.z, JURO_BED_POS.z, 0.15);
+          }
           const targetGroundY = getTerrainHeightAt(targetX, targetZ);
 
           _targetVec.set(targetX, targetGroundY + BODY_BOTTOM_OFFSET * 0.96, targetZ);
@@ -837,7 +844,7 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
               0.08
             );
             const targetYaw = isAtBed ? 0.35 : 0;
-            groupRef.current.rotation.y = lerpAngle(groupRef.current.rotation.y, targetYaw, 0.06);
+            groupRef.current.rotation.y = lerpAngle(groupRef.current.rotation.y, targetYaw, 0.08);
           }
         } else if (currentState === "eating") {
           const chewY = restY + Math.sin(t * 14) * 0.015 * motionScale;
@@ -886,10 +893,10 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
       spring.target.x = postStepCollision.x;
       spring.target.z = postStepCollision.z;
 
-      // If wandering and persistently blocked by an obstacle, pick a new path immediately!
+      // If wandering and persistently blocked by an obstacle, pick a new path immediately (unless heading to bed!)
       if (currentState === "wander") {
         blockedTimerRef.current += delta;
-        if (blockedTimerRef.current > 0.35) {
+        if (blockedTimerRef.current > 0.4 && !(isHeadingToBedRef?.current ?? false)) {
           blockedTimerRef.current = 0;
           fsm.pickNewWanderTarget(spring.position);
         }
@@ -932,8 +939,8 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
       // Hard terrain collision boundary: keep Juro's bottom resting cleanly on grass/hill/bridge/stump/mattress
       const isSleepingOnBed =
         currentState === "sleep" &&
-        Math.hypot(spring.position.x - JURO_BED_POS.x, spring.position.z - JURO_BED_POS.z) < 0.6;
-      const bedMattressLift = isSleepingOnBed ? 0.125 : 0;
+        Math.hypot(spring.position.x - JURO_BED_POS.x, spring.position.z - JURO_BED_POS.z) < 0.85;
+      const bedMattressLift = isSleepingOnBed ? 0.135 : 0;
       const minCenterY = liveSurfaceY + bedMattressLift + 0.01 + BODY_BOTTOM_LOCAL * scale.y;
       spring.clampFloor(minCenterY, 0.22);
 
@@ -1004,8 +1011,8 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
     if (shadowRef.current && groupRef.current) {
       const isSleepingOnBed =
         currentState === "sleep" &&
-        Math.hypot(spring.position.x - JURO_BED_POS.x, spring.position.z - JURO_BED_POS.z) < 0.6;
-      const bedMattressLift = isSleepingOnBed ? 0.125 : 0;
+        Math.hypot(spring.position.x - JURO_BED_POS.x, spring.position.z - JURO_BED_POS.z) < 0.85;
+      const bedMattressLift = isSleepingOnBed ? 0.135 : 0;
       shadowRef.current.position.set(
         spring.position.x,
         liveSurfaceY + bedMattressLift + 0.008,
