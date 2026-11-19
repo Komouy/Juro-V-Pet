@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Utensils, Gamepad2, Sun, Moon, Droplets, HandHeart, MessageSquare, Send } from "lucide-react";
+import { Utensils, Gamepad2, Sun, Moon, Droplets, HandHeart, MessageSquare, Send, Brain } from "lucide-react";
 
 export interface JuroContextMenuProps {
   open: boolean;
@@ -10,6 +10,7 @@ export interface JuroContextMenuProps {
   totalFoodStock: number;
   onAction: (action: "food" | "toy" | "sleep" | "bath" | "pet") => void;
   onSendMessage?: (message: string) => void;
+  onOpenMemory?: () => void;
   isChatLoading?: boolean;
   menuRef?: React.RefObject<HTMLDivElement | null>;
   tailRef?: React.RefObject<HTMLDivElement | null>;
@@ -24,6 +25,7 @@ export const JuroContextMenu: React.FC<JuroContextMenuProps> = ({
   totalFoodStock,
   onAction,
   onSendMessage,
+  onOpenMemory,
   isChatLoading = false,
   menuRef,
   tailRef,
@@ -88,8 +90,18 @@ export const JuroContextMenu: React.FC<JuroContextMenuProps> = ({
                 : "bg-neutral-200 dark:bg-neutral-700 text-neutral-400 dark:text-neutral-500 cursor-not-allowed opacity-60"
             }`}
             aria-label="Kirim pesan"
+            title="Kirim pesan"
           >
             <Send size={10} strokeWidth={2.5} />
+          </button>
+          <button
+            type="button"
+            onClick={onOpenMemory}
+            className="p-1 border border-charcoal dark:border-neutral-600 bg-neutral-100 dark:bg-neutral-700 text-charcoal dark:text-white hover:bg-neutral-200 dark:hover:bg-neutral-600 active:translate-x-[1px] active:translate-y-[1px] cursor-pointer transition-all"
+            aria-label="Buka Buku Ingatan Juro"
+            title="Buku Ingatan Juro"
+          >
+            <Brain size={10} strokeWidth={2.5} className="text-juro-orange" />
           </button>
         </form>
 

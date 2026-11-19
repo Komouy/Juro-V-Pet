@@ -18,8 +18,9 @@ export interface JuroSpeechBubbleProps {
 
 /**
  * Juro's Floating Retro Speech Bubble
- * Dynamically positions to the left or right of Juro on screen, with a directional triangular pointer tail.
- * Follows Juro at 60fps via RAF if targetPosRef and containerRef are provided.
+ * Perfectly centered directly above Juro's head with a downward pointing tail that tracks Juro's horizontal position.
+ * Automatically flips below Juro if Juro walks too close to the top edge of the screen.
+ * Tracks Juro smoothly at 60fps via requestAnimationFrame without CSS transition lag.
  */
 export const JuroSpeechBubble: React.FC<JuroSpeechBubbleProps> = ({
   open,
@@ -35,13 +36,10 @@ export const JuroSpeechBubble: React.FC<JuroSpeechBubbleProps> = ({
   petName = "JURO",
 }) => {
   const rootRef = useRef<HTMLDivElement>(null);
-  const [placeOnLeft, setPlaceOnLeft] = useState<boolean>(() => {
-    const initX = screenX ?? 400;
-    const initW = containerWidth ?? 800;
-    return initX >= initW / 2;
-  });
+  const tailRef = useRef<HTMLDivElement>(null);
+  const [isPlacedAbove, setIsPlacedAbove] = useState<boolean>(true);
 
-  // Dynamic 60fps position tracking attached to Juro's screen coordinates
+  // Dynamic 60fps position tracking directly above Juro's head
   useEffect(() => {
     if (!open) return;
     let animId: number;
@@ -55,22 +53,36 @@ export const JuroSpeechBubble: React.FC<JuroSpeechBubbleProps> = ({
 
         const bubbleEl = rootRef.current;
         const bubbleW = bubbleEl.offsetWidth || 240;
-        const shouldPlaceLeft = pos.x >= contW / 2;
+        const bubbleH = bubbleEl.offsetHeight || 68;
 
-        setPlaceOnLeft((prev) => (prev !== shouldPlaceLeft ? shouldPlaceLeft : prev));
+        // Horizontally center bubble right over Juro's X coordinate
+        const targetX = pos.x - bubbleW / 2;
+        const clampedX = Math.max(16, Math.min(contW - bubbleW - 16, targetX));
 
-        let bubbleX: number;
-        if (shouldPlaceLeft) {
-          bubbleX = Math.max(12, pos.x - bubbleW - 28);
+        // Crown/head Y position
+        const crownY = pos.headY ?? (pos.y - pos.radiusPx);
+
+        // Check vertical clearance: if there is enough space above, position above; otherwise flip below
+        const spaceAbove = crownY - 14;
+        const placeAbove = spaceAbove >= bubbleH + 12;
+
+        setIsPlacedAbove((prev) => (prev !== placeAbove ? placeAbove : prev));
+
+        let clampedY: number;
+        if (placeAbove) {
+          clampedY = Math.max(14, crownY - bubbleH - 12);
         } else {
-          bubbleX = Math.min(contW - bubbleW - 12, pos.x + 28);
+          clampedY = Math.min(contH - bubbleH - 16, pos.y + (pos.radiusPx * 0.75) + 14);
         }
 
-        const crownY = pos.headY ?? (pos.y - pos.radiusPx);
-        const bubbleY = Math.max(24, Math.min(contH - 120, crownY - 30));
+        // Apply smooth GPU-accelerated transform without CSS transition lag
+        bubbleEl.style.transform = `translate3d(${clampedX}px, ${clampedY}px, 0)`;
 
-        bubbleEl.style.left = `${bubbleX}px`;
-        bubbleEl.style.top = `${bubbleY}px`;
+        // Position pointer tail to point directly towards Juro's center
+        if (tailRef.current) {
+          const tailX = Math.max(16, Math.min(bubbleW - 16, pos.x - clampedX));
+          tailRef.current.style.left = `${tailX}px`;
+        }
       }
       animId = requestAnimationFrame(updatePosition);
     };
@@ -81,49 +93,51 @@ export const JuroSpeechBubble: React.FC<JuroSpeechBubbleProps> = ({
 
   if (!open) return null;
 
-  // Fallback calculations for static rendering or isolated tests
+  // Fallback initial calculations for static rendering or isolated tests
   const contW = containerWidth || (typeof window !== "undefined" ? window.innerWidth : 800);
   const contH = containerHeight || (typeof window !== "undefined" ? window.innerHeight : 600);
   const fallbackX = screenX ?? contW / 2;
   const fallbackY = headY ?? contH / 2;
-  const fallbackLeft = fallbackX >= contW / 2;
-  const bubbleW = Math.min(260, contW - 48);
+  const bubbleW = Math.min(270, contW - 32);
+  const bubbleH = 68;
 
-  const initialX = fallbackLeft
-    ? Math.max(12, fallbackX - bubbleW - 28)
-    : Math.min(contW - bubbleW - 12, fallbackX + 28);
-  const initialY = Math.max(24, Math.min(contH - 120, fallbackY - 45));
+  const initialX = Math.max(16, Math.min(contW - bubbleW - 16, fallbackX - bubbleW / 2));
+  const placeAboveInitial = fallbackY - 14 >= bubbleH + 12;
+  const initialY = placeAboveInitial
+    ? Math.max(14, fallbackY - bubbleH - 12)
+    : Math.min(contH - bubbleH - 16, fallbackY + 45);
+  const initialTailLeft = Math.max(16, Math.min(bubbleW - 16, fallbackX - initialX));
 
   return (
     <div
       ref={rootRef}
       style={{
-        left: `${initialX}px`,
-        top: `${initialY}px`,
+        transform: `translate3d(${initialX}px, ${initialY}px, 0)`,
         maxWidth: `${bubbleW}px`,
+        width: "max-content",
       }}
-      className="absolute z-35 pointer-events-auto transition-[left,top] duration-75 ease-out select-none"
+      className="absolute top-0 left-0 z-35 pointer-events-auto will-change-transform select-none"
     >
       <div className="relative animate-tray-enter p-2 sm:p-2.5 bg-warm-white/95 dark:bg-neutral-900/95 backdrop-blur-xs border-2 border-charcoal dark:border-neutral-600 shadow-[3px_3px_0px_#171717] dark:shadow-[3px_3px_0px_#000000]">
-        {/* Directional Pointer Tail */}
-        {placeOnLeft ? (
-          // Tail on the right side pointing right towards Juro
+        {/* Dynamic Pointer Tail — points straight down to Juro (or straight up if flipped) */}
+        {isPlacedAbove ? (
           <div
-            style={{ top: "18px" }}
-            className="absolute -right-2 w-3.5 h-3.5 bg-warm-white dark:bg-neutral-900 rotate-45 border-t-2 border-r-2 border-charcoal dark:border-neutral-600 pointer-events-none"
+            ref={tailRef}
+            style={{ left: `${initialTailLeft}px` }}
+            className="absolute -bottom-1.5 -translate-x-1/2 w-3 h-3 bg-warm-white dark:bg-neutral-900 rotate-45 border-r-2 border-b-2 border-charcoal dark:border-neutral-600 pointer-events-none"
             aria-hidden="true"
           />
         ) : (
-          // Tail on the left side pointing left towards Juro
           <div
-            style={{ top: "18px" }}
-            className="absolute -left-2 w-3.5 h-3.5 bg-warm-white dark:bg-neutral-900 rotate-45 border-b-2 border-l-2 border-charcoal dark:border-neutral-600 pointer-events-none"
+            ref={tailRef}
+            style={{ left: `${initialTailLeft}px` }}
+            className="absolute -top-1.5 -translate-x-1/2 w-3 h-3 bg-warm-white dark:bg-neutral-900 rotate-45 border-l-2 border-t-2 border-charcoal dark:border-neutral-600 pointer-events-none"
             aria-hidden="true"
           />
         )}
 
         {/* Header Bar: Pet Name Badge + Close Icon */}
-        <div className="flex items-center justify-between gap-2 pb-1 border-b border-charcoal/20 dark:border-neutral-700/60 mb-1.5">
+        <div className="flex items-center justify-between gap-3 pb-1 border-b border-charcoal/20 dark:border-neutral-700/60 mb-1.5">
           <div className="flex items-center gap-1">
             <span className="w-1.5 h-1.5 bg-juro-orange inline-block" />
             <span className="pixel-text text-[7.5px] sm:text-[8.5px] font-bold text-juro-orange uppercase tracking-wider">

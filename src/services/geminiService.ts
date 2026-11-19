@@ -3,6 +3,13 @@
  * Connects Juro to Google Gemini 2.5 Flash API for cute, witty, and contextual pet replies.
  */
 
+import {
+  addChatMessage,
+  extractMemoriesFromMessage,
+  getFormattedGeminiHistory,
+  getPetMemories,
+} from "./petMemoryService";
+
 export interface PetChatContext {
   name: string;
   hunger: number;
@@ -25,6 +32,7 @@ export interface PetChatContext {
   isNight?: boolean;
   isRaining?: boolean;
   isSpontaneous?: boolean;
+  memories?: string[];
 }
 
 const STORAGE_KEY = "juro_gemini_api_key";
@@ -326,6 +334,12 @@ export function buildJuroSystemPrompt(context?: PetChatContext): string {
     ? "Ini adalah celetukan spontan/gumamanmu sendiri (monolog lucu) yang kamu ucapkan tiba-tiba kepada pemilikmu tanpa ditanya. Ungkapkan celetukan imut yang sedang kamu pikirkan atau rasakan saat ini."
     : "Jawablah pesan atau sapaan dari pemilikmu dengan menghubungkannya langsung ke kondisi dan ekspresimu saat ini.";
 
+  const rawMemories = context?.memories ?? getPetMemories().map((m) => m.text);
+  const memoryInfo =
+    rawMemories.length > 0
+      ? `INGATAN JURO TENTANG PEMILIK: ${rawMemories.slice(0, 8).join("; ")}. Kamu SELALU mengingat fakta-fakta ini tentang pemilikmu dan gunakan ingatan ini saat mengobrol agar terasa akrab!`
+      : "";
+
   return [
     `Kamu adalah ${petName}, sesosok slime jeli oranye peliharaan virtual yang imut, polos, lucu, agak gembul, dan sangat menyayangi pemilikmu.`,
     `Kamu tinggal di sebuah lembah padang rumput yang damai, dengan sungai kecil berair jernih, bukit santai, dan gua kristal.`,
@@ -333,6 +347,7 @@ export function buildJuroSystemPrompt(context?: PetChatContext): string {
     energyInfo,
     moodState,
     weatherState,
+    memoryInfo,
     `KONDISI & EKSPRESI JURO SAAT INI (WAJIB JADI FOKUS UTAMA JAWABAN):`,
     `- Sedang melakukan: ${activity}.`,
     `- Ekspresi wajah & perasaan: ${expression}.`,
@@ -393,6 +408,12 @@ export async function chatWithJuro(
     return "Bloop? Pemilikku mau ngomong apa nih ke Juro? Slimey~";
   }
 
+  // Record user message & extract facts into long-term memory
+  if (trimmedInput) {
+    extractMemoriesFromMessage(trimmedInput);
+    addChatMessage("user", trimmedInput);
+  }
+
   const promptText =
     trimmedInput ||
     "Bloop! Celetuk sesuatu yang imut sesuai apa yang sedang kamu lakukan sekarang!";
@@ -401,7 +422,9 @@ export async function chatWithJuro(
 
   // If no Gemini API key is configured, respond with a contextual in-character fallback
   if (!apiKey) {
-    return getContextualFallbackReply(context);
+    const fallbackReply = getContextualFallbackReply(context);
+    addChatMessage("juro", fallbackReply);
+    return fallbackReply;
   }
 
   const systemInstruction = buildJuroSystemPrompt(context);
@@ -409,16 +432,14 @@ export async function chatWithJuro(
   try {
     const url = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${apiKey}`;
 
+    // Format multi-turn conversation history with alternating turns
+    const formattedContents = getFormattedGeminiHistory(promptText);
+
     const requestBody = {
       systemInstruction: {
         parts: [{ text: systemInstruction }],
       },
-      contents: [
-        {
-          role: "user",
-          parts: [{ text: promptText }],
-        },
-      ],
+      contents: formattedContents,
       generationConfig: {
         temperature: 0.85,
         maxOutputTokens: 100,
@@ -442,7 +463,9 @@ export async function chatWithJuro(
     if (!response.ok) {
       const errorText = await response.text();
       console.warn("Gemini API error:", response.status, errorText);
-      return getContextualFallbackReply(context);
+      const fallback = getContextualFallbackReply(context);
+      addChatMessage("juro", fallback);
+      return fallback;
     }
 
     const data = await response.json();
@@ -450,13 +473,19 @@ export async function chatWithJuro(
       data.candidates?.[0]?.content?.parts?.[0]?.text;
 
     if (replyText && typeof replyText === "string") {
-      return sanitizeJuroReply(replyText);
+      const sanitized = sanitizeJuroReply(replyText);
+      addChatMessage("juro", sanitized);
+      return sanitized;
     }
 
-    return getContextualFallbackReply(context);
+    const fallback = getContextualFallbackReply(context);
+    addChatMessage("juro", fallback);
+    return fallback;
   } catch (error) {
     console.warn("Gemini chat error, using fallback:", error);
-    return getContextualFallbackReply(context);
+    const fallback = getContextualFallbackReply(context);
+    addChatMessage("juro", fallback);
+    return fallback;
   }
 }
 

@@ -31,6 +31,7 @@ import { StatBars } from "./viewport/StatBars";
 import { ActionTray, type DragPayload } from "./viewport/ActionTray";
 import { JuroContextMenu } from "./viewport/JuroContextMenu";
 import { JuroSpeechBubble } from "./viewport/JuroSpeechBubble";
+import { JuroMemoryModal } from "./viewport/JuroMemoryModal";
 import {
   chatWithJuro,
   computePetExpression,
@@ -99,6 +100,8 @@ export const PetViewport: React.FC = () => {
     y: 0,
     isNearTop: false,
   });
+
+  const [showMemoryModal, setShowMemoryModal] = useState(false);
 
   const [speechBubble, setSpeechBubble] = useState<{
     text: string;
@@ -243,9 +246,9 @@ export const PetViewport: React.FC = () => {
     [juroMenu.open]
   );
 
-  // Dismiss open trays / stat popover / Juro menu / Petting Mode / Speech Bubble on Escape key
+  // Dismiss open trays / stat popover / Juro menu / Petting Mode / Speech Bubble / Memory Modal on Escape key
   useEffect(() => {
-    if (activeTray === "none" && !showStatDetails && !juroMenu.open && !isPettingActive && !speechBubble.visible) return;
+    if (activeTray === "none" && !showStatDetails && !juroMenu.open && !isPettingActive && !speechBubble.visible && !showMemoryModal) return;
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
         if (isPettingActive) setIsPettingActive(false);
@@ -253,11 +256,12 @@ export const PetViewport: React.FC = () => {
         setShowStatDetails(false);
         setJuroMenu({ open: false, x: 0, y: 0, isNearTop: false });
         setSpeechBubble((s) => ({ ...s, visible: false }));
+        setShowMemoryModal(false);
       }
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [activeTray, showStatDetails, juroMenu.open, isPettingActive, speechBubble.visible]);
+  }, [activeTray, showStatDetails, juroMenu.open, isPettingActive, speechBubble.visible, showMemoryModal]);
 
   // Dynamically assemble pet context: activities, emotions, sensations & environmental state
   const getLiveChatContext = useCallback(
@@ -1305,10 +1309,23 @@ export const PetViewport: React.FC = () => {
         totalFoodStock={totalFoodStock}
         onAction={handleMenuAction}
         onSendMessage={handleSendMessage}
+        onOpenMemory={() => {
+          setJuroMenu((m) => ({ ...m, open: false }));
+          setShowMemoryModal(true);
+        }}
         isChatLoading={speechBubble.isLoading}
         menuRef={juroMenuRef}
         tailRef={tailRef}
       />
+
+      {/* Juro's Memory Book Modal */}
+      {showMemoryModal && (
+        <JuroMemoryModal
+          open={showMemoryModal}
+          onClose={() => setShowMemoryModal(false)}
+          petName={name}
+        />
+      )}
 
       {/* Juro's Floating Retro Speech Bubble */}
       <JuroSpeechBubble

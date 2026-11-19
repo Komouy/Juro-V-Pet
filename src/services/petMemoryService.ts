@@ -1,0 +1,238 @@
+/**
+ * Pet Memory & Conversation History Service for Juro
+ * Handles multi-turn chat history persistence and long-term remembered facts about the user.
+ */
+
+export interface ChatMessage {
+  id: string;
+  sender: "user" | "juro";
+  text: string;
+  timestamp: number;
+}
+
+export interface PetMemoryItem {
+  id: string;
+  text: string;
+  createdAt: number;
+  category?: "profile" | "preference" | "milestone" | "custom";
+}
+
+const CHAT_HISTORY_STORAGE_KEY = "juro_chat_history_v1";
+const MEMORIES_STORAGE_KEY = "juro_memories_v1";
+const MAX_STORED_MESSAGES = 40;
+const MAX_CONTEXT_TURNS = 10; // Number of recent turns passed to Gemini API
+
+/**
+ * Safe local storage reader
+ */
+function readStorage<T>(key: string, fallback: T): T {
+  try {
+    const raw = localStorage.getItem(key);
+    if (!raw) return fallback;
+    return JSON.parse(raw) as T;
+  } catch {
+    return fallback;
+  }
+}
+
+/**
+ * Safe local storage writer
+ */
+function writeStorage<T>(key: string, data: T): void {
+  try {
+    localStorage.setItem(key, JSON.stringify(data));
+  } catch {
+    // LocalStorage quota or restricted environment
+  }
+}
+
+/**
+ * Get all stored chat messages
+ */
+export function getChatHistory(): ChatMessage[] {
+  return readStorage<ChatMessage[]>(CHAT_HISTORY_STORAGE_KEY, []);
+}
+
+/**
+ * Save a new chat message to persistent history
+ */
+export function addChatMessage(sender: "user" | "juro", text: string): ChatMessage {
+  const cleanText = text.trim();
+  const newMessage: ChatMessage = {
+    id: `msg-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+    sender,
+    text: cleanText,
+    timestamp: Date.now(),
+  };
+
+  const history = getChatHistory();
+  const updated = [...history, newMessage].slice(-MAX_STORED_MESSAGES);
+  writeStorage(CHAT_HISTORY_STORAGE_KEY, updated);
+  return newMessage;
+}
+
+/**
+ * Clear all chat messages
+ */
+export function clearChatHistory(): void {
+  try {
+    localStorage.removeItem(CHAT_HISTORY_STORAGE_KEY);
+  } catch {
+    // Ignored
+  }
+}
+
+/**
+ * Format recent messages for Google Gemini REST API `contents` array.
+ * Ensures strict alternation between "user" and "model", starting with "user".
+ */
+export function getFormattedGeminiHistory(
+  newPrompt: string
+): Array<{ role: "user" | "model"; parts: Array<{ text: string }> }> {
+  const history = getChatHistory();
+  const recent = history.slice(-MAX_CONTEXT_TURNS);
+
+  const formatted: Array<{ role: "user" | "model"; parts: Array<{ text: string }> }> = [];
+
+  for (const msg of recent) {
+    const role: "user" | "model" = msg.sender === "user" ? "user" : "model";
+
+    // Gemini API requires strict role alternation
+    if (formatted.length > 0 && formatted[formatted.length - 1].role === role) {
+      // Append text to the existing turn if same role repeated
+      formatted[formatted.length - 1].parts[0].text += ` ${msg.text}`;
+    } else {
+      formatted.push({
+        role,
+        parts: [{ text: msg.text }],
+      });
+    }
+  }
+
+  // Ensure first element is "user" if history began with "model"
+  while (formatted.length > 0 && formatted[0].role !== "user") {
+    formatted.shift();
+  }
+
+  // Append current user prompt
+  if (formatted.length > 0 && formatted[formatted.length - 1].role === "user") {
+    formatted[formatted.length - 1].parts[0].text += ` ${newPrompt.trim()}`;
+  } else {
+    formatted.push({
+      role: "user",
+      parts: [{ text: newPrompt.trim() }],
+    });
+  }
+
+  return formatted;
+}
+
+/**
+ * Get all stored facts / memories about the user
+ */
+export function getPetMemories(): PetMemoryItem[] {
+  return readStorage<PetMemoryItem[]>(MEMORIES_STORAGE_KEY, []);
+}
+
+/**
+ * Add a fact / memory to Juro's persistent memory bank
+ */
+export function addPetMemory(
+  text: string,
+  category: PetMemoryItem["category"] = "custom"
+): PetMemoryItem | null {
+  const clean = text.trim();
+  if (!clean || clean.length < 3) return null;
+
+  const current = getPetMemories();
+
+  // Deduplicate case-insensitively
+  const exists = current.some((m) => m.text.toLowerCase() === clean.toLowerCase());
+  if (exists) return null;
+
+  const newMemory: PetMemoryItem = {
+    id: `mem-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+    text: clean,
+    createdAt: Date.now(),
+    category,
+  };
+
+  const updated = [newMemory, ...current].slice(0, 30);
+  writeStorage(MEMORIES_STORAGE_KEY, updated);
+  return newMemory;
+}
+
+/**
+ * Remove a specific memory by ID
+ */
+export function removePetMemory(id: string): void {
+  const current = getPetMemories();
+  const updated = current.filter((m) => m.id !== id);
+  writeStorage(MEMORIES_STORAGE_KEY, updated);
+}
+
+/**
+ * Clear all stored memories
+ */
+export function clearPetMemories(): void {
+  try {
+    localStorage.removeItem(MEMORIES_STORAGE_KEY);
+  } catch {
+    // Ignored
+  }
+}
+
+/**
+ * Automatic Memory Extractor:
+ * Analyzes the user's message for personal details (name, favorites, hobbies, moods)
+ * and automatically saves them as remembered facts.
+ */
+export function extractMemoriesFromMessage(userMessage: string): PetMemoryItem[] {
+  const text = userMessage.trim();
+  if (!text) return [];
+
+  const extracted: PetMemoryItem[] = [];
+
+  // 1. Name patterns: "namaku X", "nama aku X", "panggil aku X"
+  const nameMatch = text.match(/(?:namaku|nama\s+aku|panggil\s+aku)\s+([A-Za-z0-9_-]+)/i);
+  if (nameMatch && nameMatch[1]) {
+    const rawName = nameMatch[1].trim();
+    if (rawName.length > 1 && !/^(siapa|apa|ya|deh|nih|dong)$/i.test(rawName)) {
+      const mem = addPetMemory(`Nama pemilik adalah ${rawName}`, "profile");
+      if (mem) extracted.push(mem);
+    }
+  }
+
+  // 2. Favorite food patterns: "makanan favoritku X", "makanan kesukaanku X"
+  const foodMatch = text.match(/(?:makanan\s+favoritku|makanan\s+kesukaanku|makanan\s+favorit\s+aku)\s+(.+?)(?:[.,!?]|$)/i);
+  if (foodMatch && foodMatch[1]) {
+    const food = foodMatch[1].trim();
+    if (food.length > 2) {
+      const mem = addPetMemory(`Makanan favorit pemilik adalah ${food}`, "preference");
+      if (mem) extracted.push(mem);
+    }
+  }
+
+  // 3. General likes: "aku suka X", "aku menyukai X", "hobiku X"
+  const likeMatch = text.match(/(?:aku\s+suka|aku\s+menyukai|hobiku|hobi\s+aku)\s+(.+?)(?:[.,!?]|$)/i);
+  if (likeMatch && likeMatch[1]) {
+    const thing = likeMatch[1].trim();
+    // Exclude generic short phrases like "kamu", "juro"
+    if (thing.length > 2 && !/^(kamu|juro|ini|itu)$/i.test(thing)) {
+      const mem = addPetMemory(`Pemilik menyukai ${thing}`, "preference");
+      if (mem) extracted.push(mem);
+    }
+  }
+
+  // 4. Explicit memory instruction: "ingat ya: X", "ingat ini: X"
+  const explicitMatch = text.match(/(?:ingat\s+ya|ingat\s+ini|tolong\s+ingat)[:\s]+(.+?)(?:[.,!?]|$)/i);
+  if (explicitMatch && explicitMatch[1]) {
+    const fact = explicitMatch[1].trim();
+    if (fact.length > 3) {
+      const mem = addPetMemory(fact, "custom");
+      if (mem) extracted.push(mem);
+    }
+  }
+
+  return extracted;
+}
