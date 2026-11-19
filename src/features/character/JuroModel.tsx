@@ -151,6 +151,13 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
     z: 0,
   });
 
+  const radioStandRef = useRef({
+    active: false,
+    x: 0,
+    y: 0,
+    z: 0,
+  });
+
   // Dynamic Expressions & Need-State Refs
   const bodyMeshRef = useRef<THREE.Mesh>(null);
   const salivaDripRef = useRef<THREE.Group>(null);
@@ -1265,28 +1272,58 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
             }
           }
         } else if (toyId === "music-box") {
-          const radioX = spring.position.x + 0.52;
-          const radioZ = spring.position.z + 0.28;
-          const groundY = getTerrainHeightAt(radioX, radioZ);
-          worldToyRef.current.position.set(radioX, groundY + 0.14, radioZ);
+          const rs = radioStandRef.current;
+          if (!rs.active) {
+            rs.active = true;
+            // Place retro radio freestanding on the meadow grass at a comfortable distance (never attached to Juro!)
+            const yaw = groupRef.current ? groupRef.current.rotation.y : 0;
+            const placeAngle = yaw + 0.55;
+            const placeDist = 1.35;
+            const candX = THREE.MathUtils.clamp(
+              spring.position.x + Math.sin(placeAngle) * placeDist,
+              MAP_BOUNDS.minX + 0.6,
+              MAP_BOUNDS.maxX - 0.6
+            );
+            const candZ = THREE.MathUtils.clamp(
+              spring.position.z + Math.cos(placeAngle) * placeDist,
+              MAP_BOUNDS.minZ + 0.6,
+              MAP_BOUNDS.maxZ - 0.6
+            );
+            const safe = resolveHorizontalCollisions(candX, candZ, BASE_GROUND_Y, 0.3, false, false);
+            rs.x = safe.x;
+            rs.z = safe.z;
+            rs.y = getTerrainHeightAt(safe.x, safe.z) + 0.14;
+            soundEffects.playHappy();
+          }
+
+          // Freestanding radio playing chiptune music on the meadow
+          worldToyRef.current.position.set(rs.x, rs.y, rs.z);
           worldToyRef.current.scale.setScalar(1);
+          if (worldToyMeshRef.current) {
+            worldToyMeshRef.current.rotation.set(0, -0.35 + Math.sin(t * 3.5) * 0.04, 0);
+          }
 
           if (worldToyShadowRef.current) {
             worldToyShadowRef.current.visible = true;
-            worldToyShadowRef.current.position.set(radioX, groundY + 0.005, radioZ);
-            worldToyShadowRef.current.scale.set(1.4, 0.9, 1);
+            const groundY = getTerrainHeightAt(rs.x, rs.z);
+            worldToyShadowRef.current.position.set(rs.x, groundY + 0.005, rs.z);
+            worldToyShadowRef.current.scale.set(0.65, 0.45, 1);
             const mat = worldToyShadowRef.current.material as THREE.MeshBasicMaterial;
             if (mat) mat.opacity = 0.35;
           }
 
+          // Juro grooves happily on the grass facing the radio — STAYS POCKET-SIZED (multiplication by relative factor, NEVER absolute scale override!)
+          const lookAngle = Math.atan2(rs.x - spring.position.x, rs.z - spring.position.z);
           if (groupRef.current) {
-            groupRef.current.rotation.z = Math.sin(playTimer.current * 9) * 0.16;
-            groupRef.current.scale.x = 1 + Math.sin(playTimer.current * 18) * 0.08;
-            groupRef.current.scale.y = 1 - Math.sin(playTimer.current * 18) * 0.08;
+            groupRef.current.rotation.y = lerpAngle(groupRef.current.rotation.y, lookAngle, 0.12);
+            groupRef.current.rotation.z = Math.sin(playTimer.current * 8) * 0.14;
+            groupRef.current.scale.x *= 1 + Math.sin(playTimer.current * 16) * 0.04;
+            groupRef.current.scale.y *= 1 - Math.sin(playTimer.current * 16) * 0.04;
           }
 
-          if (playTimer.current >= 4.5) {
+          if (playTimer.current >= 4.8) {
             soundEffects.playHappy();
+            rs.active = false;
             clearToyBeingPlayed();
             fsm.transitionTo("happy", true);
             setBehaviorState("happy");
@@ -1363,6 +1400,7 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
       playTimer.current = 0;
       fetchBallRef.current.active = false;
       bubbleStandRef.current.active = false;
+      radioStandRef.current.active = false;
       if (worldToyRef.current) worldToyRef.current.visible = false;
       if (worldToyShadowRef.current) worldToyShadowRef.current.visible = false;
       if (!isCurrentlyEating && heartBubbleRef.current) {
