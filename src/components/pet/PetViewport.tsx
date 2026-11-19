@@ -24,6 +24,7 @@ import {
   Heart,
   Zap,
   HandHeart,
+  Hand,
   Store,
   X,
 } from "lucide-react";
@@ -119,7 +120,12 @@ export const PetViewport: React.FC = () => {
 
   const [activeTray, setActiveTray] = useState<ActiveTray>("none");
   const [showStatDetails, setShowStatDetails] = useState(false);
+  const [showJuroMenu, setShowJuroMenu] = useState(false);
+  const [grabRequested, setGrabRequested] = useState<number | undefined>(undefined);
   const [isDraggingPet, setIsDraggingPet] = useState(false);
+
+  const juroMenuRef = useRef<HTMLDivElement>(null);
+  const tailRef = useRef<HTMLDivElement>(null);
 
   // Coarse UI states (only change on discrete state flips — NEVER on pointermove pixels!)
   const [dragVisual, setDragVisual] = useState<DragVisualState | null>(null);
@@ -127,33 +133,112 @@ export const PetViewport: React.FC = () => {
   const [walkCommand, setWalkCommand] = useState<WalkCommand | null>(null);
 
   const handleWalkPointSelect = useCallback((x: number, z: number) => {
+    setShowJuroMenu(false);
     setActiveTray("none");
     setShowStatDetails(false);
     setWalkCommand({ x, z, nonce: Date.now() });
   }, [setActiveTray, setShowStatDetails]);
 
   const handleOpenShopFromMap = useCallback(() => {
+    setShowJuroMenu(false);
     soundEffects.playClick();
     navigate("/shop");
   }, [navigate]);
 
   const handleOpenMineFromMap = useCallback(() => {
+    setShowJuroMenu(false);
     soundEffects.playClick();
     navigate("/mine");
   }, [navigate]);
 
-  // Dismiss open trays / stat popover on Escape key
+  const handlePetClick = useCallback(() => {
+    soundEffects.playSquish();
+    setShowStatDetails(false);
+    setActiveTray("none");
+    setShowJuroMenu((prev) => !prev);
+  }, []);
+
+  // Dismiss open trays / stat popover / Juro menu on Escape key
   useEffect(() => {
-    if (activeTray === "none" && !showStatDetails) return;
+    if (activeTray === "none" && !showStatDetails && !showJuroMenu) return;
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
         setActiveTray("none");
         setShowStatDetails(false);
+        setShowJuroMenu(false);
       }
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [activeTray, showStatDetails]);
+  }, [activeTray, showStatDetails, showJuroMenu]);
+
+  // Dismiss Juro menu when clicking outside
+  useEffect(() => {
+    if (!showJuroMenu) return;
+    const onWindowClick = (e: MouseEvent) => {
+      if (juroMenuRef.current && juroMenuRef.current.contains(e.target as Node)) {
+        return;
+      }
+      setShowJuroMenu(false);
+    };
+    const timer = setTimeout(() => {
+      window.addEventListener("click", onWindowClick);
+    }, 60);
+    return () => {
+      clearTimeout(timer);
+      window.removeEventListener("click", onWindowClick);
+    };
+  }, [showJuroMenu]);
+
+  // Dismiss Juro menu when user rotates or zooms camera with OrbitControls
+  useEffect(() => {
+    const controls = controlsRef.current;
+    if (!controls) return;
+    const onOrbitStart = () => {
+      setShowJuroMenu(false);
+    };
+    controls.addEventListener("start", onOrbitStart);
+    return () => controls.removeEventListener("start", onOrbitStart);
+  }, []);
+
+  // Lightweight 60fps RAF loop to lock Juro menu directly above Juro in screen coordinates
+  useEffect(() => {
+    if (!showJuroMenu) return;
+    let animId: number;
+    const update = () => {
+      if (juroMenuRef.current && juroScreenPosRef.current && containerRef.current) {
+        const contRect = containerRef.current.getBoundingClientRect();
+        const pos = juroScreenPosRef.current;
+        const contW = contRect.width || window.innerWidth;
+        const contH = contRect.height || window.innerHeight;
+
+        const menuWidth = 360;
+        const halfW = menuWidth / 2;
+        const clampedX = Math.max(halfW + 8, Math.min(contW - halfW - 8, pos.x));
+
+        const isNearTop = pos.y < 135;
+        const targetY = isNearTop ? pos.y + pos.radiusPx + 16 : pos.y - pos.radiusPx - 16;
+        const clampedY = Math.max(16, Math.min(contH - 70, targetY));
+
+        juroMenuRef.current.style.transform = `translate3d(${clampedX}px, ${clampedY}px, 0) translate(-50%, ${
+          isNearTop ? "0" : "-100%"
+        })`;
+
+        if (tailRef.current) {
+          if (isNearTop) {
+            tailRef.current.className =
+              "absolute -top-1.5 left-1/2 -translate-x-1/2 w-3 h-3 bg-warm-white dark:bg-neutral-900 border-l-2 border-t-2 border-charcoal dark:border-neutral-600 rotate-45";
+          } else {
+            tailRef.current.className =
+              "absolute -bottom-1.5 left-1/2 -translate-x-1/2 w-3 h-3 bg-warm-white dark:bg-neutral-900 border-r-2 border-b-2 border-charcoal dark:border-neutral-600 rotate-45";
+          }
+        }
+      }
+      animId = requestAnimationFrame(update);
+    };
+    update();
+    return () => cancelAnimationFrame(animId);
+  }, [showJuroMenu]);
 
   // Imperative drag tracking refs (zero allocations, zero layout thrash, zero re-renders)
   const dragMetaRef = useRef<{
@@ -478,11 +563,6 @@ export const PetViewport: React.FC = () => {
     }
   };
 
-  const handleToggleTray = (tray: Exclude<ActiveTray, "none">) => {
-    soundEffects.playClick();
-    setActiveTray((prev) => (prev === tray ? "none" : tray));
-  };
-
   const handleToggleSleep = () => {
     if (currentState === "sleep") {
       wakeUp();
@@ -494,6 +574,30 @@ export const PetViewport: React.FC = () => {
       addLog("sleep", "Juro memejamkan mata dan tidur lelap.");
     }
     setActiveTray("none");
+  };
+
+  const handleMenuAction = (action: "food" | "toy" | "sleep" | "bath" | "grab") => {
+    soundEffects.playClick();
+    setShowJuroMenu(false);
+    setShowStatDetails(false);
+
+    switch (action) {
+      case "food":
+        setActiveTray("food");
+        break;
+      case "toy":
+        setActiveTray("toy");
+        break;
+      case "sleep":
+        handleToggleSleep();
+        break;
+      case "bath":
+        setActiveTray("bath");
+        break;
+      case "grab":
+        setGrabRequested(Date.now());
+        break;
+    }
   };
 
   const compactStats = [
@@ -534,7 +638,9 @@ export const PetViewport: React.FC = () => {
     <div
       ref={containerRef}
       style={{ background: activeTheme.skyGradient }}
-      className="relative flex-1 min-h-0 w-full overflow-hidden select-none touch-none transition-all duration-700"
+      className={`relative flex-1 min-h-0 w-full overflow-hidden select-none touch-none transition-all duration-700 ${
+        isDraggingPet ? "cursor-grabbing" : "cursor-default"
+      }`}
     >
       {/* Top Overlay Bar: Compact Tap-to-Peek Stat Strip (Left) + Camera Zoom Dock (Right) */}
       <div className="absolute top-3 left-3 right-3 z-20 flex items-start justify-between gap-2 pointer-events-none">
@@ -703,12 +809,14 @@ export const PetViewport: React.FC = () => {
             onOpenMine={handleOpenMineFromMap}
           />
 
-          {/* Juro Pocket-Sized 3D Slime Model with Crawling, Jumping & Bathing */}
+          {/* Juro Pocket-Sized 3D Slime Model with Crawling, Jumping, Bathing & Pegang */}
           <JuroModel
             onDraggingChange={handleDraggingPetChange}
             bathStateRef={bathStateRef}
             juroScreenPosRef={juroScreenPosRef}
             walkCommand={walkCommand}
+            onPetClick={handlePetClick}
+            grabRequested={grabRequested}
           />
 
           {/* Wide Diorama Orbit Controls — automatically paused while grabbing Juro or dragging any item */}
@@ -753,12 +861,13 @@ export const PetViewport: React.FC = () => {
         </div>
       )}
 
-      {/* Bottom Floating Controls: Pop-up Draggable Trays + Minimalist Action Dock */}
-      <div
-        className={`absolute bottom-3 left-1/2 -translate-x-1/2 z-20 flex flex-col items-center gap-2 w-max max-w-[calc(100%-1.5rem)] transition-opacity duration-150 ${
-          dragVisual?.moved ? "opacity-30 pointer-events-none" : "opacity-100"
-        }`}
-      >
+      {/* Bottom Floating Trays (Food Pantry, Toy Shelf, Bath Kit) */}
+      {activeTray !== "none" && (
+        <div
+          className={`absolute bottom-3 left-1/2 -translate-x-1/2 z-20 flex flex-col items-center gap-2 w-max max-w-[calc(100%-1.5rem)] transition-opacity duration-150 ${
+            dragVisual?.moved ? "opacity-30 pointer-events-none" : "opacity-100"
+          }`}
+        >
         {/* Pop-Up Food Pantry Strip (Real Consumable Stock — Drag onto Juro or Tap) */}
         {activeTray === "food" && (() => {
           const availableFoods = SHOP_FOODS.filter((f) => (foodInventory[f.id] ?? 0) > 0);
@@ -960,76 +1069,94 @@ export const PetViewport: React.FC = () => {
           </div>
         )}
 
-        {/* Minimalist Floating Action Dock (Consistent Desktop & Mobile Fit) */}
-        <div className="inline-flex items-center gap-1 sm:gap-2 p-1.5 bg-warm-white/95 dark:bg-neutral-900/92 backdrop-blur-xs border-2 border-charcoal dark:border-neutral-600 shadow-[3px_3px_0px_#171717] dark:shadow-[3px_3px_0px_#000000]">
-          <button
-            type="button"
-            onClick={() => handleToggleTray("food")}
-            className={`relative inline-flex items-center gap-1 sm:gap-1.5 px-2.5 sm:px-3 py-1.5 border-2 pixel-text text-[9px] sm:text-[10px] uppercase font-bold tracking-wider transition-all cursor-pointer active:translate-x-[1px] active:translate-y-[1px] ${
-              activeTray === "food"
-                ? "bg-juro-orange text-white border-charcoal shadow-none"
-                : "bg-white dark:bg-neutral-800 text-charcoal dark:text-white border-charcoal dark:border-neutral-600 shadow-[2px_2px_0px_#171717] dark:shadow-[2px_2px_0px_#000000] hover:border-juro-orange"
-            }`}
-          >
-            <Utensils size={13} strokeWidth={2.5} />
-            <span>Makan</span>
-            {totalFoodStock === 0 && activeTray !== "food" && (
-              <span
-                className="absolute -top-1 -right-1 w-2 h-2 bg-rose-500 border border-charcoal"
-                aria-hidden="true"
-              />
-            )}
-          </button>
-
-          <button
-            type="button"
-            onClick={() => handleToggleTray("toy")}
-            className={`inline-flex items-center gap-1 sm:gap-1.5 px-2.5 sm:px-3 py-1.5 border-2 pixel-text text-[9px] sm:text-[10px] uppercase font-bold tracking-wider transition-all cursor-pointer active:translate-x-[1px] active:translate-y-[1px] ${
-              activeTray === "toy"
-                ? "bg-juro-orange text-white border-charcoal shadow-none"
-                : "bg-white dark:bg-neutral-800 text-charcoal dark:text-white border-charcoal dark:border-neutral-600 shadow-[2px_2px_0px_#171717] dark:shadow-[2px_2px_0px_#000000] hover:border-juro-orange"
-            }`}
-          >
-            <Gamepad2 size={13} strokeWidth={2.5} />
-            <span>Main</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={handleToggleSleep}
-            className={`inline-flex items-center gap-1 sm:gap-1.5 px-2.5 sm:px-3 py-1.5 border-2 pixel-text text-[9px] sm:text-[10px] uppercase font-bold tracking-wider transition-all cursor-pointer active:translate-x-[1px] active:translate-y-[1px] ${
-              currentState === "sleep"
-                ? "bg-juro-orange text-white border-charcoal shadow-none"
-                : "bg-white dark:bg-neutral-800 text-charcoal dark:text-white border-charcoal dark:border-neutral-600 shadow-[2px_2px_0px_#171717] dark:shadow-[2px_2px_0px_#000000] hover:border-juro-orange"
-            }`}
-          >
-            {currentState === "sleep" ? (
-              <>
-                <Sun size={13} strokeWidth={2.5} />
-                <span>Bangun</span>
-              </>
-            ) : (
-              <>
-                <Moon size={13} strokeWidth={2.5} />
-                <span>Tidur</span>
-              </>
-            )}
-          </button>
-
-          <button
-            type="button"
-            onClick={() => handleToggleTray("bath")}
-            className={`inline-flex items-center gap-1 sm:gap-1.5 px-2.5 sm:px-3 py-1.5 border-2 pixel-text text-[9px] sm:text-[10px] uppercase font-bold tracking-wider transition-all cursor-pointer active:translate-x-[1px] active:translate-y-[1px] ${
-              activeTray === "bath"
-                ? "bg-sky-500 text-white border-charcoal shadow-none"
-                : "bg-white dark:bg-neutral-800 text-charcoal dark:text-white border-charcoal dark:border-neutral-600 shadow-[2px_2px_0px_#171717] dark:shadow-[2px_2px_0px_#000000] hover:border-sky-400"
-            }`}
-          >
-            <Droplets size={13} strokeWidth={2.5} />
-            <span>Mandi</span>
-          </button>
         </div>
-      </div>
+      )}
+
+      {/* Interactive Contextual Juro Menu (Pops up directly on Juro Tap/Click) */}
+      {showJuroMenu && (
+        <div
+          ref={juroMenuRef}
+          className="animate-tray-enter absolute top-0 left-0 z-30 pointer-events-auto will-change-transform"
+          style={{ transform: "translate3d(-9999px, -9999px, 0)" }}
+        >
+          <div className="relative inline-flex items-center gap-1 sm:gap-1.5 p-1 sm:p-1.5 bg-warm-white/95 dark:bg-neutral-900/95 backdrop-blur-xs border-2 border-charcoal dark:border-neutral-600 shadow-[3px_3px_0px_#171717] dark:shadow-[3px_3px_0px_#000000]">
+            <div ref={tailRef} aria-hidden="true" />
+
+            {/* 1. Makan */}
+            <button
+              type="button"
+              onClick={() => handleMenuAction("food")}
+              className="relative inline-flex items-center gap-1 sm:gap-1.5 px-2 sm:px-2.5 py-1.5 bg-white dark:bg-neutral-800 text-charcoal dark:text-white border-2 border-charcoal dark:border-neutral-600 shadow-[2px_2px_0px_#171717] dark:shadow-[2px_2px_0px_#000000] hover:border-juro-orange hover:text-juro-orange active:translate-x-[1px] active:translate-y-[1px] active:shadow-none pixel-text text-[9px] sm:text-[10px] uppercase font-bold tracking-wider transition-all cursor-pointer"
+            >
+              <Utensils size={13} strokeWidth={2.5} className="shrink-0 text-juro-orange" />
+              <span>Makan</span>
+              {totalFoodStock === 0 && (
+                <span
+                  className="absolute -top-1 -right-1 w-2 h-2 bg-rose-500 border border-charcoal"
+                  aria-hidden="true"
+                />
+              )}
+            </button>
+
+            {/* 2. Main */}
+            <button
+              type="button"
+              onClick={() => handleMenuAction("toy")}
+              className="inline-flex items-center gap-1 sm:gap-1.5 px-2 sm:px-2.5 py-1.5 bg-white dark:bg-neutral-800 text-charcoal dark:text-white border-2 border-charcoal dark:border-neutral-600 shadow-[2px_2px_0px_#171717] dark:shadow-[2px_2px_0px_#000000] hover:border-juro-orange hover:text-juro-orange active:translate-x-[1px] active:translate-y-[1px] active:shadow-none pixel-text text-[9px] sm:text-[10px] uppercase font-bold tracking-wider transition-all cursor-pointer"
+            >
+              <Gamepad2 size={13} strokeWidth={2.5} className="shrink-0 text-rose-500" />
+              <span>Main</span>
+            </button>
+
+            {/* 3. Tidur / Bangun */}
+            <button
+              type="button"
+              onClick={() => handleMenuAction("sleep")}
+              className="inline-flex items-center gap-1 sm:gap-1.5 px-2 sm:px-2.5 py-1.5 bg-white dark:bg-neutral-800 text-charcoal dark:text-white border-2 border-charcoal dark:border-neutral-600 shadow-[2px_2px_0px_#171717] dark:shadow-[2px_2px_0px_#000000] hover:border-juro-orange hover:text-juro-orange active:translate-x-[1px] active:translate-y-[1px] active:shadow-none pixel-text text-[9px] sm:text-[10px] uppercase font-bold tracking-wider transition-all cursor-pointer"
+            >
+              {currentState === "sleep" ? (
+                <>
+                  <Sun size={13} strokeWidth={2.5} className="text-amber-500 shrink-0" />
+                  <span>Bangun</span>
+                </>
+              ) : (
+                <>
+                  <Moon size={13} strokeWidth={2.5} className="text-purple-500 shrink-0" />
+                  <span>Tidur</span>
+                </>
+              )}
+            </button>
+
+            {/* 4. Mandi */}
+            <button
+              type="button"
+              onClick={() => handleMenuAction("bath")}
+              className="inline-flex items-center gap-1 sm:gap-1.5 px-2 sm:px-2.5 py-1.5 bg-white dark:bg-neutral-800 text-charcoal dark:text-white border-2 border-charcoal dark:border-neutral-600 shadow-[2px_2px_0px_#171717] dark:shadow-[2px_2px_0px_#000000] hover:border-sky-400 hover:text-sky-500 active:translate-x-[1px] active:translate-y-[1px] active:shadow-none pixel-text text-[9px] sm:text-[10px] uppercase font-bold tracking-wider transition-all cursor-pointer"
+            >
+              <Droplets size={13} strokeWidth={2.5} className="text-sky-500 shrink-0" />
+              <span>Mandi</span>
+            </button>
+
+            {/* 5. Pegang */}
+            <button
+              type="button"
+              onClick={() => handleMenuAction("grab")}
+              className="inline-flex items-center gap-1 sm:gap-1.5 px-2 sm:px-2.5 py-1.5 bg-white dark:bg-neutral-800 text-charcoal dark:text-white border-2 border-charcoal dark:border-neutral-600 shadow-[2px_2px_0px_#171717] dark:shadow-[2px_2px_0px_#000000] hover:border-juro-orange hover:text-juro-orange active:translate-x-[1px] active:translate-y-[1px] active:shadow-none pixel-text text-[9px] sm:text-[10px] uppercase font-bold tracking-wider transition-all cursor-pointer"
+            >
+              <Hand size={13} strokeWidth={2.5} className="text-juro-orange shrink-0" />
+              <span>Pegang</span>
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Floating Grab Guide Pill when Juro is actively held */}
+      {isDraggingPet && (
+        <div className="animate-tray-enter absolute bottom-6 left-1/2 -translate-x-1/2 z-30 inline-flex items-center gap-2 px-3 py-1.5 bg-warm-white/95 dark:bg-neutral-900/95 border-2 border-charcoal dark:border-neutral-600 shadow-[3px_3px_0px_#171717] dark:shadow-[3px_3px_0px_#000000] pixel-text text-[9px] sm:text-[10px] uppercase font-bold text-charcoal dark:text-white pointer-events-none">
+          <Hand size={14} className="text-juro-orange animate-bounce shrink-0" />
+          <span>Memegang Juro · Seret & Lepaskan untuk Menurunkan</span>
+        </div>
+      )}
     </div>
   );
 };

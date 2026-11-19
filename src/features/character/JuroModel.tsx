@@ -1,4 +1,4 @@
-import React, { useRef, useState, useMemo, useEffect } from "react";
+import React, { useRef, useState, useMemo, useEffect, useCallback } from "react";
 import { useFrame, useThree } from "@react-three/fiber";
 import * as THREE from "three";
 import { SpringOscillator3D } from "../../engine/physics/SpringOscillator";
@@ -242,6 +242,9 @@ interface JuroModelProps {
   bathStateRef?: React.RefObject<BathLiveState>;
   juroScreenPosRef?: React.RefObject<JuroScreenTarget>;
   walkCommand?: WalkCommand | null;
+  onPetClick?: () => void;
+  grabRequested?: number;
+  onGrabEnd?: () => void;
 }
 
 export const JuroModel: React.FC<JuroModelProps> = React.memo(({
@@ -249,6 +252,9 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
   bathStateRef,
   juroScreenPosRef,
   walkCommand,
+  onPetClick,
+  grabRequested,
+  onGrabEnd,
 }) => {
   const groupRef = useRef<THREE.Group>(null);
   const leftEyeRef = useRef<THREE.Group>(null);
@@ -529,9 +535,8 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
     return shape;
   }, []);
 
-  // Handle pointer down (grab Juro — lock camera orbit immediately & align drag plane to camera)
-  const handlePointerDown = (e: { stopPropagation: () => void; point: THREE.Vector3 }) => {
-    e.stopPropagation();
+  // Start dragging Juro across the 3D valley map (triggered by "Pegang" action)
+  const startDragging = useCallback(() => {
     onDraggingChange?.(true);
     setIsDragging(true);
     jumpRef.current.active = false;
@@ -542,58 +547,66 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
     camera.getWorldDirection(_camDir);
     dragPlane.setFromNormalAndCoplanarPoint(_camDir, spring.position);
 
-    raycaster.ray.intersectPlane(dragPlane, _intersectVec);
-    dragOffset.current.subVectors(spring.position, _intersectVec);
+    if (raycaster.ray.intersectPlane(dragPlane, _intersectVec)) {
+      dragOffset.current.subVectors(spring.position, _intersectVec);
+    } else {
+      dragOffset.current.set(0, 0, 0);
+    }
     // Match _targetVec coordinate space so frame-1 delta is 0 (no false velocity spike on grab!)
     lastPointerPos.current.copy(spring.position);
     pointerSpeed.current = 0;
     dizzyRef.current.buildup = 0;
     dizzyRef.current.dragAge = 0;
 
-    spring.applyImpulse(new THREE.Vector3(0, -0.5, 0));
-  };
+    spring.applyImpulse(new THREE.Vector3(0, 0.55, 0));
+  }, [camera, dragPlane, fsm, onDraggingChange, raycaster, setBehaviorState, spring]);
 
-  // Global pointer up listener (attached to window while dragging so release never gets missed)
-  const handlePointerUp = () => {
-    if (isDragging) {
-      onDraggingChange?.(false);
-      setIsDragging(false);
-      const nextState = dizzyRef.current.timer > 0.2 ? "idle" : "happy";
-      fsm.transitionTo(nextState, true);
-      setBehaviorState(nextState);
-      const landX = THREE.MathUtils.clamp(spring.position.x, MAP_BOUNDS.minX, MAP_BOUNDS.maxX);
-      const landZ = THREE.MathUtils.clamp(spring.position.z, MAP_BOUNDS.minZ, MAP_BOUNDS.maxZ);
-      const landY = getTerrainHeightAt(landX, landZ) + BODY_BOTTOM_OFFSET;
-      spring.setTarget(new THREE.Vector3(landX, landY, landZ));
-      if (dizzyRef.current.timer <= 0.2) {
-        soundEffects.playBoing();
-      }
+  // Stop dragging Juro and land safely on ground
+  const stopDragging = useCallback(() => {
+    if (!isDragging) return;
+    onDraggingChange?.(false);
+    setIsDragging(false);
+    onGrabEnd?.();
+    const nextState = dizzyRef.current.timer > 0.2 ? "idle" : "happy";
+    fsm.transitionTo(nextState, true);
+    setBehaviorState(nextState);
+    const landX = THREE.MathUtils.clamp(spring.position.x, MAP_BOUNDS.minX, MAP_BOUNDS.maxX);
+    const landZ = THREE.MathUtils.clamp(spring.position.z, MAP_BOUNDS.minZ, MAP_BOUNDS.maxZ);
+    const landY = getTerrainHeightAt(landX, landZ) + BODY_BOTTOM_OFFSET;
+    spring.setTarget(new THREE.Vector3(landX, landY, landZ));
+    if (dizzyRef.current.timer <= 0.2) {
+      soundEffects.playBoing();
     }
-  };
+  }, [isDragging, onDraggingChange, onGrabEnd, fsm, setBehaviorState, spring]);
 
+  // Initiate drag when grabRequested prop triggers
+  useEffect(() => {
+    if (!grabRequested) return;
+    startDragging();
+  }, [grabRequested, startDragging]);
+
+  // Attach window release listeners while dragging with short grace period
   useEffect(() => {
     if (!isDragging) return;
-    const onGlobalPointerUp = () => {
-      onDraggingChange?.(false);
-      setIsDragging(false);
-      const nextState = dizzyRef.current.timer > 0.2 ? "idle" : "happy";
-      fsm.transitionTo(nextState, true);
-      setBehaviorState(nextState);
-      const landX = THREE.MathUtils.clamp(spring.position.x, MAP_BOUNDS.minX, MAP_BOUNDS.maxX);
-      const landZ = THREE.MathUtils.clamp(spring.position.z, MAP_BOUNDS.minZ, MAP_BOUNDS.maxZ);
-      const landY = getTerrainHeightAt(landX, landZ) + BODY_BOTTOM_OFFSET;
-      spring.setTarget(new THREE.Vector3(landX, landY, landZ));
-      if (dizzyRef.current.timer <= 0.2) {
-        soundEffects.playBoing();
-      }
-    };
-    window.addEventListener("pointerup", onGlobalPointerUp);
-    window.addEventListener("pointercancel", onGlobalPointerUp);
+    let active = true;
+    const timer = setTimeout(() => {
+      if (!active) return;
+      const onRelease = () => {
+        stopDragging();
+      };
+      window.addEventListener("pointerup", onRelease);
+      window.addEventListener("pointerdown", onRelease);
+      return () => {
+        window.removeEventListener("pointerup", onRelease);
+        window.removeEventListener("pointerdown", onRelease);
+      };
+    }, 120);
+
     return () => {
-      window.removeEventListener("pointerup", onGlobalPointerUp);
-      window.removeEventListener("pointercancel", onGlobalPointerUp);
+      active = false;
+      clearTimeout(timer);
     };
-  }, [isDragging, fsm, setBehaviorState, spring, onDraggingChange]);
+  }, [isDragging, stopDragging]);
 
   useFrame((state, delta) => {
     const t = state.clock.getElapsedTime();
@@ -1332,21 +1345,19 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
 
   return (
     <>
-      {/* Invisible global drag capture plane */}
-      <mesh
-        visible={false}
-        onPointerUp={handlePointerUp}
-        onPointerLeave={handlePointerUp}
-      >
-        <planeGeometry args={[100, 100]} />
-      </mesh>
-
-      {/* Main Character Group */}
+      {/* Main Character Group (Clicking opens action menu; dragging managed via Pegang) */}
       <group
         ref={groupRef}
         position={[0, -0.1, 0]}
-        onPointerDown={handlePointerDown}
-        onPointerUp={handlePointerUp}
+        onClick={(e) => {
+          e.stopPropagation();
+          if (isDragging) return;
+          if (fsm.currentState === "wander") {
+            fsm.transitionTo("idle", true);
+            setBehaviorState("idle");
+          }
+          onPetClick?.();
+        }}
       >
         {/* Main Sculpted Chubby Jelly Body */}
         <mesh geometry={outerBodyGeometry}>
