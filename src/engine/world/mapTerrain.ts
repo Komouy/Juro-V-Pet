@@ -181,37 +181,13 @@ export const MAP_PLATFORMS: ElevatedPlatform[] = [
   },
 ];
 
-// Check if (x, z) is on the straight wooden footbridge over the brook
-export function getBridgeElevation(x: number, z: number): number | null {
-  // Straight bridge centered at (-0.36, -2.32), aligned cleanly with world Z (rotation = 0)
-  const localX = x - -0.36;
-  const localZ = z - -2.32;
-
-  // Deck width is 0.82m (halfWidth = 0.41m, allow 0.44m for clearance)
-  if (Math.abs(localX) <= 0.44) {
-    const absZ = Math.abs(localZ);
-    // Main level wooden bridge deck spans |localZ| <= 0.62
-    if (absZ <= 0.62) {
-      return 0.11;
-    }
-    // Smooth wooden ramp transition connecting bridge planks to meadow banks (|localZ| up to 0.86m)
-    if (absZ <= 0.86) {
-      const rampT = 1 - (absZ - 0.62) / 0.24;
-      return 0.11 * Math.max(0, rampT);
-    }
-  }
+// Check if (x, z) is on any bridge (kept for backward-compatibility, footbridge removed as Juro walks through water)
+export function getBridgeElevation(_x: number, _z: number): number | null {
   return null;
 }
 
-// Check if (x, z) is inside the lily pond or winding brook (excluding bridge & dry platforms)
+// Check if (x, z) is inside the lily pond or winding brook (Juro can swim/glide over water!)
 export function isWaterAt(x: number, z: number): boolean {
-  if (getBridgeElevation(x, z) !== null) return false;
-
-  // Bridge corridor clearance (both approach ramps and bridge deck)
-  const localBridgeX = Math.abs(x - -0.36);
-  const localBridgeZ = Math.abs(z - -2.32);
-  if (localBridgeX <= 0.46 && localBridgeZ <= 0.90) return false;
-
   // Stumps and platforms are elevated dry land above water
   for (let i = 0; i < MAP_PLATFORMS.length; i++) {
     const p = MAP_PLATFORMS[i];
@@ -370,54 +346,6 @@ export function resolveHorizontalCollisions(
         }
       }
     }
-
-    // 3. Water Collision (Lily Pond & Brook Stream) — Juro must never walk into water unless in bridge corridor!
-    const isBridgeCorridor = Math.abs(rx - -0.36) <= 0.46 && Math.abs(rz - -2.32) <= 0.90;
-    if (!isBridgeCorridor) {
-      // 3a. Lily Pond Oval centered at (2.45, -1.05) with outer bank margin
-      const pondCenterX = 2.45;
-      const pondCenterZ = -1.05;
-      const pondRadiusX = 1.18 + petRadius * 0.65;
-      const pondRadiusZ = 0.84 + petRadius * 0.65;
-      const pdx = rx - pondCenterX;
-      const pdz = rz - pondCenterZ;
-      const normX = pdx / pondRadiusX;
-      const normZ = pdz / pondRadiusZ;
-      const pondDistSq = normX * normX + normZ * normZ;
-      if (pondDistSq < 1.0) {
-        const dirX = Math.abs(pdx) > 0.0001 || Math.abs(pdz) > 0.0001 ? normX : 1.0;
-        const dirZ = Math.abs(pdx) > 0.0001 || Math.abs(pdz) > 0.0001 ? normZ : 0.0;
-        const pondDist = Math.hypot(dirX, dirZ) || 1.0;
-        rx = pondCenterX + (dirX / pondDist) * (pondRadiusX + 0.08);
-        rz = pondCenterZ + (dirZ / pondDist) * (pondRadiusZ + 0.08);
-        hitObstacle = true;
-      }
-
-      // 3b. Brook Stream Winding Ribbon between x = -5.5 and x = 2.2
-      if (rx >= -5.5 && rx <= 2.2) {
-        const t = (rx + 5.5) / 7.7;
-        const streamZ = -4.9 + t * 3.7 + Math.sin(t * Math.PI) * 0.35;
-        const halfWidth = 0.52 + petRadius * 0.62;
-        const streamDz = rz - streamZ;
-        if (Math.abs(streamDz) < halfWidth) {
-          const pushSign = streamDz >= 0 ? 1 : -1;
-          rz = streamZ + pushSign * (halfWidth + 0.08);
-          hitObstacle = true;
-        }
-      }
-    } else {
-      // 4. Wooden Footbridge Handrails: keep Juro centered safely on bridge planks (rx in [-0.56, -0.16])
-      // Only apply railings on the bridge deck proper (|rz - -2.32| <= 0.62), keeping north and south approach ramps wide open
-      if (Math.abs(rz - -2.32) <= 0.62) {
-        if (rx < -0.56) {
-          rx = -0.56;
-          hitObstacle = true;
-        } else if (rx > -0.16) {
-          rx = -0.16;
-          hitObstacle = true;
-        }
-      }
-    }
   }
 
   return {
@@ -427,9 +355,9 @@ export function resolveHorizontalCollisions(
   };
 }
 
-// Pick a scenic, walkable waypoint anywhere on the wide map (meadow, hills, stumps, bridge!)
+// Pick a scenic, walkable waypoint anywhere on the wide map (meadow, hills, water, stumps!)
 export function pickScenicWaypoint(): { x: number; z: number } {
-  // 45% chance to specifically visit an elevated platform, stump, or wooden bridge!
+  // 35% chance to specifically visit an elevated platform or stump
   const roll = Math.random();
   if (roll < 0.35) {
     const platform = MAP_PLATFORMS[Math.floor(Math.random() * MAP_PLATFORMS.length)];
@@ -438,7 +366,7 @@ export function pickScenicWaypoint(): { x: number; z: number } {
       const r = Math.random() * platform.radius * 0.55;
       const px = platform.x + Math.cos(angle) * r;
       const pz = platform.z + Math.sin(angle) * r;
-      if (!isInsideObstacle(px, pz, 0.42) && !isWaterAt(px, pz)) {
+      if (!isInsideObstacle(px, pz, 0.42)) {
         return { x: px, z: pz };
       }
     }
@@ -446,20 +374,26 @@ export function pickScenicWaypoint(): { x: number; z: number } {
     if (platform.id === "west-knoll") {
       return { x: -2.6, z: -0.15 };
     }
-    if (!isWaterAt(platform.x, platform.z) && !isInsideObstacle(platform.x, platform.z, 0.2)) {
+    if (!isInsideObstacle(platform.x, platform.z, 0.2)) {
       return { x: platform.x, z: platform.z };
     }
   }
-  if (roll < 0.45) {
-    // Visit the wooden footbridge!
-    return { x: -0.36, z: -2.32 };
+
+  // 15% chance to visit the cool winding brook stream or lily pond for a splash!
+  if (roll < 0.5) {
+    const brookX = -2.5 + Math.random() * 3.5;
+    const t = (brookX + 5.5) / 7.7;
+    const brookZ = -4.9 + t * 3.7 + Math.sin(t * Math.PI) * 0.35;
+    if (!isInsideObstacle(brookX, brookZ, 0.3)) {
+      return { x: brookX, z: brookZ };
+    }
   }
 
-  // Otherwise pick any clear dry spot across the wide valley meadow
+  // Otherwise pick any clear spot across the wide valley
   for (let attempt = 0; attempt < 30; attempt++) {
     const x = MAP_BOUNDS.minX + Math.random() * (MAP_BOUNDS.maxX - MAP_BOUNDS.minX);
     const z = MAP_BOUNDS.minZ + Math.random() * (MAP_BOUNDS.maxZ - MAP_BOUNDS.minZ);
-    if (!isWaterAt(x, z) && !isInsideObstacle(x, z, 0.45)) {
+    if (!isInsideObstacle(x, z, 0.45)) {
       return { x, z };
     }
   }

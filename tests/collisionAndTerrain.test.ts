@@ -102,7 +102,7 @@ describe("Terrain & Object Collision Hull System", () => {
     expect(sitCol.z).toBeCloseTo(JURO_BENCH_POS.z, 2);
   });
 
-  it("blocks Juro from walking into the lily pond water", () => {
+  it("allows Juro to freely wade and swim into the lily pond water without collision blockage", () => {
     const pondCenter = { x: 2.45, z: -1.05 };
     expect(isWaterAt(pondCenter.x, pondCenter.z)).toBe(true);
 
@@ -114,13 +114,14 @@ describe("Terrain & Object Collision Hull System", () => {
       false,
       false
     );
-    expect(resolved.hitObstacle).toBe(true);
-    expect(isWaterAt(resolved.x, resolved.z)).toBe(false);
+    // As requested: Juro can traverse water freely without invisible walls!
+    expect(resolved.hitObstacle).toBe(false);
+    expect(isWaterAt(resolved.x, resolved.z)).toBe(true);
   });
 
-  it("blocks Juro from walking into the winding brook stream off-bridge", () => {
-    // Open brook water near x = -3.5
-    const brookX = -3.5;
+  it("allows Juro to wade and swim across the winding brook stream", () => {
+    // Open brook water near x = 0.0
+    const brookX = 0.0;
     const t = (brookX + 5.5) / 7.7;
     const streamZ = -4.9 + t * 3.7 + Math.sin(t * Math.PI) * 0.35;
 
@@ -134,78 +135,25 @@ describe("Terrain & Object Collision Hull System", () => {
       false,
       false
     );
-    expect(resolved.hitObstacle).toBe(true);
-    expect(isWaterAt(resolved.x, resolved.z)).toBe(false);
+    // Juro can freely splash and cross water without invisible walls!
+    expect(resolved.hitObstacle).toBe(false);
+    expect(isWaterAt(resolved.x, resolved.z)).toBe(true);
   });
 
-  it("allows Juro to smoothly walk onto and across the footbridge from both south and north banks", () => {
-    // 1. South approach (stepping stones at z = -1.56 and z = -1.75)
-    const southApproach = resolveHorizontalCollisions(
-      -0.36,
-      -1.56,
-      BASE_GROUND_Y,
-      0.38,
-      false,
-      false
-    );
-    // Must NOT be pushed back by stream water collision!
-    expect(southApproach.hitObstacle).toBe(false);
-    expect(southApproach.z).toBeCloseTo(-1.56, 2);
-    expect(isWaterAt(-0.36, -1.56)).toBe(false);
+  it("verifies footbridge is removed and Juro traverses the stream naturally", () => {
+    // Footbridge elevation is null (removed as requested)
+    expect(getBridgeElevation(-0.36, -2.32)).toBeNull();
 
-    // 2. Mid-bridge wooden deck planks
-    const deckMid = resolveHorizontalCollisions(
+    const streamCrossing = resolveHorizontalCollisions(
       -0.36,
       -2.32,
-      BASE_GROUND_Y + 0.11,
-      0.38,
-      false,
-      false
-    );
-    expect(deckMid.hitObstacle).toBe(false);
-    expect(getBridgeElevation(-0.36, -2.32)).toBe(0.11);
-
-    // 3. North approach (mine path at z = -3.10)
-    const northApproach = resolveHorizontalCollisions(
-      -0.36,
-      -3.10,
       BASE_GROUND_Y,
       0.38,
       false,
       false
     );
-    expect(northApproach.hitObstacle).toBe(false);
-    expect(northApproach.z).toBeCloseTo(-3.10, 2);
-    expect(isWaterAt(-0.36, -3.10)).toBe(false);
-  });
-
-  it("clamps Juro safely between bridge railings when crossing footbridge", () => {
-    const bridgeZ = -2.32;
-    expect(getBridgeElevation(-0.36, bridgeZ)).not.toBeNull();
-
-    // Trying to walk past the west bridge railing (e.g. x = -0.65)
-    const westCol = resolveHorizontalCollisions(
-      -0.65,
-      bridgeZ,
-      BASE_GROUND_Y + 0.11,
-      0.38,
-      false,
-      false
-    );
-    expect(westCol.hitObstacle).toBe(true);
-    expect(westCol.x).toBeGreaterThanOrEqual(-0.56);
-
-    // Trying to walk past the east bridge railing (e.g. x = -0.10)
-    const eastCol = resolveHorizontalCollisions(
-      -0.1,
-      bridgeZ,
-      BASE_GROUND_Y + 0.11,
-      0.38,
-      false,
-      false
-    );
-    expect(eastCol.hitObstacle).toBe(true);
-    expect(eastCol.x).toBeLessThanOrEqual(-0.16);
+    expect(streamCrossing.hitObstacle).toBe(false);
+    expect(isWaterAt(-0.36, -2.32)).toBe(true);
   });
 
   it("prevents clipping horizontally into platform cliff walls from below", () => {
@@ -224,10 +172,9 @@ describe("Terrain & Object Collision Hull System", () => {
     expect(Math.hypot(wallCol.x - 3.45, wallCol.z - 0.75)).toBeGreaterThan(1.4);
   });
 
-  it("picks scenic waypoints that never spawn inside obstacles or water", () => {
+  it("picks scenic waypoints that never spawn inside obstacles", () => {
     for (let i = 0; i < 25; i++) {
       const pt = pickScenicWaypoint();
-      expect(isWaterAt(pt.x, pt.z)).toBe(false);
       expect(isInsideObstacle(pt.x, pt.z, 0.1)).toBe(false);
     }
   });

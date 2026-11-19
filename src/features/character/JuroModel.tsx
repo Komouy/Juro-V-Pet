@@ -836,7 +836,9 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
               }
 
               const nextGroundY = getTerrainHeightAt(finalX, finalZ);
-              _targetVec.set(finalX, nextGroundY + currentBottomOffset, finalZ);
+              const inWaterStep = isWaterAt(finalX, finalZ);
+              const waterFloat = inWaterStep ? Math.sin(t * 3.5) * 0.016 : 0;
+              _targetVec.set(finalX, nextGroundY + currentBottomOffset + waterFloat, finalZ);
               spring.setTarget(_targetVec);
 
               if (groupRef.current) {
@@ -853,12 +855,14 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
               }
             }
           } else {
-            // Reached destination! Settle happily on current spot
-            _targetVec.set(spring.position.x, restY, spring.position.z);
+            // Reached destination! Settle happily on current spot (with buoyant float if in water)
+            const inWaterRest = isWaterAt(spring.position.x, spring.position.z);
+            const waterFloatRest = inWaterRest ? Math.sin(t * 2.6) * 0.018 : 0;
+            _targetVec.set(spring.position.x, restY + waterFloatRest, spring.position.z);
             spring.setTarget(_targetVec);
             usePetStore.getState().setLastPosition({
               x: spring.position.x,
-              y: restY,
+              y: restY + waterFloatRest,
               z: spring.position.z,
             });
             if (groupRef.current) {
@@ -1136,6 +1140,12 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
         scale.x -= chewSquash * 0.45;
         scale.z -= chewSquash * 0.45;
       } else if (currentState === "wander") {
+        const inWater = isWaterAt(spring.position.x, spring.position.z);
+        if (inWater) {
+          crawlScaleY *= 0.92;
+          crawlScaleX *= 1.04;
+          crawlScaleZ *= 1.04;
+        }
         // Blend crawl / jump stretch cleanly
         scale.x *= crawlScaleX;
         scale.y *= crawlScaleY;

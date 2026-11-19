@@ -167,8 +167,8 @@ describe("Economy, Mining & Shop System", () => {
     // When elevated atop the West Knoll, terrain height matches platform elevation
     expect(getTerrainHeightAt(-3.25, -0.55)).toBeCloseTo(BASE_GROUND_Y + 0.46, 2);
 
-    // Straight bridge elevation is level along center
-    expect(getTerrainHeightAt(-0.36, -2.32)).toBeCloseTo(BASE_GROUND_Y + 0.11, 2);
+    // With footbridge removed, terrain height at stream is ground level
+    expect(getTerrainHeightAt(-0.36, -2.32)).toBeCloseTo(BASE_GROUND_Y, 2);
 
     // Mine Cave at (-0.36, -4.55) blocks Juro from clipping inside
     const hitMineCave = resolveHorizontalCollisions(-0.36, -3.4, BASE_GROUND_Y, 0.38, false);

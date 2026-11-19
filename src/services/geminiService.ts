@@ -9,6 +9,12 @@ import {
   getFormattedGeminiHistory,
   getPetMemories,
 } from "./petMemoryService";
+import {
+  getCognitiveTier,
+  computePetEmotionalState,
+  type CognitiveStageInfo,
+  type PetEmotionalState,
+} from "../engine/ai/cognitiveCore";
 
 export interface PetChatContext {
   name: string;
@@ -18,6 +24,7 @@ export interface PetChatContext {
   happiness: number;
   affection: number;
   currentState: string;
+  level?: number;
   expression?: string;
   currentActivity?: string;
   currentFoodName?: string;
@@ -31,8 +38,12 @@ export interface PetChatContext {
   isDizzy?: boolean;
   isNight?: boolean;
   isRaining?: boolean;
+  isSittingOnBench?: boolean;
+  isInWater?: boolean;
   isSpontaneous?: boolean;
   memories?: string[];
+  cognitiveTier?: CognitiveStageInfo;
+  emotionalState?: PetEmotionalState;
 }
 
 const STORAGE_KEY = "juro_gemini_api_key";
@@ -106,6 +117,8 @@ export function computePetActivity(context: {
   isPlaying?: boolean;
   isDragging?: boolean;
   isDizzy?: boolean;
+  isSittingOnBench?: boolean;
+  isInWater?: boolean;
   currentFoodName?: string;
   currentToyName?: string;
 }): string {
@@ -114,6 +127,12 @@ export function computePetActivity(context: {
   }
   if (context.isSleeping || context.currentState === "sleep") {
     return "sedang tidur nyenyak di kasur/sofa empuk sambil mendengkur Zzz";
+  }
+  if (context.isSittingOnBench) {
+    return "sedang duduk santai di kursi kayu bukit timur memandang pemandangan lembah yang damai";
+  }
+  if (context.isInWater) {
+    return "sedang mengapung dan berenang riang mengarungi air sungai yang jernih dan sejuk";
   }
   if (context.isPetting) {
     return "sedang dielus-elus penuh kasih sayang oleh pemilik, tubuh jeli bergetar hangat";
@@ -147,7 +166,36 @@ export function computePetActivity(context: {
 /**
  * Get an immediate contextual fallback reply that tightly matches Juro's condition
  */
-export function getContextualFallbackReply(context?: PetChatContext): string {
+export function getContextualFallbackReply(
+  context?: PetChatContext,
+  userPrompt?: string
+): string {
+  const promptLower = (userPrompt || "").toLowerCase();
+
+  // If user asks how Juro is feeling or about emotional state
+  if (
+    promptLower.includes("perasaan") ||
+    promptLower.includes("gimana rasa") ||
+    promptLower.includes("kondisi") ||
+    promptLower.includes("emosi") ||
+    promptLower.includes("lagi apa") ||
+    promptLower.includes("mikirin")
+  ) {
+    const emo =
+      context?.emotionalState ||
+      computePetEmotionalState(
+        {
+          hunger: context?.hunger,
+          energy: context?.energy,
+          happiness: context?.happiness,
+          cleanliness: context?.cleanliness,
+          affection: context?.affection,
+        },
+        context
+      );
+    return `Bloop! Perasaan Juro saat ini lagi ${emo.primaryEmotion.toLowerCase()}. ${emo.thoughtSummary}`;
+  }
+
   if (context?.isDizzy) {
     const dizzyOptions = [
       "Uwaaa... Bloop... kepala Juro berputar-putar, banyak bintang kelap-kelip!",
@@ -162,6 +210,22 @@ export function getContextualFallbackReply(context?: PetChatContext): string {
       "Zzz... kasur ini empuk sekali... nanti bangun ya pemilikku... Bloop...",
     ];
     return sleepOptions[Math.floor(Math.random() * sleepOptions.length)];
+  }
+
+  if (context?.isSittingOnBench) {
+    const benchOptions = [
+      "Ahhh... duduk di kursi kayu bukit timur ini damai sekali, semilir anginnya sejuk! Bloop~",
+      "Bloop! Duduk santai di kursi bukit sambil memandang lembah hijau bersama kamu rasanya tenang banget~",
+    ];
+    return benchOptions[Math.floor(Math.random() * benchOptions.length)];
+  }
+
+  if (context?.isInWater) {
+    const waterOptions = [
+      "Bloop bloop! Dingin dan segar sekali airnya, tubuh jeli Juro mengapung bebas!",
+      "Slimey! Berenang di air sungai ini seru banget, seger dan bikin adem! Bloop~",
+    ];
+    return waterOptions[Math.floor(Math.random() * waterOptions.length)];
   }
 
   if (context?.isPetting) {
@@ -321,6 +385,20 @@ export function buildJuroSystemPrompt(context?: PetChatContext): string {
     context?.currentActivity ||
     (context ? computePetActivity(context) : "sedang berdiri santai di padang rumput");
 
+  const tier = context?.cognitiveTier || getCognitiveTier(context?.level ?? 1);
+  const emotionalState =
+    context?.emotionalState ||
+    computePetEmotionalState(
+      {
+        hunger: context?.hunger,
+        energy: context?.energy,
+        happiness: context?.happiness,
+        cleanliness: context?.cleanliness,
+        affection: context?.affection,
+      },
+      context
+    );
+
   const hungerInfo = context ? `Kondisi lapar: ${context.hunger}/100.` : "";
   const energyInfo = context ? `Kondisi energi: ${context.energy}/100.` : "";
   const moodState = context ? `Aktivitas saat ini: ${context.currentState}.` : "";
@@ -329,6 +407,9 @@ export function buildJuroSystemPrompt(context?: PetChatContext): string {
     : context?.isNight
     ? "Waktu malam hari."
     : "Cuaca cerah.";
+
+  const cognitiveInfo = `PERKEMBANGAN KOGNITIF OTAK AI (TIER ${tier.tier} - ${tier.name}): ${tier.archetype}. Tingkat kosa kata: ${tier.vocabularyLevel}. PANDUAN BICARA SESUAI TINGKAT PERTUMBUHAN KOGNITIF: ${tier.speechGuidance}`;
+  const emotionalInfo = `KONDISI EMOSIONAL & KESADARAN DIRI SAAT INI: Emosi utama: "${emotionalState.primaryEmotion}". Intensitas perasaan: "${emotionalState.moodIntensity}". Resonansi emosi: ${emotionalState.resonanceScore}%. Pikiran batin: "${emotionalState.thoughtSummary}". Jika pemilik bertanya tentang perasaan, emosi, atau pikiranmu, ceritakan kondisi emosionalmu ini dengan jujur dan hangat!`;
 
   const spontaneousDirective = context?.isSpontaneous
     ? "Ini adalah celetukan spontan/gumamanmu sendiri (monolog lucu) yang kamu ucapkan tiba-tiba kepada pemilikmu tanpa ditanya. Ungkapkan celetukan imut yang sedang kamu pikirkan atau rasakan saat ini."
@@ -347,15 +428,19 @@ export function buildJuroSystemPrompt(context?: PetChatContext): string {
     energyInfo,
     moodState,
     weatherState,
+    cognitiveInfo,
+    emotionalInfo,
     memoryInfo,
     `KONDISI & EKSPRESI JURO SAAT INI (WAJIB JADI FOKUS UTAMA JAWABAN):`,
     `- Sedang melakukan: ${activity}.`,
     `- Ekspresi wajah & perasaan: ${expression}.`,
     spontaneousDirective,
     `ATURAN GAYA BICARA:`,
-    `- Gunakan Bahasa Indonesia yang santai, imut, ramah, dan sedikit jenaka/lucu.`,
+    `- Gunakan Bahasa Indonesia yang santai, imut, ramah, dan sedikit jenaka/lucu sesuai dengan TIER PERKEMBANGAN KOGNITIF OTAK AI.`,
     `- WAJIB SESUAIKAN ISI JAWABAN DENGAN KONDISI / EKSPRESI:`,
     `  * Jika sedang tidur / mengantuk: bicaralah dengan nada mengantuk, menguap ("Hwaaam... Zzz..."), setengah mengigau atau sebut kasur/mimpimu.`,
+    `  * Jika sedang duduk santai di bangku: sebut suasana damai angin bukit dan indahnya pemandangan lembah.`,
+    `  * Jika sedang di dalam air / berenang: sebut segarnya air sungai jernih dan tubuh jeli yang mengapung bebas.`,
     `  * Jika sedang lapar / ngiler: bicaralah sambil ngiler, sebut perut jeli yang keroncongan, atau minta camilan/makanan manis.`,
     `  * Jika sedang makan: bicaralah sambil mengunyah ("Nyam nyam nyam!"), puji kelezatan camilannya.`,
     `  * Jika sedang dimandikan / disabun: sebut busa sabun wangi, gelembung air, tubuh jeli yang geli atau sejuk segar.`,
@@ -422,7 +507,7 @@ export async function chatWithJuro(
 
   // If no Gemini API key is configured, respond with a contextual in-character fallback
   if (!apiKey) {
-    const fallbackReply = getContextualFallbackReply(context);
+    const fallbackReply = getContextualFallbackReply(context, promptText);
     addChatMessage("juro", fallbackReply);
     return fallbackReply;
   }
@@ -463,7 +548,7 @@ export async function chatWithJuro(
     if (!response.ok) {
       const errorText = await response.text();
       console.warn("Gemini API error:", response.status, errorText);
-      const fallback = getContextualFallbackReply(context);
+      const fallback = getContextualFallbackReply(context, promptText);
       addChatMessage("juro", fallback);
       return fallback;
     }
@@ -478,12 +563,12 @@ export async function chatWithJuro(
       return sanitized;
     }
 
-    const fallback = getContextualFallbackReply(context);
+    const fallback = getContextualFallbackReply(context, promptText);
     addChatMessage("juro", fallback);
     return fallback;
   } catch (error) {
     console.warn("Gemini chat error, using fallback:", error);
-    const fallback = getContextualFallbackReply(context);
+    const fallback = getContextualFallbackReply(context, promptText);
     addChatMessage("juro", fallback);
     return fallback;
   }

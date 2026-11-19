@@ -738,53 +738,7 @@ export const OutdoorEnvironment: React.FC<OutdoorEnvironmentProps> = React.memo(
           </mesh>
         </group>
 
-        {/* 11. Straight Flat Wooden Footbridge Over the Brook (Clickable!) */}
-        <group
-          position={[-0.36, -0.9, -2.32]}
-          rotation={[0, 0, 0]}
-          onPointerDown={handleGroundPointerDown}
-          onClick={handleGroundClick}
-        >
-          {/* Two Straight Longitudinal Support Beams Underneath */}
-          <mesh position={[-0.28, 0.05, 0]}>
-            <boxGeometry args={[0.07, 0.06, 1.18]} />
-            <meshLambertMaterial color={woodDarkColor} />
-          </mesh>
-          <mesh position={[0.28, 0.05, 0]}>
-            <boxGeometry args={[0.07, 0.06, 1.18]} />
-            <meshLambertMaterial color={woodDarkColor} />
-          </mesh>
-
-          {/* 5 Even, Level Wooden Bridge Planks */}
-          {[-0.46, -0.23, 0, 0.23, 0.46].map((zOff, idx) => (
-            <mesh key={idx} position={[0, 0.095, zOff]}>
-              <boxGeometry args={[0.82, 0.045, 0.19]} />
-              <meshLambertMaterial color={idx % 2 === 0 ? woodColor : woodDarkColor} />
-            </mesh>
-          ))}
-
-          {/* 4 Straight Corner Posts */}
-          {[-0.38, 0.38].map((xOff, xi) =>
-            [-0.5, 0.5].map((zOff, zi) => (
-              <mesh key={`${xi}-${zi}`} position={[xOff, 0.24, zOff]}>
-                <boxGeometry args={[0.06, 0.36, 0.06]} />
-                <meshLambertMaterial color={woodDarkColor} />
-              </mesh>
-            ))
-          )}
-
-          {/* Straight Left & Right Handrails */}
-          <mesh position={[-0.38, 0.38, 0]}>
-            <boxGeometry args={[0.048, 0.048, 1.06]} />
-            <meshLambertMaterial color={woodColor} />
-          </mesh>
-          <mesh position={[0.38, 0.38, 0]}>
-            <boxGeometry args={[0.048, 0.048, 1.06]} />
-            <meshLambertMaterial color={woodColor} />
-          </mesh>
-        </group>
-
-        {/* 12. Two Cozy Glowing Meadow Lantern Posts (Bridge & East Path) */}
+        {/* 11. Two Cozy Glowing Meadow Lantern Posts (North Brook & East Path) */}
         {[
           { pos: [-1.45, BASE_GROUND_Y, -1.65] as [number, number, number], rotY: 0.45 },
           { pos: [2.25, BASE_GROUND_Y, 0.22] as [number, number, number], rotY: -2.2 },

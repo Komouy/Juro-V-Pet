@@ -12,7 +12,7 @@ import {
 } from "../../features/character/JuroModel";
 import { OutdoorEnvironment } from "./OutdoorEnvironment";
 import { ItemIllustration } from "../items/ItemIllustration";
-import { Heart, CloudRain, Sun, Moon, Armchair, Footprints, X } from "lucide-react";
+import { Heart, CloudRain, Sun, Moon, Armchair, Footprints, X, Brain } from "lucide-react";
 import { usePetStore } from "../../stores/petStore";
 import { useGameStore } from "../../stores/gameStore";
 import { useUIStore } from "../../stores/uiStore";
@@ -24,13 +24,15 @@ import {
   TIME_THEMES,
   type TimePhase,
 } from "../../utils/timeOfDay";
-import { JURO_BED_POS, JURO_BENCH_POS } from "../../engine/world/mapTerrain";
+import { JURO_BED_POS, JURO_BENCH_POS, isWaterAt } from "../../engine/world/mapTerrain";
+import { getCognitiveTier, computePetEmotionalState } from "../../engine/ai/cognitiveCore";
 import type { FoodItem, ToyItem } from "../../types/pet";
 import { ResponsiveCamera } from "./viewport/ResponsiveCamera";
 import { StatBars } from "./viewport/StatBars";
 import { ActionTray, type DragPayload } from "./viewport/ActionTray";
 import { JuroContextMenu } from "./viewport/JuroContextMenu";
 import { JuroSpeechBubble } from "./viewport/JuroSpeechBubble";
+import { AICoreModal } from "./viewport/AICoreModal";
 import {
   chatWithJuro,
   computePetExpression,
@@ -88,6 +90,8 @@ export const PetViewport: React.FC = () => {
 
   const [activeTray, setActiveTray] = useState<ActiveTray>("none");
   const [showStatDetails, setShowStatDetails] = useState(false);
+  const [showAICoreModal, setShowAICoreModal] = useState(false);
+  const [aiCoreContext, setAiCoreContext] = useState<PetChatContext | null>(null);
   const [juroMenu, setJuroMenu] = useState<{
     open: boolean;
     x: number;
@@ -271,6 +275,7 @@ export const PetViewport: React.FC = () => {
     if (
       activeTray === "none" &&
       !showStatDetails &&
+      !showAICoreModal &&
       !juroMenu.open &&
       !benchMenu?.open &&
       !isPettingActive &&
@@ -282,6 +287,7 @@ export const PetViewport: React.FC = () => {
         if (isPettingActive) setIsPettingActive(false);
         setActiveTray("none");
         setShowStatDetails(false);
+        setShowAICoreModal(false);
         setJuroMenu({ open: false, x: 0, y: 0, isNearTop: false });
         setBenchMenu(null);
         setSpeechBubble((s) => ({ ...s, visible: false }));
@@ -289,7 +295,7 @@ export const PetViewport: React.FC = () => {
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [activeTray, showStatDetails, juroMenu.open, benchMenu?.open, isPettingActive, speechBubble.visible]);
+  }, [activeTray, showStatDetails, showAICoreModal, juroMenu.open, benchMenu?.open, isPettingActive, speechBubble.visible]);
 
   // Dynamically assemble pet context: activities, emotions, sensations & environmental state
   const getLiveChatContext = useCallback(
@@ -306,6 +312,35 @@ export const PetViewport: React.FC = () => {
       const isEating = petState.currentState === "eating";
       const isPlaying = petState.currentState === "play";
       const isDragging = isDraggingPet || petState.currentState === "dragging";
+
+      const lastX = petState.lastPosition?.x ?? 0;
+      const lastZ = petState.lastPosition?.z ?? 0;
+      const inWater = isWaterAt(lastX, lastZ);
+
+      const cognitiveTier = getCognitiveTier(petState.level);
+      const emotionalState = computePetEmotionalState(
+        {
+          hunger: petState.hunger,
+          energy: petState.energy,
+          cleanliness: petState.cleanliness,
+          happiness: petState.happiness,
+          affection: petState.affection,
+        },
+        {
+          currentState: petState.currentState,
+          isDizzy,
+          isSleeping,
+          isPetting: isPettingActive,
+          isBathing,
+          isEating,
+          isPlaying,
+          isSittingOnBench,
+          isInWater: inWater,
+          isRaining: weather === "rain",
+          isNight,
+          level: petState.level,
+        }
+      );
 
       const expression = computePetExpression({
         hunger: petState.hunger,
@@ -326,6 +361,8 @@ export const PetViewport: React.FC = () => {
         isPlaying,
         isDragging,
         isDizzy,
+        isSittingOnBench,
+        isInWater: inWater,
         currentFoodName: petState.currentFoodBeingEaten?.name,
         currentToyName: petState.currentToyBeingPlayed?.name,
       });
@@ -338,6 +375,7 @@ export const PetViewport: React.FC = () => {
         happiness: petState.happiness,
         affection: petState.affection,
         currentState: petState.currentState,
+        level: petState.level,
         expression,
         currentActivity,
         currentFoodName: petState.currentFoodBeingEaten?.name,
@@ -351,10 +389,14 @@ export const PetViewport: React.FC = () => {
         isDizzy,
         isNight,
         isRaining: weather === "rain",
+        isSittingOnBench,
+        isInWater: inWater,
         isSpontaneous,
+        cognitiveTier,
+        emotionalState,
       };
     },
-    [weather, isPettingActive, isDraggingPet]
+    [weather, isPettingActive, isDraggingPet, isSittingOnBench]
   );
 
   // AI Pet Chat message handler (triggers Gemini API or fallback & shows speech bubble)
@@ -1111,6 +1153,12 @@ export const PetViewport: React.FC = () => {
     setActiveTray("none");
   }, [currentState, wakeUp, addLog, isSittingOnBench]);
 
+  const handleOpenAICore = useCallback(() => {
+    soundEffects.playClick();
+    setAiCoreContext(getLiveChatContext());
+    setShowAICoreModal(true);
+  }, [getLiveChatContext]);
+
   const handleToggleWeather = useCallback(() => {
     const nextWeather = weather === "clear" ? "rain" : "clear";
     soundEffects.playWeatherChange(nextWeather === "rain");
@@ -1264,8 +1312,20 @@ export const PetViewport: React.FC = () => {
         onToggleStatDetails={() => setShowStatDetails((prev) => !prev)}
       />
 
-      {/* Atmospheric Weather Indicator & Toggle Pill (Clear <-> Pixel Rain) */}
-      <div className="absolute top-3 right-3 z-20 pointer-events-auto">
+      {/* Top Right Controls: Otak AI (Core) & Atmospheric Weather Indicator */}
+      <div className="absolute top-3 right-3 z-20 pointer-events-auto flex items-center gap-2">
+        <button
+          type="button"
+          onClick={handleOpenAICore}
+          aria-label="Buka Otak AI Juro"
+          className="h-10 inline-flex items-center gap-1.5 sm:gap-2 px-3 bg-warm-white/95 dark:bg-neutral-900/90 backdrop-blur-xs border-2 border-charcoal dark:border-neutral-600 shadow-[2px_2px_0px_#171717] dark:shadow-[2px_2px_0px_#000000] hover:border-purple-500 transition-all active:translate-x-[1px] active:translate-y-[1px] cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple-500"
+        >
+          <Brain size={14} className="text-purple-600 dark:text-purple-400 animate-pulse shrink-0" />
+          <span className="pixel-text text-[9px] sm:text-[10px] font-bold text-purple-700 dark:text-purple-300 uppercase">
+            Otak AI · Lv.{level}
+          </span>
+        </button>
+
         <button
           type="button"
           onClick={handleToggleWeather}
@@ -1638,6 +1698,24 @@ export const PetViewport: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* Juro AI Brain Core & Emotional Awareness Modal */}
+      <AICoreModal
+        open={showAICoreModal}
+        onClose={() => setShowAICoreModal(false)}
+        level={level}
+        attributes={{
+          hunger,
+          energy,
+          happiness,
+          cleanliness,
+          affection,
+        }}
+        context={aiCoreContext ?? undefined}
+        onAskFeelings={(prompt) => {
+          handleSendMessage(prompt || "Bagaimana perasaanmu sekarang?");
+        }}
+      />
     </div>
   );
 };

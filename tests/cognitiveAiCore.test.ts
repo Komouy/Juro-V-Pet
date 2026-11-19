@@ -1,0 +1,147 @@
+import { describe, it, expect } from "vitest";
+import {
+  getCognitiveTier,
+  computePetEmotionalState,
+} from "../src/engine/ai/cognitiveCore";
+import {
+  buildJuroSystemPrompt,
+  getContextualFallbackReply,
+  computePetActivity,
+} from "../src/services/geminiService";
+
+describe("Cognitive AI Core & Developmental Progression", () => {
+  it("maps pet level dynamically across 5 distinct developmental tiers", () => {
+    // Level 1-2: Tunas Pikiran
+    expect(getCognitiveTier(1).tier).toBe(1);
+    expect(getCognitiveTier(1).name).toBe("Tunas Pikiran");
+    expect(getCognitiveTier(2).tier).toBe(1);
+
+    // Level 3-4: Kognisi Belajar
+    expect(getCognitiveTier(3).tier).toBe(2);
+    expect(getCognitiveTier(3).name).toBe("Kognisi Belajar");
+    expect(getCognitiveTier(4).tier).toBe(2);
+
+    // Level 5-6: Pikiran Adaptif
+    expect(getCognitiveTier(5).tier).toBe(3);
+    expect(getCognitiveTier(5).name).toBe("Pikiran Adaptif");
+    expect(getCognitiveTier(6).tier).toBe(3);
+
+    // Level 7-8: Akal Cendikia
+    expect(getCognitiveTier(7).tier).toBe(4);
+    expect(getCognitiveTier(7).name).toBe("Akal Cendikia");
+    expect(getCognitiveTier(8).tier).toBe(4);
+
+    // Level 9-10+: Kesadaran Purba
+    expect(getCognitiveTier(9).tier).toBe(5);
+    expect(getCognitiveTier(9).name).toBe("Kesadaran Purba");
+    expect(getCognitiveTier(12).tier).toBe(5);
+  });
+
+  it("evaluates emotional condition accurately for various context states", () => {
+    // Petting state: very affectionate & pampering
+    const petState = computePetEmotionalState({ affection: 90 }, { isPetting: true });
+    expect(petState.primaryEmotion).toContain("Manja");
+    expect(petState.moodIntensity).toBe("meluap-luap");
+
+    // Bench sitting: peaceful & contemplative
+    const benchState = computePetEmotionalState(
+      { happiness: 85 },
+      { isSittingOnBench: true }
+    );
+    expect(benchState.primaryEmotion).toContain("Damai");
+
+    // In water: refreshing swim
+    const waterState = computePetEmotionalState(
+      { happiness: 80 },
+      { isInWater: true }
+    );
+    expect(waterState.primaryEmotion).toContain("Air");
+
+    // Dizzy state: dizzy & stars
+    const dizzyState = computePetEmotionalState({}, { isDizzy: true });
+    expect(dizzyState.primaryEmotion).toContain("Pusing");
+
+    // Hungry state
+    const hungryState = computePetEmotionalState({ hunger: 15 });
+    expect(hungryState.primaryEmotion).toContain("Lapar");
+  });
+
+  it("injects cognitive tier and emotional state into Gemini system prompt", () => {
+    const prompt = buildJuroSystemPrompt({
+      name: "Juro",
+      hunger: 80,
+      energy: 85,
+      cleanliness: 90,
+      happiness: 95,
+      affection: 90,
+      currentState: "wander",
+      level: 5,
+      isSittingOnBench: true,
+      isInWater: false,
+    });
+
+    expect(prompt).toContain("Pikiran Adaptif");
+    expect(prompt).toContain("PERKEMBANGAN KOGNITIF OTAK AI");
+    expect(prompt).toContain("KONDISI EMOSIONAL & KESADARAN DIRI SAAT INI");
+    expect(prompt).toContain("Damai & Kontemplatif");
+  });
+
+  it("responds contextually to feeling inquiries and activities in offline fallback mode", () => {
+    // When user asks about feelings
+    const feelingReply = getContextualFallbackReply(
+      {
+        name: "Juro",
+        hunger: 85,
+        energy: 85,
+        cleanliness: 90,
+        happiness: 90,
+        affection: 90,
+        currentState: "idle",
+        level: 3,
+        isSittingOnBench: true,
+      },
+      "Bagaimana perasaanmu sekarang?"
+    );
+    expect(feelingReply.toLowerCase()).toContain("perasaan juro");
+
+    // When sitting on bench
+    const benchReply = getContextualFallbackReply({
+      name: "Juro",
+      hunger: 80,
+      energy: 80,
+      cleanliness: 80,
+      happiness: 80,
+      affection: 80,
+      currentState: "idle",
+      isSittingOnBench: true,
+    });
+    expect(benchReply.toLowerCase()).toContain("kursi");
+
+    // When in water
+    const waterReply = getContextualFallbackReply({
+      name: "Juro",
+      hunger: 80,
+      energy: 80,
+      cleanliness: 80,
+      happiness: 80,
+      affection: 80,
+      currentState: "wander",
+      isInWater: true,
+    });
+    expect(waterReply.toLowerCase()).toContain("air");
+  });
+
+  it("computes pet activity for sitting on bench and swimming in water", () => {
+    const benchActivity = computePetActivity({
+      currentState: "idle",
+      isSittingOnBench: true,
+    });
+    expect(benchActivity).toContain("kursi");
+
+    const waterActivity = computePetActivity({
+      currentState: "wander",
+      isInWater: true,
+    });
+    expect(waterActivity).toContain("sungai");
+  });
+});
