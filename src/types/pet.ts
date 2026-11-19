@@ -17,7 +17,8 @@ export type PetMood =
   | "bored"
   | "dirty"
   | "content"
-  | "excited";
+  | "excited"
+  | "angry";
 
 export type PetBehaviorState =
   | "idle"

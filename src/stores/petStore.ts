@@ -65,6 +65,7 @@ interface PetState {
   affection: number;
   currentState: PetBehaviorState;
   currentFoodBeingEaten: FoodItem | null;
+  currentToyBeingPlayed: ToyItem | null;
   lastUpdated: number;
   lastSleepRewardAt: number;
   lastCleanRewardAt: number;
@@ -81,6 +82,7 @@ interface PetState {
   feedWithItem: (food: FoodItem) => void;
   play: () => void;
   playWithItem: (toy: ToyItem) => void;
+  clearToyBeingPlayed: () => void;
   sleep: () => void;
   wakeUp: () => void;
   recoverSleepEnergy: (amount?: number) => void;
@@ -105,6 +107,7 @@ export const usePetStore = create<PetState>((set, get) => ({
   affection: 50,
   currentState: "idle",
   currentFoodBeingEaten: null,
+  currentToyBeingPlayed: null,
   lastUpdated: Date.now(),
   lastSleepRewardAt: 0,
   lastCleanRewardAt: 0,
@@ -116,6 +119,8 @@ export const usePetStore = create<PetState>((set, get) => ({
 
   clearLevelUpAlert: () => set({ recentlyLeveledUp: false }),
 
+  clearToyBeingPlayed: () => set({ currentToyBeingPlayed: null }),
+
   getAttributes: () => {
     const { hunger, energy, happiness, cleanliness, affection } = get();
     return { hunger, energy, happiness, cleanliness, affection };
@@ -126,9 +131,10 @@ export const usePetStore = create<PetState>((set, get) => ({
     if (hunger < 35) return "hungry";
     if (energy < 30) return "sleepy";
     if (cleanliness < 30) return "dirty";
+    if (affection < 35) return "angry";
+    if (happiness < 35) return "bored";
     if (happiness > 80 && affection > 60) return "excited";
     if (happiness > 60) return "happy";
-    if (happiness < 40) return "bored";
     return "content";
   },
 
@@ -196,6 +202,7 @@ export const usePetStore = create<PetState>((set, get) => ({
       affection: Math.min(100, s.affection + toy.affectionGain),
       hunger: Math.max(10, s.hunger - 6),
       currentState: "play",
+      currentToyBeingPlayed: toy,
       lastUpdated: Date.now(),
     }));
     get().addXP(toy.xpReward);

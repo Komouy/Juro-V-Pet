@@ -625,17 +625,20 @@ export const PetViewport: React.FC = () => {
 
       if (!finalMeta) return;
 
-      if (finalMeta.moved && !finalMeta.overJuro) {
+      const totalDist = Math.hypot(finalMeta.x - finalMeta.startX, finalMeta.y - finalMeta.startY);
+      const isTap = totalDist < 28 || !finalMeta.moved;
+
+      if (finalMeta.moved && !finalMeta.overJuro && !isTap) {
         soundEffects.playDrop();
       }
 
       // Food & Toy support BOTH manual drag-and-drop onto Juro AND quick tap
       if (finalMeta.payload.kind === "food") {
-        if (finalMeta.overJuro || !finalMeta.moved) {
+        if (finalMeta.overJuro || isTap) {
           triggerFeed(finalMeta.payload.food);
         }
       } else if (finalMeta.payload.kind === "toy") {
-        if (finalMeta.overJuro || !finalMeta.moved) {
+        if (finalMeta.overJuro || isTap) {
           triggerPlay(finalMeta.payload.toy);
         }
       }
@@ -945,6 +948,13 @@ export const PetViewport: React.FC = () => {
         soapBadgePercent={soapBadgePercent}
         dragVisualMoved={dragVisual?.moved}
         onStartItemDrag={handleStartItemDrag}
+        onDirectUse={(payload) => {
+          if (payload.kind === "food") {
+            triggerFeed(payload.food);
+          } else if (payload.kind === "toy") {
+            triggerPlay(payload.toy);
+          }
+        }}
       />
 
       {/* Interactive Contextual Juro Menu (Pops up directly on Juro Tap/Click) */}

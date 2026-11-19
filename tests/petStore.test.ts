@@ -65,6 +65,9 @@ describe("usePetStore", () => {
 
     usePetStore.setState({ energy: 80, happiness: 95, affection: 75 });
     expect(usePetStore.getState().getMood()).toBe("excited");
+
+    usePetStore.setState({ hunger: 80, energy: 80, cleanliness: 80, affection: 20 });
+    expect(usePetStore.getState().getMood()).toBe("angry");
   });
 
   it("blocks rapid sleep/wake toggle spam for infinite energy and XP", () => {

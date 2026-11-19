@@ -8,6 +8,7 @@ import { usePetStore } from "../../stores/petStore";
 import { useGameStore } from "../../stores/gameStore";
 import { getSkinById } from "../../data/economyCatalog";
 import { FoodProp3D, HeartPop3D } from "./FoodProp3D";
+import { ToyProp3D, MusicalNote3D, PlayBubble3D } from "./ToyProp3D";
 import {
   createSleepZTexture,
   createSoftShadowTexture,
@@ -114,6 +115,26 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
   const eatingTimer = useRef(0);
   const lastBiteSoundRef = useRef(-1);
 
+  // Toy playing animation refs
+  const toyPropRef = useRef<THREE.Group>(null);
+  const playTimer = useRef(0);
+  const lastPlayHopSoundRef = useRef(-1);
+
+  // Dynamic Expressions & Need-State Refs
+  const bodyMeshRef = useRef<THREE.Mesh>(null);
+  const salivaDripRef = useRef<THREE.Group>(null);
+  const sweatDropRef = useRef<THREE.Group>(null);
+  const angerSteamGroupRef = useRef<THREE.Group>(null);
+  const sighCloudRef = useRef<THREE.Group>(null);
+  const mudGroupRef = useRef<THREE.Group>(null);
+  const dustGroupRef = useRef<THREE.Group>(null);
+  const dustSpeckRefs = useRef<(THREE.Mesh | null)[]>([]);
+  const leftCheekGroupRef = useRef<THREE.Group>(null);
+  const rightCheekGroupRef = useRef<THREE.Group>(null);
+  const leftCheekMatRef = useRef<THREE.MeshBasicMaterial>(null);
+  const rightCheekMatRef = useRef<THREE.MeshBasicMaterial>(null);
+  const dirtyShakeTimer = useRef({ nextShake: 5 + Math.random() * 4, timer: 0 });
+
   // Interactive Bath 3D effects (GPU-instanced for smooth mobile performance)
   const soapFoamInstRef = useRef<THREE.InstancedMesh>(null);
   const waterDropsInstRef = useRef<THREE.InstancedMesh>(null);
@@ -123,6 +144,8 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
     getAttributes,
     currentState: storeState,
     currentFoodBeingEaten,
+    currentToyBeingPlayed,
+    clearToyBeingPlayed,
     setBehaviorState,
   } = usePetStore();
   const { activeSkin } = useGameStore();
@@ -893,7 +916,82 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
       if (heartBubbleRef.current) heartBubbleRef.current.visible = false;
     }
 
-    // 7. Eyes: Awake vs Sleeping Curved Eyelids (︶ ︶)
+    // 6.5 Interactive Toy Playing Sequence with 3D Toy Prop
+    const isPlayingToy = currentState === "play" && Boolean(currentToyBeingPlayed);
+    if (isPlayingToy) {
+      playTimer.current += delta;
+      const playT = playTimer.current;
+      const toyId = currentToyBeingPlayed?.id ?? "bounce-ball";
+
+      if (toyPropRef.current) {
+        toyPropRef.current.visible = true;
+
+        if (toyId === "bounce-ball") {
+          // Bouncy striped rubber ball
+          const bounceCycle = (playT * 3.6) % 1;
+          const bounceArc = Math.sin(bounceCycle * Math.PI);
+          const bounceY = -0.1 + bounceArc * 0.72;
+          toyPropRef.current.position.set(0.42, bounceY, 0.95);
+          toyPropRef.current.rotation.x = playT * 8;
+          toyPropRef.current.rotation.z = playT * 6;
+
+          const hopBucket = Math.floor(playT * 3.6);
+          if (bounceArc < 0.12 && lastPlayHopSoundRef.current !== hopBucket) {
+            lastPlayHopSoundRef.current = hopBucket;
+            soundEffects.playHop();
+          }
+
+          if (groupRef.current) {
+            const juroHop = Math.sin(bounceCycle * Math.PI * 2) * 0.08;
+            groupRef.current.position.y = -0.1 + Math.max(0, juroHop);
+          }
+        } else if (toyId === "bubble-blower") {
+          toyPropRef.current.position.set(0.55, 0.05 + Math.sin(playT * 3) * 0.04, 0.85);
+          toyPropRef.current.rotation.z = -0.3 + Math.sin(playT * 2.5) * 0.1;
+
+          if (groupRef.current) {
+            groupRef.current.position.y = -0.1 + Math.abs(Math.sin(playT * 6)) * 0.07;
+          }
+        } else if (toyId === "music-box") {
+          toyPropRef.current.position.set(0.58, -0.15, 0.78);
+          toyPropRef.current.rotation.y = -0.4;
+
+          if (groupRef.current) {
+            groupRef.current.rotation.z = Math.sin(playT * 9) * 0.16;
+            groupRef.current.scale.x = 1 + Math.sin(playT * 18) * 0.08;
+            groupRef.current.scale.y = 1 - Math.sin(playT * 18) * 0.08;
+          }
+        }
+      }
+
+      if (playT >= 4.2) {
+        soundEffects.playHappy();
+        clearToyBeingPlayed();
+        fsm.transitionTo("happy", true);
+        setBehaviorState("happy");
+        playTimer.current = 0;
+        lastPlayHopSoundRef.current = -1;
+      }
+    } else {
+      playTimer.current = 0;
+      lastPlayHopSoundRef.current = -1;
+      if (toyPropRef.current) toyPropRef.current.visible = false;
+    }
+
+    // 7. Dynamic Need-State Facial Expressions
+    const isDirty = attributes.cleanliness < 35;
+    let expression: "hungry" | "tired" | "angry" | "bored" | "normal" = "normal";
+    if (attributes.hunger < 35) {
+      expression = "hungry";
+    } else if (attributes.energy < 35) {
+      expression = "tired";
+    } else if (attributes.affection < 35) {
+      expression = "angry";
+    } else if (attributes.happiness < 35) {
+      expression = "bored";
+    }
+
+    // Eyes: Awake vs Sleeping Curved Eyelids (︶ ︶)
     blinkState.current.timer += delta;
     if (blinkState.current.timer > blinkState.current.nextBlink) {
       blinkState.current.isBlinking = true;
@@ -914,6 +1012,8 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
     const dizzyFade = isDizzy ? Math.min(1, dizzyRef.current.timer / 0.65) : 0;
     const isChewing = isEating && eatingTimer.current > 0.7 && eatingTimer.current < 2.6;
     const isBathSquint = isScrubbingNow || isRinsingNow;
+    const isHappyFace = isPlayingToy || currentState === "happy" || isPettingActive;
+
     const blinkScaleY = isRinsingNow
       ? 0.16
       : isScrubbingNow
@@ -925,10 +1025,10 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
       : 1;
 
     if (leftEyeRef.current && rightEyeRef.current) {
-      leftEyeRef.current.visible = !isSleeping && !isDizzy && !isPettingActive;
-      rightEyeRef.current.visible = !isSleeping && !isDizzy && !isPettingActive;
+      leftEyeRef.current.visible = !isSleeping && !isDizzy && !isHappyFace;
+      rightEyeRef.current.visible = !isSleeping && !isDizzy && !isHappyFace;
 
-      if (!isSleeping && !isDizzy) {
+      if (!isSleeping && !isDizzy && !isHappyFace) {
         let lookX = state.pointer.x * 0.08;
         let lookY = state.pointer.y * 0.06;
 
@@ -942,11 +1042,57 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
 
         leftEyeRef.current.position.x = -0.35 + lookX;
         leftEyeRef.current.position.y = 0.07 + lookY;
-        leftEyeRef.current.scale.y = blinkScaleY;
-
         rightEyeRef.current.position.x = 0.35 + lookX;
         rightEyeRef.current.position.y = 0.07 + lookY;
-        rightEyeRef.current.scale.y = blinkScaleY;
+
+        if (expression === "hungry") {
+          // Puppy dog pleading watery eyes with sparkling shimmer
+          leftEyeRef.current.scale.set(1.18, 1.35 * blinkScaleY, 0.52);
+          rightEyeRef.current.scale.set(1.18, 1.35 * blinkScaleY, 0.52);
+          leftEyeRef.current.rotation.z = -0.05;
+          rightEyeRef.current.rotation.z = 0.05;
+          if (leftCatchlightRef.current && rightCatchlightRef.current) {
+            const catchPulse = 1.35 + Math.sin(t * 8) * 0.2;
+            leftCatchlightRef.current.scale.setScalar(catchPulse);
+            rightCatchlightRef.current.scale.setScalar(catchPulse);
+          }
+        } else if (expression === "tired") {
+          // Heavy weary droopy eyelids (u u)
+          leftEyeRef.current.scale.set(1.02, 0.42 * blinkScaleY, 0.52);
+          rightEyeRef.current.scale.set(1.02, 0.42 * blinkScaleY, 0.52);
+          leftEyeRef.current.rotation.z = -0.16;
+          rightEyeRef.current.rotation.z = 0.16;
+          if (leftCatchlightRef.current && rightCatchlightRef.current) {
+            leftCatchlightRef.current.scale.setScalar(0.68);
+            rightCatchlightRef.current.scale.setScalar(0.68);
+          }
+        } else if (expression === "angry") {
+          // Fierce angled pouting angry eyes (> <)
+          leftEyeRef.current.scale.set(1.12, 0.65 * blinkScaleY, 0.52);
+          rightEyeRef.current.scale.set(1.12, 0.65 * blinkScaleY, 0.52);
+          leftEyeRef.current.rotation.z = 0.32;
+          rightEyeRef.current.rotation.z = -0.32;
+          if (leftCatchlightRef.current && rightCatchlightRef.current) {
+            leftCatchlightRef.current.scale.setScalar(0.65);
+            rightCatchlightRef.current.scale.setScalar(0.65);
+          }
+        } else if (expression === "bored") {
+          // Flat horizontal slit eyes (- -)
+          leftEyeRef.current.scale.set(1.24, 0.22 * blinkScaleY, 0.52);
+          rightEyeRef.current.scale.set(1.24, 0.22 * blinkScaleY, 0.52);
+          leftEyeRef.current.rotation.z = 0;
+          rightEyeRef.current.rotation.z = 0;
+        } else {
+          // Normal awake eyes
+          leftEyeRef.current.scale.set(1.0, 1.24 * blinkScaleY, 0.52);
+          rightEyeRef.current.scale.set(1.0, 1.24 * blinkScaleY, 0.52);
+          leftEyeRef.current.rotation.z = -0.05;
+          rightEyeRef.current.rotation.z = 0.05;
+          if (leftCatchlightRef.current && rightCatchlightRef.current) {
+            leftCatchlightRef.current.scale.setScalar(1.0);
+            rightCatchlightRef.current.scale.setScalar(1.0);
+          }
+        }
       }
     }
 
@@ -964,19 +1110,21 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
     }
 
     if (leftCatchlightRef.current && rightCatchlightRef.current) {
-      leftCatchlightRef.current.visible = !isSleeping && !isDizzy && !isChewing && !isBathSquint && !isPettingActive;
-      rightCatchlightRef.current.visible = !isSleeping && !isDizzy && !isChewing && !isBathSquint && !isPettingActive;
+      leftCatchlightRef.current.visible =
+        !isSleeping && !isDizzy && !isChewing && !isBathSquint && !isHappyFace && expression !== "bored";
+      rightCatchlightRef.current.visible =
+        !isSleeping && !isDizzy && !isChewing && !isBathSquint && !isHappyFace && expression !== "bored";
     }
 
-    // Peaceful Sleeping Closed Eyelids or Sweet Petting Eyes (︶ ︶)
+    // Peaceful Sleeping Closed Eyelids or Sweet Petting/Play Eyes (︶ ︶)
     if (sleepEyesRef.current) {
-      sleepEyesRef.current.visible = isSleeping || isPettingActive;
-      if (isSleeping || isPettingActive) {
+      sleepEyesRef.current.visible = isSleeping || isHappyFace;
+      if (isSleeping || isHappyFace) {
         sleepEyesRef.current.position.y = 0.01 - sleepBreath * 0.012;
       }
     }
 
-    // 8. Mouth: Awake Smiling Mouth vs Dizzy Wavy Mouth vs Cozy Sleeping Mouth + Sleep Bubble
+    // 8. Mouth: Dynamic Expression vs Eating vs Sleeping
     if (mouthGroupRef.current) {
       mouthGroupRef.current.visible = !isSleeping && !isDizzy;
       if (!isSleeping && !isDizzy) {
@@ -990,10 +1138,132 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
           } else {
             mouthGroupRef.current.scale.set(1.2, 1.15, 1);
           }
-        } else if (currentState === "happy" || currentState === "play" || isPettingActive) {
+          mouthGroupRef.current.position.set(0, -0.01, 1.035);
+        } else if (isHappyFace) {
           mouthGroupRef.current.scale.set(1.18 + Math.sin(t * 8) * 0.08, 1.16, 1);
+          mouthGroupRef.current.position.set(0, -0.01, 1.035);
+        } else if (expression === "hungry") {
+          // Open longing mouth
+          mouthGroupRef.current.scale.set(1.15, 1.3, 1);
+          mouthGroupRef.current.position.set(0, -0.03, 1.035);
+        } else if (expression === "tired") {
+          // Small panting oval
+          const pant = 0.55 + Math.sin(t * 7.5) * 0.2;
+          mouthGroupRef.current.scale.set(0.65, pant, 1);
+          mouthGroupRef.current.position.set(0, -0.04, 1.035);
+        } else if (expression === "angry") {
+          // Grumpy inverted pout
+          mouthGroupRef.current.scale.set(0.85, -0.65, 1);
+          mouthGroupRef.current.position.set(0, -0.035, 1.035);
+        } else if (expression === "bored") {
+          // Flat horizontal line
+          mouthGroupRef.current.scale.set(0.95, 0.16, 1);
+          mouthGroupRef.current.position.set(0, -0.06, 1.035);
         } else {
           mouthGroupRef.current.scale.set(1, 1, 1);
+          mouthGroupRef.current.position.set(0, -0.01, 1.035);
+        }
+      }
+    }
+
+    // Dynamic Cheeks, Accessories & Dirty Overlays
+    const isAngry = !isSleeping && expression === "angry";
+    const cheekColor = isAngry
+      ? "#DC2626"
+      : isPettingActive
+      ? "#F43F5E"
+      : "#F97316";
+    if (leftCheekMatRef.current) leftCheekMatRef.current.color.set(cheekColor);
+    if (rightCheekMatRef.current) rightCheekMatRef.current.color.set(cheekColor);
+    if (leftCheekGroupRef.current && rightCheekGroupRef.current) {
+      const cheekScale = isAngry ? 1.25 : 1.0;
+      leftCheekGroupRef.current.scale.setScalar(cheekScale);
+      rightCheekGroupRef.current.scale.setScalar(cheekScale);
+    }
+
+    // Saliva Drip (Hungry)
+    if (salivaDripRef.current) {
+      const showSaliva = !isSleeping && !isEating && !isPlayingToy && expression === "hungry";
+      salivaDripRef.current.visible = showSaliva;
+      if (showSaliva) {
+        const dripScale = 0.85 + Math.sin(t * 5) * 0.22;
+        salivaDripRef.current.scale.set(1, dripScale, 1);
+      }
+    }
+
+    // Anime Sweat Drop (Tired)
+    if (sweatDropRef.current) {
+      const showSweat = !isSleeping && !isPlayingToy && expression === "tired";
+      sweatDropRef.current.visible = showSweat;
+      if (showSweat) {
+        sweatDropRef.current.position.y = 0.48 + Math.sin(t * 6.5) * 0.035;
+      }
+    }
+
+    // Anger Steam Puffs (Angry)
+    if (angerSteamGroupRef.current) {
+      const showSteam = !isSleeping && !isPlayingToy && expression === "angry";
+      angerSteamGroupRef.current.visible = showSteam;
+      if (showSteam) {
+        const steamPuff = 0.75 + Math.sin(t * 8) * 0.28;
+        angerSteamGroupRef.current.scale.setScalar(steamPuff);
+      }
+    }
+
+    // Bored Heavy Sigh Cloud
+    if (sighCloudRef.current) {
+      const showSigh = !isSleeping && !isPlayingToy && expression === "bored";
+      sighCloudRef.current.visible = showSigh;
+      if (showSigh) {
+        const sighCycle = (t * 0.35) % 1;
+        sighCloudRef.current.position.set(0.12 + sighCycle * 0.15, -0.02 + sighCycle * 0.42, 1.06);
+        const sighScale = Math.sin(sighCycle * Math.PI) * 0.85;
+        sighCloudRef.current.scale.setScalar(sighScale);
+      }
+    }
+
+    // Mud Splatters & Orbiting Dust/Fly Specks (Dirty)
+    if (mudGroupRef.current) {
+      mudGroupRef.current.visible = isDirty;
+    }
+    if (dustGroupRef.current) {
+      dustGroupRef.current.visible = isDirty;
+      if (isDirty) {
+        for (let i = 0; i < 3; i++) {
+          const speck = dustSpeckRefs.current[i];
+          if (speck) {
+            const angle = t * 3.5 + (i * Math.PI * 2) / 3;
+            const jitter = Math.sin(t * 19 + i * 5) * 0.08;
+            speck.position.set(
+              Math.cos(angle) * 0.72 + jitter,
+              0.35 + Math.sin(t * 4 + i) * 0.3 + jitter,
+              Math.sin(angle) * 0.65 + jitter
+            );
+          }
+        }
+      }
+    }
+
+    // Dirty Skin Material Reaction
+    if (bodyMeshRef.current) {
+      const mat = bodyMeshRef.current.material as THREE.MeshPhysicalMaterial;
+      if (mat) {
+        mat.roughness = isDirty ? 0.36 : 0.14;
+        mat.clearcoat = isDirty ? 0.35 : 1.0;
+      }
+    }
+
+    // Dirty Dust Shake Shiver
+    if (isDirty && !isSleeping && !isEating && !isPlayingToy) {
+      dirtyShakeTimer.current.timer += delta;
+      if (dirtyShakeTimer.current.timer > dirtyShakeTimer.current.nextShake) {
+        if (groupRef.current) {
+          groupRef.current.rotation.z = Math.sin(dirtyShakeTimer.current.timer * 36) * 0.12;
+        }
+        if (dirtyShakeTimer.current.timer > dirtyShakeTimer.current.nextShake + 0.35) {
+          dirtyShakeTimer.current.timer = 0;
+          dirtyShakeTimer.current.nextShake = 5 + Math.random() * 5;
+          soundEffects.playPlop();
         }
       }
     }
@@ -1128,6 +1398,7 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
   });
 
   const isCurrentlyEating = storeState === "eating";
+  const isPlayingToy = storeState === "play" && Boolean(currentToyBeingPlayed);
 
   return (
     <>
@@ -1157,7 +1428,7 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
         }}
       >
         {/* Main Sculpted Chubby Jelly Body */}
-        <mesh geometry={outerBodyGeometry}>
+        <mesh ref={bodyMeshRef} geometry={outerBodyGeometry}>
           <meshPhysicalMaterial
             vertexColors={true}
             roughness={0.14}
@@ -1358,11 +1629,11 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
           </mesh>
         </mesh>
 
-        {/* === CHEEK BLUSH STRIPES (/// Clearly Visible) === */}
-        <group position={[-0.45, -0.075, 0.945]} rotation={[0, -0.36, -0.16]}>
+        {/* === CHEEK BLUSH STRIPES (Dynamically Flushes Crimson when Angry, Rosy when Petted) === */}
+        <group ref={leftCheekGroupRef} position={[-0.45, -0.075, 0.945]} rotation={[0, -0.36, -0.16]}>
           <mesh position={[-0.038, 0, 0]}>
             <capsuleGeometry args={[0.014, 0.046, 4, 8]} />
-            <meshBasicMaterial color="#F97316" opacity={0.92} transparent />
+            <meshBasicMaterial ref={leftCheekMatRef} color="#F97316" opacity={0.92} transparent />
           </mesh>
           <mesh position={[0, 0, 0]}>
             <capsuleGeometry args={[0.014, 0.058, 4, 8]} />
@@ -1374,10 +1645,10 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
           </mesh>
         </group>
 
-        <group position={[0.45, -0.075, 0.945]} rotation={[0, 0.36, 0.16]}>
+        <group ref={rightCheekGroupRef} position={[0.45, -0.075, 0.945]} rotation={[0, 0.36, 0.16]}>
           <mesh position={[-0.038, 0, 0]}>
             <capsuleGeometry args={[0.014, 0.046, 4, 8]} />
-            <meshBasicMaterial color="#F97316" opacity={0.92} transparent />
+            <meshBasicMaterial ref={rightCheekMatRef} color="#F97316" opacity={0.92} transparent />
           </mesh>
           <mesh position={[0, 0, 0]}>
             <capsuleGeometry args={[0.014, 0.058, 4, 8]} />
@@ -1463,6 +1734,178 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
             </group>
           </group>
         )}
+
+        {/* Interactive 3D Toy Prop and Play Accessories */}
+        {isPlayingToy && currentToyBeingPlayed && (
+          <group ref={toyPropRef}>
+            <ToyProp3D
+              toyId={currentToyBeingPlayed.id}
+              bounceHeight={playTimer.current}
+            />
+            {currentToyBeingPlayed.id === "music-box" && (
+              <>
+                <MusicalNote3D progress={playTimer.current * 0.8} offset={0} />
+                <MusicalNote3D progress={playTimer.current * 0.8} offset={0.33} />
+                <MusicalNote3D progress={playTimer.current * 0.8} offset={0.66} />
+              </>
+            )}
+            {currentToyBeingPlayed.id === "bubble-blower" && (
+              <>
+                {[0, 1, 2, 3, 4, 5].map((idx) => (
+                  <PlayBubble3D
+                    key={idx}
+                    index={idx}
+                    progress={playTimer.current * 0.75}
+                  />
+                ))}
+              </>
+            )}
+          </group>
+        )}
+
+        {/* Pleading Hungry Droplet at mouth corner */}
+        <group ref={salivaDripRef} position={[-0.08, -0.15, 1.05]} visible={false}>
+          <mesh scale={[0.024, 0.048, 0.024]}>
+            <sphereGeometry args={[1, 12, 12]} />
+            <meshPhysicalMaterial
+              color="#BAE6FD"
+              roughness={0.06}
+              clearcoat={1.0}
+              transparent
+              opacity={0.85}
+              emissive="#E0F2FE"
+              emissiveIntensity={0.2}
+            />
+          </mesh>
+          <mesh position={[0, 0.032, 0]} scale={[0.014, 0.028, 0.014]}>
+            <coneGeometry args={[1, 1.5, 8]} />
+            <meshPhysicalMaterial
+              color="#BAE6FD"
+              roughness={0.06}
+              clearcoat={1.0}
+              transparent
+              opacity={0.85}
+            />
+          </mesh>
+        </group>
+
+        {/* Anime Weary Sweat Droplet on forehead */}
+        <group ref={sweatDropRef} position={[0.42, 0.48, 0.82]} rotation={[0, 0, -0.28]} visible={false}>
+          <mesh scale={[0.038, 0.062, 0.03]}>
+            <sphereGeometry args={[1, 12, 12]} />
+            <meshPhysicalMaterial
+              color="#38BDF8"
+              roughness={0.05}
+              clearcoat={1.0}
+              transparent
+              opacity={0.88}
+              emissive="#7DD3FC"
+              emissiveIntensity={0.3}
+            />
+          </mesh>
+          <mesh position={[0, 0.048, 0]} rotation={[0, 0, Math.PI]} scale={[0.028, 0.045, 0.024]}>
+            <coneGeometry args={[1, 1.6, 10]} />
+            <meshPhysicalMaterial
+              color="#38BDF8"
+              roughness={0.05}
+              clearcoat={1.0}
+              transparent
+              opacity={0.88}
+            />
+          </mesh>
+        </group>
+
+        {/* Cartoon Anger Steam Puffs on Crown */}
+        <group ref={angerSteamGroupRef} visible={false}>
+          <group position={[-0.45, 0.95, 0.15]}>
+            <mesh position={[0, 0, 0]}>
+              <sphereGeometry args={[0.068, 12, 12]} />
+              <meshBasicMaterial color="#FFFFFF" transparent opacity={0.85} />
+            </mesh>
+            <mesh position={[-0.035, 0.052, 0]}>
+              <sphereGeometry args={[0.048, 10, 10]} />
+              <meshBasicMaterial color="#FFFFFF" transparent opacity={0.75} />
+            </mesh>
+            <mesh position={[0.032, 0.045, 0]}>
+              <sphereGeometry args={[0.04, 10, 10]} />
+              <meshBasicMaterial color="#FFFFFF" transparent opacity={0.7} />
+            </mesh>
+          </group>
+          <group position={[0.45, 0.95, 0.15]}>
+            <mesh position={[0, 0, 0]}>
+              <sphereGeometry args={[0.068, 12, 12]} />
+              <meshBasicMaterial color="#FFFFFF" transparent opacity={0.85} />
+            </mesh>
+            <mesh position={[0.035, 0.052, 0]}>
+              <sphereGeometry args={[0.048, 10, 10]} />
+              <meshBasicMaterial color="#FFFFFF" transparent opacity={0.75} />
+            </mesh>
+            <mesh position={[-0.032, 0.045, 0]}>
+              <sphereGeometry args={[0.04, 10, 10]} />
+              <meshBasicMaterial color="#FFFFFF" transparent opacity={0.7} />
+            </mesh>
+          </group>
+        </group>
+
+        {/* Soft Sigh Cloud */}
+        <group ref={sighCloudRef} position={[0.12, -0.02, 1.05]} visible={false}>
+          <mesh position={[0, 0, 0]}>
+            <sphereGeometry args={[0.052, 12, 12]} />
+            <meshBasicMaterial color="#F3F4F6" transparent opacity={0.7} />
+          </mesh>
+          <mesh position={[0.038, 0.02, 0]}>
+            <sphereGeometry args={[0.036, 10, 10]} />
+            <meshBasicMaterial color="#F3F4F6" transparent opacity={0.65} />
+          </mesh>
+          <mesh position={[-0.032, 0.015, 0]}>
+            <sphereGeometry args={[0.03, 10, 10]} />
+            <meshBasicMaterial color="#F3F4F6" transparent opacity={0.6} />
+          </mesh>
+        </group>
+
+        {/* 5 Sculpted Dark Mud Splatters clinging to Juro's Body */}
+        <group ref={mudGroupRef} visible={false}>
+          {/* Mud Blot 1 - Crown */}
+          <mesh position={[0.18, 0.74, 0.42]} rotation={[0.4, 0.2, -0.3]} scale={[1.2, 0.35, 1.0]}>
+            <sphereGeometry args={[0.12, 12, 12]} />
+            <meshStandardMaterial color="#451A03" roughness={0.85} />
+          </mesh>
+          {/* Mud Blot 2 - Left Flank */}
+          <mesh position={[-0.72, 0.16, 0.65]} rotation={[-0.2, -0.5, 0.3]} scale={[0.85, 1.25, 0.4]}>
+            <sphereGeometry args={[0.13, 12, 12]} />
+            <meshStandardMaterial color="#3E1A04" roughness={0.85} />
+          </mesh>
+          {/* Mud Blot 3 - Right Shoulder */}
+          <mesh position={[0.78, -0.15, 0.58]} rotation={[0.2, 0.6, -0.2]} scale={[1.1, 0.85, 0.45]}>
+            <sphereGeometry args={[0.11, 12, 12]} />
+            <meshStandardMaterial color="#451A03" roughness={0.85} />
+          </mesh>
+          {/* Mud Blot 4 - Belly Spot */}
+          <mesh position={[-0.15, -0.42, 0.88]} rotation={[0.5, 0, 0]} scale={[1.15, 0.4, 0.8]}>
+            <sphereGeometry args={[0.09, 10, 10]} />
+            <meshStandardMaterial color="#3A1700" roughness={0.9} />
+          </mesh>
+          {/* Mud Blot 5 - Back Side */}
+          <mesh position={[0.22, 0.38, -0.78]} rotation={[-0.4, 0.3, 0]} scale={[1.0, 0.5, 0.9]}>
+            <sphereGeometry args={[0.13, 12, 12]} />
+            <meshStandardMaterial color="#451A03" roughness={0.85} />
+          </mesh>
+        </group>
+
+        {/* 3 Buzzing Dark Dust/Fly Specks */}
+        <group ref={dustGroupRef} visible={false}>
+          {[0, 1, 2].map((idx) => (
+            <mesh
+              key={idx}
+              ref={(el) => {
+                dustSpeckRefs.current[idx] = el;
+              }}
+            >
+              <sphereGeometry args={[0.016, 6, 6]} />
+              <meshBasicMaterial color="#1C1917" />
+            </mesh>
+          ))}
+        </group>
 
         {/* Sculpted Glossy 3D Heart Satisfaction Pop after Eating */}
         <group ref={heartBubbleRef} position={[0, 1.0, 0.35]} visible={false}>

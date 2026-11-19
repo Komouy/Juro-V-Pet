@@ -20,6 +20,7 @@ export interface ActionTrayProps {
   soapBadgePercent: number;
   dragVisualMoved?: boolean;
   onStartItemDrag: (payload: DragPayload, e: React.PointerEvent) => void;
+  onDirectUse?: (payload: DragPayload) => void;
 }
 
 export const ActionTray: React.FC<ActionTrayProps> = ({
@@ -30,6 +31,7 @@ export const ActionTray: React.FC<ActionTrayProps> = ({
   soapBadgePercent,
   dragVisualMoved = false,
   onStartItemDrag,
+  onDirectUse,
 }) => {
   if (activeTray === "none") return null;
 
@@ -91,6 +93,7 @@ export const ActionTray: React.FC<ActionTrayProps> = ({
                       key={food.id}
                       type="button"
                       onPointerDown={(e) => onStartItemDrag({ kind: "food", food }, e)}
+                      onClick={() => onDirectUse?.({ kind: "food", food })}
                       className="relative group shrink-0 w-24 p-2 bg-white dark:bg-neutral-800 border-2 border-charcoal dark:border-neutral-700 shadow-[2px_2px_0px_#171717] hover:border-juro-orange hover:-translate-y-0.5 active:translate-x-[1px] active:translate-y-[1px] active:shadow-none transition-all cursor-grab active:cursor-grabbing flex flex-col items-center text-center gap-1 touch-none"
                     >
                       <span className="absolute top-1 right-1 pixel-text text-[8px] px-1 bg-charcoal text-white">
@@ -161,6 +164,7 @@ export const ActionTray: React.FC<ActionTrayProps> = ({
                   key={toy.id}
                   type="button"
                   onPointerDown={(e) => onStartItemDrag({ kind: "toy", toy }, e)}
+                  onClick={() => onDirectUse?.({ kind: "toy", toy })}
                   className="group min-w-0 p-2 bg-white dark:bg-neutral-800 border-2 border-charcoal dark:border-neutral-700 shadow-[2px_2px_0px_#171717] hover:border-juro-orange hover:-translate-y-0.5 active:translate-x-[1px] active:translate-y-[1px] active:shadow-none transition-all cursor-grab active:cursor-grabbing flex flex-col items-center text-center gap-1.5 touch-none"
                 >
                   <ItemIllustration id={toy.id} size={36} />
