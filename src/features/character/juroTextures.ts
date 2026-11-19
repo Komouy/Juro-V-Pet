@@ -48,6 +48,9 @@ export function createSleepZTexture(): THREE.CanvasTexture | null {
   ctx.fillRect(24, 100, 80, 5);
 
   const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  texture.minFilter = THREE.NearestFilter;
+  texture.magFilter = THREE.NearestFilter;
   texture.needsUpdate = true;
   return texture;
 }
@@ -72,6 +75,7 @@ export function createSoftShadowTexture(): THREE.CanvasTexture | null {
   ctx.fillRect(0, 0, 128, 128);
 
   const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
   texture.needsUpdate = true;
   return texture;
 }
@@ -113,6 +117,8 @@ export function createDizzyEyeTexture(): THREE.CanvasTexture | null {
 
   const texture = new THREE.CanvasTexture(canvas);
   texture.colorSpace = THREE.SRGBColorSpace;
+  texture.minFilter = THREE.NearestFilter;
+  texture.magFilter = THREE.NearestFilter;
   texture.needsUpdate = true;
   return texture;
 }
@@ -143,6 +149,8 @@ export function createDizzyMouthTexture(): THREE.CanvasTexture | null {
 
   const texture = new THREE.CanvasTexture(canvas);
   texture.colorSpace = THREE.SRGBColorSpace;
+  texture.minFilter = THREE.NearestFilter;
+  texture.magFilter = THREE.NearestFilter;
   texture.needsUpdate = true;
   return texture;
 }
@@ -185,6 +193,8 @@ export function createDizzyStarTexture(): THREE.CanvasTexture | null {
 
   const texture = new THREE.CanvasTexture(canvas);
   texture.colorSpace = THREE.SRGBColorSpace;
+  texture.minFilter = THREE.NearestFilter;
+  texture.magFilter = THREE.NearestFilter;
   texture.needsUpdate = true;
   return texture;
 }

@@ -117,6 +117,8 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
   const dizzyHaloRef = useRef<THREE.Group>(null);
   const dizzyStarRefs = useRef<(THREE.Sprite | null)[]>([]);
   const dizzyRef = useRef({ buildup: 0, timer: 0, lastSoundAt: -10, dragAge: 0 });
+  const petVelocityRef = useRef({ lastX: 0, lastY: 0, lastTime: 0, hasSample: false });
+  const rapidTapHistoryRef = useRef<number[]>([]);
 
   // Eating animation refs
   const foodPropRef = useRef<THREE.Group>(null);
@@ -542,6 +544,52 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
       typeof window !== "undefined" &&
       window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
     const motionScale = prefersReduced ? 0.3 : 1;
+
+    // Update dizzy timers & recovery buildup
+    if (dizzyRef.current.timer > 0) {
+      dizzyRef.current.timer = Math.max(0, dizzyRef.current.timer - delta);
+    }
+    if (dizzyRef.current.buildup > 0) {
+      dizzyRef.current.buildup = Math.max(0, dizzyRef.current.buildup - delta * 1.5);
+    }
+
+    // Dynamic trigger: vigorous petting speed calculation
+    if (isPettingActive && currentState !== "sleep") {
+      const nowMs = performance.now();
+      if (petVelocityRef.current.hasSample) {
+        const dtSec = Math.max((nowMs - petVelocityRef.current.lastTime) / 1000, 0.016);
+        const dx = state.pointer.x - petVelocityRef.current.lastX;
+        const dy = state.pointer.y - petVelocityRef.current.lastY;
+        const pSpeed = Math.hypot(dx, dy) / dtSec;
+        if (pSpeed > 5.0) {
+          dizzyRef.current.buildup = Math.min(2.5, dizzyRef.current.buildup + delta * (pSpeed * 0.45));
+          if (dizzyRef.current.buildup >= 1.25 && dizzyRef.current.timer <= 0.2) {
+            dizzyRef.current.timer = 3.2;
+            dizzyRef.current.buildup = 0;
+            soundEffects.playDizzy();
+          }
+        }
+      }
+      petVelocityRef.current = {
+        lastX: state.pointer.x,
+        lastY: state.pointer.y,
+        lastTime: nowMs,
+        hasSample: true,
+      };
+    } else {
+      petVelocityRef.current.hasSample = false;
+    }
+
+    // Dynamic trigger: rapid soap scrubbing during bath
+    const liveBathForDizzy = bathStateRef?.current;
+    if (liveBathForDizzy?.isScrubbing && currentState !== "sleep") {
+      dizzyRef.current.buildup = Math.min(2.5, dizzyRef.current.buildup + delta * 0.45);
+      if (dizzyRef.current.buildup >= 1.4 && dizzyRef.current.timer <= 0.2) {
+        dizzyRef.current.timer = 3.0;
+        dizzyRef.current.buildup = 0;
+        soundEffects.playDizzy();
+      }
+    }
 
     // 2. Behavior Position, Slime Drag-Crawl & Jump-Up Calculations across the 3D Valley Map
     let crawlScaleX = 1;
@@ -1009,7 +1057,15 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
       const isDizzyActive = currentState !== "sleep" && dizzyRef.current.timer > 0;
       const dizzyFade = isDizzyActive ? Math.min(1, dizzyRef.current.timer / 0.65) : 0;
 
-      if (isScrubbingNow) {
+      if (isDizzyActive) {
+        // Woozy circular sway + soft jelly wobble while dizzy from frantic petting/scrubbing
+        groupRef.current.rotation.z = Math.sin(t * 5.4) * 0.24 * dizzyFade * motionScale;
+        groupRef.current.rotation.x = Math.cos(t * 5.4) * 0.12 * dizzyFade * motionScale;
+        groupRef.current.rotation.y = Math.sin(t * 2.7) * 0.26 * dizzyFade * motionScale;
+        const wobble = Math.sin(t * 11) * 0.035 * dizzyFade * motionScale;
+        groupRef.current.scale.x *= 1 + wobble;
+        groupRef.current.scale.y *= 1 - wobble;
+      } else if (isScrubbingNow) {
         groupRef.current.rotation.z = Math.sin(t * 16) * 0.08 * motionScale;
         groupRef.current.scale.x *= 1 + Math.sin(t * 18) * 0.03;
         groupRef.current.scale.y *= 1 - Math.sin(t * 18) * 0.03;
@@ -1023,14 +1079,6 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
         groupRef.current.scale.y *= 0.93 + Math.sin(t * 12) * 0.02;
         groupRef.current.scale.x *= 1.05;
         groupRef.current.scale.z *= 1.05;
-      } else if (isDizzyActive) {
-        // Woozy circular sway + soft jelly wobble while recovering from being flung fast
-        groupRef.current.rotation.z = Math.sin(t * 5.4) * 0.24 * dizzyFade * motionScale;
-        groupRef.current.rotation.x = Math.cos(t * 5.4) * 0.12 * dizzyFade * motionScale;
-        groupRef.current.rotation.y = Math.sin(t * 2.7) * 0.26 * dizzyFade * motionScale;
-        const wobble = Math.sin(t * 11) * 0.035 * dizzyFade * motionScale;
-        groupRef.current.scale.x *= 1 + wobble;
-        groupRef.current.scale.y *= 1 - wobble;
       }
 
       // Project Juro's live 3D position & scaled radius to viewport pixel coordinates
@@ -1955,6 +2003,18 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
         position={[0, -0.1, 0]}
         onPointerDown={(e) => {
           e.stopPropagation();
+          const now = performance.now();
+          rapidTapHistoryRef.current = rapidTapHistoryRef.current.filter((ts) => now - ts < 1100);
+          rapidTapHistoryRef.current.push(now);
+          if (
+            rapidTapHistoryRef.current.length >= 5 &&
+            dizzyRef.current.timer <= 0.2 &&
+            fsm.currentState !== "sleep"
+          ) {
+            dizzyRef.current.timer = 3.2;
+            rapidTapHistoryRef.current = [];
+            soundEffects.playDizzy();
+          }
         }}
         onClick={(e) => {
           e.stopPropagation();

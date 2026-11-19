@@ -98,10 +98,9 @@ export function buildJuroSystemPrompt(context?: PetChatContext): string {
 export function sanitizeJuroReply(rawText: string): string {
   if (!rawText) return JURO_FALLBACK_REPLIES[0];
 
-  // Remove markdown bold/italics, quotes, or trailing whitespace
+  // Remove markdown bold/italics, quotes, hashtags, or trailing whitespace
   let clean = rawText
-    .replace(/[*_#`~]/g, "")
-    .replace(/^["']|["']$/g, "")
+    .replace(/[*_#`~"“”]/g, "")
     .replace(/\s+/g, " ")
     .trim();
 

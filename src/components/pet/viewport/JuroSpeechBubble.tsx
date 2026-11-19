@@ -1,14 +1,17 @@
-import React from "react";
+import React, { useRef, useState, useEffect } from "react";
 import { X } from "lucide-react";
+import type { JuroScreenTarget } from "../../../features/character/JuroModel";
 
 export interface JuroSpeechBubbleProps {
   open: boolean;
   text: string;
   isLoading: boolean;
-  screenX: number;
-  headY: number;
-  containerWidth: number;
-  containerHeight: number;
+  targetPosRef?: React.RefObject<JuroScreenTarget>;
+  containerRef?: React.RefObject<HTMLDivElement | null>;
+  screenX?: number;
+  headY?: number;
+  containerWidth?: number;
+  containerHeight?: number;
   onClose: () => void;
   petName?: string;
 }
@@ -16,11 +19,14 @@ export interface JuroSpeechBubbleProps {
 /**
  * Juro's Floating Retro Speech Bubble
  * Dynamically positions to the left or right of Juro on screen, with a directional triangular pointer tail.
+ * Follows Juro at 60fps via RAF if targetPosRef and containerRef are provided.
  */
 export const JuroSpeechBubble: React.FC<JuroSpeechBubbleProps> = ({
   open,
   text,
   isLoading,
+  targetPosRef,
+  containerRef,
   screenX,
   headY,
   containerWidth,
@@ -28,40 +34,75 @@ export const JuroSpeechBubble: React.FC<JuroSpeechBubbleProps> = ({
   onClose,
   petName = "JURO",
 }) => {
+  const rootRef = useRef<HTMLDivElement>(null);
+  const [placeOnLeft, setPlaceOnLeft] = useState<boolean>(() => {
+    const initX = screenX ?? 400;
+    const initW = containerWidth ?? 800;
+    return initX >= initW / 2;
+  });
+
+  // Dynamic 60fps position tracking attached to Juro's screen coordinates
+  useEffect(() => {
+    if (!open) return;
+    let animId: number;
+
+    const updatePosition = () => {
+      if (rootRef.current && targetPosRef?.current && containerRef?.current) {
+        const contRect = containerRef.current.getBoundingClientRect();
+        const pos = targetPosRef.current;
+        const contW = contRect.width || window.innerWidth;
+        const contH = contRect.height || window.innerHeight;
+
+        const bubbleEl = rootRef.current;
+        const bubbleW = bubbleEl.offsetWidth || 240;
+        const shouldPlaceLeft = pos.x >= contW / 2;
+
+        setPlaceOnLeft((prev) => (prev !== shouldPlaceLeft ? shouldPlaceLeft : prev));
+
+        let bubbleX: number;
+        if (shouldPlaceLeft) {
+          bubbleX = Math.max(12, pos.x - bubbleW - 28);
+        } else {
+          bubbleX = Math.min(contW - bubbleW - 12, pos.x + 28);
+        }
+
+        const crownY = pos.headY ?? (pos.y - pos.radiusPx);
+        const bubbleY = Math.max(24, Math.min(contH - 120, crownY - 30));
+
+        bubbleEl.style.left = `${bubbleX}px`;
+        bubbleEl.style.top = `${bubbleY}px`;
+      }
+      animId = requestAnimationFrame(updatePosition);
+    };
+
+    updatePosition();
+    return () => cancelAnimationFrame(animId);
+  }, [open, targetPosRef, containerRef]);
+
   if (!open) return null;
 
+  // Fallback calculations for static rendering or isolated tests
   const contW = containerWidth || (typeof window !== "undefined" ? window.innerWidth : 800);
   const contH = containerHeight || (typeof window !== "undefined" ? window.innerHeight : 600);
-
-  // Determine whether to place speech bubble on Juro's Left or Right side
-  const placeOnLeft = screenX >= contW / 2;
-
-  // Max width of the retro bubble
+  const fallbackX = screenX ?? contW / 2;
+  const fallbackY = headY ?? contH / 2;
+  const fallbackLeft = fallbackX >= contW / 2;
   const bubbleW = Math.min(260, contW - 48);
 
-  // Horizontal position calculation
-  let bubbleX: number;
-  if (placeOnLeft) {
-    // Bubble sits on the left of Juro
-    const targetLeft = screenX - bubbleW - 28;
-    bubbleX = Math.max(12, targetLeft);
-  } else {
-    // Bubble sits on the right of Juro
-    const targetLeft = screenX + 28;
-    bubbleX = Math.min(contW - bubbleW - 12, targetLeft);
-  }
-
-  // Vertical position centered around Juro's head
-  const bubbleY = Math.max(24, Math.min(contH - 120, headY - 45));
+  const initialX = fallbackLeft
+    ? Math.max(12, fallbackX - bubbleW - 28)
+    : Math.min(contW - bubbleW - 12, fallbackX + 28);
+  const initialY = Math.max(24, Math.min(contH - 120, fallbackY - 45));
 
   return (
     <div
+      ref={rootRef}
       style={{
-        left: `${bubbleX}px`,
-        top: `${bubbleY}px`,
+        left: `${initialX}px`,
+        top: `${initialY}px`,
         maxWidth: `${bubbleW}px`,
       }}
-      className="absolute z-35 pointer-events-auto transition-transform duration-100 ease-out select-none"
+      className="absolute z-35 pointer-events-auto transition-[left,top] duration-75 ease-out select-none"
     >
       <div className="relative animate-tray-enter p-2 sm:p-2.5 bg-warm-white/95 dark:bg-neutral-900/95 backdrop-blur-xs border-2 border-charcoal dark:border-neutral-600 shadow-[3px_3px_0px_#171717] dark:shadow-[3px_3px_0px_#000000]">
         {/* Directional Pointer Tail */}
