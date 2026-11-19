@@ -165,12 +165,34 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
         }
       );
     }
+    const savedPos = usePetStore.getState().lastPosition;
+    if (savedPos && Number.isFinite(savedPos.x) && Number.isFinite(savedPos.z)) {
+      const groundY = getTerrainHeightAt(savedPos.x, savedPos.z);
+      return new SpringOscillator3D(
+        new THREE.Vector3(savedPos.x, groundY + BODY_BOTTOM_OFFSET, savedPos.z),
+        {
+          stiffness: 145,
+          damping: 10,
+          mass: 1,
+        }
+      );
+    }
     return new SpringOscillator3D(new THREE.Vector3(0, BASE_GROUND_Y + BODY_BOTTOM_OFFSET, 0.2), {
       stiffness: 145,
       damping: 10,
       mass: 1,
     });
   }, []);
+
+  // Persist Juro's position across route transitions (e.g. navigating to Shop, Mine, Evolution, etc.)
+  useEffect(() => {
+    return () => {
+      const pos = spring.position;
+      if (Number.isFinite(pos.x) && Number.isFinite(pos.z)) {
+        usePetStore.getState().setLastPosition({ x: pos.x, y: pos.y, z: pos.z });
+      }
+    };
+  }, [spring]);
 
   // Parabolic jump-up / hop-down state when climbing hills, bridges & stumps
   const jumpRef = useRef({
@@ -599,6 +621,11 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
             // Reached destination! Settle happily on current spot
             _targetVec.set(spring.position.x, restY, spring.position.z);
             spring.setTarget(_targetVec);
+            usePetStore.getState().setLastPosition({
+              x: spring.position.x,
+              y: restY,
+              z: spring.position.z,
+            });
             if (groupRef.current) {
               groupRef.current.rotation.x = THREE.MathUtils.lerp(groupRef.current.rotation.x, 0, 0.1);
               groupRef.current.rotation.z = THREE.MathUtils.lerp(groupRef.current.rotation.z, 0, 0.1);

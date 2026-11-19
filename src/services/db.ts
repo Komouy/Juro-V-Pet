@@ -14,6 +14,7 @@ export interface PetSaveRecord {
   happiness: number;
   cleanliness: number;
   affection: number;
+  lastPosition?: { x: number; y: number; z: number };
   lastUpdated: number;
 }
 

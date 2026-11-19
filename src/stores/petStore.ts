@@ -69,6 +69,7 @@ interface PetState {
   lastSleepRewardAt: number;
   lastCleanRewardAt: number;
   lastPetRewardAt: number;
+  lastPosition?: { x: number; y: number; z: number };
 
   // Level Up Alert State
   recentlyLeveledUp: boolean;
@@ -85,6 +86,7 @@ interface PetState {
   recoverSleepEnergy: (amount?: number) => void;
   clean: () => void;
   strokePet: () => void;
+  setLastPosition: (pos: { x: number; y: number; z: number }) => void;
   setBehaviorState: (state: PetBehaviorState) => void;
   recalculateFromTimestamp: () => void;
   getMood: () => PetMood;
@@ -107,7 +109,10 @@ export const usePetStore = create<PetState>((set, get) => ({
   lastSleepRewardAt: 0,
   lastCleanRewardAt: 0,
   lastPetRewardAt: 0,
+  lastPosition: undefined,
   recentlyLeveledUp: false,
+
+  setLastPosition: (pos) => set({ lastPosition: pos }),
 
   clearLevelUpAlert: () => set({ recentlyLeveledUp: false }),
 

@@ -86,6 +86,7 @@ class PersistenceService {
           happiness: savedPet.happiness,
           cleanliness: savedPet.cleanliness,
           affection: savedPet.affection,
+          lastPosition: savedPet.lastPosition,
           lastUpdated: savedPet.lastUpdated,
         });
 
@@ -171,6 +172,7 @@ class PersistenceService {
         happiness: pet.happiness,
         cleanliness: pet.cleanliness,
         affection: pet.affection,
+        lastPosition: pet.lastPosition,
         lastUpdated: Date.now(),
       };
 

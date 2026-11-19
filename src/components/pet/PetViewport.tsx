@@ -12,7 +12,7 @@ import {
 } from "../../features/character/JuroModel";
 import { OutdoorEnvironment } from "./OutdoorEnvironment";
 import { ItemIllustration } from "../items/ItemIllustration";
-import { HandHeart } from "lucide-react";
+import { HandHeart, Heart } from "lucide-react";
 import { usePetStore } from "../../stores/petStore";
 import { useGameStore } from "../../stores/gameStore";
 import { useUIStore } from "../../stores/uiStore";
@@ -90,7 +90,12 @@ export const PetViewport: React.FC = () => {
 
   const [isPettingActive, setIsPettingActive] = useState(false);
   const [hearts, setHearts] = useState<{ id: number; x: number; y: number; dx: number }[]>([]);
-  const juroWorldPosRef = useRef<THREE.Vector3>(new THREE.Vector3(0, -0.45, -0.35));
+  const savedInitialPos = usePetStore.getState().lastPosition;
+  const juroWorldPosRef = useRef<THREE.Vector3>(
+    savedInitialPos
+      ? new THREE.Vector3(savedInitialPos.x, savedInitialPos.y, savedInitialPos.z)
+      : new THREE.Vector3(0, -0.45, -0.35)
+  );
   const [isDraggingPet, setIsDraggingPet] = useState(false);
   const isHeadingToBedRef = useRef<boolean>(false);
   const wakeCooldownUntilRef = useRef<number>(0);
@@ -779,7 +784,7 @@ export const PetViewport: React.FC = () => {
       case "pet":
         soundEffects.playHappy();
         setIsPettingActive(true);
-        addLog("play", "Mengelus tubuh Juro dengan penuh kasih sayang! 💕");
+        addLog("play", "Mengelus tubuh Juro dengan penuh kasih sayang!");
         break;
     }
   };
@@ -959,8 +964,9 @@ export const PetViewport: React.FC = () => {
       {isPettingActive && (
         <div className="animate-tray-enter fixed sm:absolute bottom-6 inset-x-0 mx-auto w-fit z-30 flex items-center gap-2 px-3 py-1.5 bg-warm-white/95 dark:bg-neutral-900/95 border-2 border-charcoal dark:border-neutral-600 shadow-[3px_3px_0px_#171717] dark:shadow-[3px_3px_0px_#000000]">
           <HandHeart size={14} className="text-rose-500 animate-pulse shrink-0" />
-          <span className="pixel-text text-[9px] sm:text-[10px] uppercase font-bold text-charcoal dark:text-white">
-            Elus Tubuh Juro 💕
+          <span className="pixel-text text-[9px] sm:text-[10px] uppercase font-bold text-charcoal dark:text-white flex items-center gap-1.5">
+            Elus Tubuh Juro
+            <Heart size={12} className="fill-rose-500 text-rose-500 shrink-0" />
           </span>
           <button
             type="button"
@@ -983,9 +989,9 @@ export const PetViewport: React.FC = () => {
               "--dx": `${h.dx}px`,
             } as React.CSSProperties
           }
-          className="pointer-events-none absolute z-40 animate-pet-heart text-rose-500 font-bold select-none text-xl drop-shadow-[0_1px_2px_rgba(0,0,0,0.3)]"
+          className="pointer-events-none absolute z-40 animate-pet-heart select-none drop-shadow-[2px_2px_0px_#171717]"
         >
-          💕
+          <Heart size={20} className="fill-rose-500 text-rose-600" strokeWidth={2} />
         </div>
       ))}
     </div>
