@@ -83,7 +83,11 @@ export const EvolutionPage: React.FC = () => {
       stageName: "Tetes Jeli",
       current: level >= 1 && level < 5,
       completed: level >= 5,
-      perks: ["Napas lembut", "Interaksi sentuh", "Warna dasar"],
+      perks: [
+        "Ukuran bayi mungil (68% – 85%)",
+        "Lompatan kecil menggemaskan",
+        "Elusan lembut & respons manja",
+      ],
     },
     {
       num: 2,
@@ -91,7 +95,11 @@ export const EvolutionPage: React.FC = () => {
       stageName: "Slime Memantul",
       current: level >= 5 && level < 10,
       completed: level >= 10,
-      perks: ["Eksplorasi otonom", "Mainan interaktif", "Ekspresi lincah"],
+      perks: [
+        "Pertumbuhan tubuh remaja",
+        "Lompatan lincah di padang rumput",
+        "Mainan interaktif & mandi busa",
+      ],
     },
     {
       num: 3,
@@ -99,7 +107,11 @@ export const EvolutionPage: React.FC = () => {
       stageName: "Juro Mulia",
       current: level >= 10,
       completed: false,
-      perks: ["Kilau jeli penuh", "Respon ceria", "Aura maksimal"],
+      perks: [
+        "Ukuran dewasa maksimal (120%)",
+        "Mahkota emas mini 3D",
+        "Tubuh gembul berwibawa",
+      ],
     },
   ];
 

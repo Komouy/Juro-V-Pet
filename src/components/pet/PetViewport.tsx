@@ -979,10 +979,10 @@ export const PetViewport: React.FC = () => {
     soundEffects.playWeatherChange(nextWeather === "rain");
     toggleWeather();
     if (nextWeather === "rain") {
-      showToast("Cuaca berganti: Hujan Pixel!", "info");
+      showToast("Cuaca berganti: Hujan!", "info");
       addLog(
         "interaction",
-        "Langit menurunkan rintik hujan pixel yang menyejukkan. Juro memakai daun kecil sebagai payung!"
+        "Langit menurunkan rintik hujan yang menyejukkan. Juro memakai daun kecil sebagai payung!"
       );
     } else {
       showToast("Cuaca berganti: Cerah!", "info");

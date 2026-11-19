@@ -63,7 +63,7 @@ describe("Gemini AI Chat Service", () => {
         isRaining: true,
       });
 
-      expect(rainyPrompt).toContain("hujan pixel");
+      expect(rainyPrompt).toContain("Cuaca sedang hujan.");
 
       const nightPrompt = buildJuroSystemPrompt({
         name: "Juro",

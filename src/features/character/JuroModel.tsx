@@ -224,10 +224,14 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
   const spring = useMemo(() => {
     const isNight = isBedtimeHour(new Date());
     const initialSleep = isNight || usePetStore.getState().currentState === "sleep";
+    const initialLevel = usePetStore.getState().level;
+    const initialGrowth = 0.68 + (Math.min(10, Math.max(1, initialLevel)) - 1) * (0.52 / 9);
+    const initBottom = BODY_BOTTOM_LOCAL * JURO_BASE_SCALE * initialGrowth;
+
     if (initialSleep) {
       const bedGroundY = getTerrainHeightAt(JURO_BED_POS.x, JURO_BED_POS.z);
       return new SpringOscillator3D(
-        new THREE.Vector3(JURO_BED_POS.x, bedGroundY + BODY_BOTTOM_OFFSET, JURO_BED_POS.z),
+        new THREE.Vector3(JURO_BED_POS.x, bedGroundY + 0.120 + initBottom * 0.88, JURO_BED_POS.z),
         {
           stiffness: 145,
           damping: 10,
@@ -239,7 +243,7 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
     if (savedPos && Number.isFinite(savedPos.x) && Number.isFinite(savedPos.z)) {
       const groundY = getTerrainHeightAt(savedPos.x, savedPos.z);
       return new SpringOscillator3D(
-        new THREE.Vector3(savedPos.x, groundY + BODY_BOTTOM_OFFSET, savedPos.z),
+        new THREE.Vector3(savedPos.x, groundY + initBottom, savedPos.z),
         {
           stiffness: 145,
           damping: 10,
@@ -247,7 +251,7 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
         }
       );
     }
-    return new SpringOscillator3D(new THREE.Vector3(0, BASE_GROUND_Y + BODY_BOTTOM_OFFSET, 0.2), {
+    return new SpringOscillator3D(new THREE.Vector3(0, BASE_GROUND_Y + initBottom, 0.2), {
       stiffness: 145,
       damping: 10,
       mass: 1,
@@ -597,6 +601,12 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
       }
     }
 
+    // Dynamic physical pet growth based on level (0.68x baby -> 1.20x adult noble)
+    const growthFactor = 0.68 + (Math.min(10, Math.max(1, level)) - 1) * (0.52 / 9);
+    const currentPetScale = JURO_BASE_SCALE * growthFactor;
+    currentPetScaleRef.current = currentPetScale;
+    const currentBottomOffset = BODY_BOTTOM_LOCAL * currentPetScale;
+
     // 2. Behavior Position, Slime Drag-Crawl & Jump-Up Calculations across the 3D Valley Map
     let crawlScaleX = 1;
     let crawlScaleY = 1;
@@ -618,7 +628,7 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
     }
 
     const currGroundY = getTerrainHeightAt(spring.position.x, spring.position.z);
-    const restY = currGroundY + BODY_BOTTOM_OFFSET;
+    const restY = currGroundY + currentBottomOffset;
 
       if (currentState === "wander") {
         const j = jumpRef.current;
@@ -730,8 +740,8 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
               j.startZ = spring.position.z;
               j.endX = safeLanding.x;
               j.endZ = safeLanding.z;
-              j.endY = landSurfaceY + BODY_BOTTOM_OFFSET;
-              j.peakY = Math.max(currGroundY, landSurfaceY) + BODY_BOTTOM_OFFSET + 0.42;
+              j.endY = landSurfaceY + currentBottomOffset;
+              j.peakY = Math.max(currGroundY, landSurfaceY) + currentBottomOffset + 0.42;
             } else {
               const step = Math.min(dist, crawlSpeed * delta * motionScale);
               const rawNextX = spring.position.x + dirX * step;
@@ -767,7 +777,7 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
               }
 
               const nextGroundY = getTerrainHeightAt(finalX, finalZ);
-              _targetVec.set(finalX, nextGroundY + BODY_BOTTOM_OFFSET, finalZ);
+              _targetVec.set(finalX, nextGroundY + currentBottomOffset, finalZ);
               spring.setTarget(_targetVec);
 
               if (groupRef.current) {
@@ -876,7 +886,7 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
                 crawlScaleY = 1 - wave * 0.10 * motionScale;
 
                 const nextGroundY = getTerrainHeightAt(resolved.x, resolved.z);
-                _targetVec.set(resolved.x, nextGroundY + BODY_BOTTOM_OFFSET, resolved.z);
+                _targetVec.set(resolved.x, nextGroundY + currentBottomOffset, resolved.z);
                 spring.setTarget(_targetVec);
               } else {
                 // Reached the ball! Catch it!
@@ -931,12 +941,10 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
           spring.velocity.z *= 0.1;
 
           const targetGroundY = getTerrainHeightAt(JURO_BED_POS.x, JURO_BED_POS.z);
-          // Target includes the +0.135m soft mattress height!
-          _targetVec.set(
-            JURO_BED_POS.x,
-            targetGroundY + 0.135 + BODY_BOTTOM_OFFSET * 0.96,
-            JURO_BED_POS.z
-          );
+          // Cushion top is ~0.132m above terrain. Loaf squish during sleep is ~0.88.
+          // Sink ~0.012m into the plush mattress cushion so Juro rests snugly on the sofa bed!
+          const sleepCenterY = targetGroundY + 0.120 + currentBottomOffset * 0.88;
+          _targetVec.set(JURO_BED_POS.x, sleepCenterY, JURO_BED_POS.z);
           spring.setTarget(_targetVec);
           if (groupRef.current) {
             const gentleSway = -0.055 + Math.sin(t * 1.1) * 0.02 * motionScale;
@@ -992,7 +1000,7 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
     const postStepCollision = resolveHorizontalCollisions(
       spring.position.x,
       spring.position.z,
-      spring.position.y - BODY_BOTTOM_OFFSET,
+      spring.position.y - currentBottomOffset,
       JURO_COLLISION_RADIUS,
       jumpRef.current.active,
       isSleepingOrHeading
@@ -1042,18 +1050,15 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
         scale.y -= breathing;
       }
 
-      // Dynamic physical pet growth based on level (0.68x baby -> 1.20x adult noble)
-      const growthFactor = 0.68 + (Math.min(10, Math.max(1, level)) - 1) * (0.52 / 9);
-      const currentPetScale = JURO_BASE_SCALE * growthFactor;
-      currentPetScaleRef.current = currentPetScale;
-
       // Scale entire character cleanly to pocket-sized currentPetScale
       scale.multiplyScalar(currentPetScale);
 
       // Hard terrain collision boundary: keep Juro's bottom resting cleanly on grass/hill/bridge/stump/mattress
-      const isSleepingOnBed = currentState === "sleep";
-      const bedMattressLift = isSleepingOnBed ? 0.135 : 0;
-      const minCenterY = liveSurfaceY + bedMattressLift + 0.01 + BODY_BOTTOM_LOCAL * scale.y;
+      const isSleepingOnBed =
+        currentState === "sleep" &&
+        Math.hypot(spring.position.x - JURO_BED_POS.x, spring.position.z - JURO_BED_POS.z) < 0.85;
+      const bedMattressLift = isSleepingOnBed ? 0.120 : 0;
+      const minCenterY = liveSurfaceY + bedMattressLift + BODY_BOTTOM_LOCAL * scale.y;
       spring.clampFloor(minCenterY, 0.22);
 
       groupRef.current.position.copy(spring.position);
@@ -1124,17 +1129,15 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
       const isSleepingOnBed =
         currentState === "sleep" &&
         Math.hypot(spring.position.x - JURO_BED_POS.x, spring.position.z - JURO_BED_POS.z) < 0.85;
-      const bedMattressLift = isSleepingOnBed ? 0.135 : 0;
+      const contactSurfaceY = liveSurfaceY + (isSleepingOnBed ? 0.132 : 0);
       shadowRef.current.position.set(
         spring.position.x,
-        liveSurfaceY + bedMattressLift + 0.008,
+        contactSurfaceY + 0.005,
         spring.position.z
       );
 
-      const lift = Math.max(
-        0,
-        spring.position.y - (liveSurfaceY + bedMattressLift + BODY_BOTTOM_OFFSET)
-      );
+      const juroBottomY = spring.position.y - BODY_BOTTOM_LOCAL * groupRef.current.scale.y;
+      const lift = Math.max(0, juroBottomY - contactSurfaceY);
       const heightShrink = 1 / (1 + lift * 0.55);
       const bodyScaleX = groupRef.current.scale.x;
       const bodyScaleZ = groupRef.current.scale.z;

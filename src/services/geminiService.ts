@@ -207,7 +207,7 @@ export function getContextualFallbackReply(context?: PetChatContext): string {
   }
 
   if (context?.isRaining) {
-    return "Tik tik tik... Bloop! Hujan pixel di luar sejuk sekali ya!";
+    return "Tik tik tik... Bloop! Hujan di luar sejuk sekali ya!";
   }
 
   if (context?.isNight) {
@@ -317,7 +317,7 @@ export function buildJuroSystemPrompt(context?: PetChatContext): string {
   const energyInfo = context ? `Kondisi energi: ${context.energy}/100.` : "";
   const moodState = context ? `Aktivitas saat ini: ${context.currentState}.` : "";
   const weatherState = context?.isRaining
-    ? "Cuaca sedang hujan pixel."
+    ? "Cuaca sedang hujan."
     : context?.isNight
     ? "Waktu malam hari."
     : "Cuaca cerah.";

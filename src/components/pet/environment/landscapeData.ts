@@ -496,7 +496,7 @@ export function generateFirefliesData(): FireflyItem[] {
   ];
 }
 
-// 13. Dynamic Pixel Rain Streaks (Rintik Hujan Pixel Vertikal)
+// 13. Dynamic Rain Streaks (Rintik Hujan Vertikal)
 export interface PixelRainStreak {
   x: number;
   z: number;
