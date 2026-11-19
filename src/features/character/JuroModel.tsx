@@ -11,9 +11,11 @@ import { FoodProp3D, HeartPop3D } from "./FoodProp3D";
 import {
   BASE_GROUND_Y,
   MAP_BOUNDS,
+  JURO_BED_POS,
   getTerrainHeightAt,
   resolveHorizontalCollisions,
 } from "../../engine/world/mapTerrain";
+import { isBedtimeHour } from "../../utils/timeOfDay";
 
 // Ultra-cute terrarium/aquarium miniature scale so Juro explores a lush big world
 const JURO_BASE_SCALE = 0.36;
@@ -247,6 +249,8 @@ export interface JuroModelProps {
   onPetClick?: (screenPos: { x: number; y: number }) => void;
   isGrabActive?: boolean;
   dragPointerNDC?: React.RefObject<{ x: number; y: number }>;
+  isHeadingToBedRef?: React.RefObject<boolean>;
+  onBedArrival?: () => void;
 }
 
 export const JuroModel: React.FC<JuroModelProps> = React.memo(({
@@ -257,6 +261,8 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
   onPetClick,
   isGrabActive = false,
   dragPointerNDC,
+  isHeadingToBedRef,
+  onBedArrival,
 }) => {
   const groupRef = useRef<THREE.Group>(null);
   const leftEyeRef = useRef<THREE.Group>(null);
@@ -323,16 +329,26 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
     };
   }, [sleepZTexture, softShadowTexture, dizzyEyeTexture, dizzyMouthTexture, dizzyStarTexture]);
 
-  // 3D Spring oscillator for realistic gelatin physics (resting on valley terrain)
-  const spring = useMemo(
-    () =>
-      new SpringOscillator3D(new THREE.Vector3(0, BASE_GROUND_Y + BODY_BOTTOM_OFFSET, 0.2), {
-        stiffness: 145,
-        damping: 10,
-        mass: 1,
-      }),
-    []
-  );
+  // 3D Spring oscillator for realistic gelatin physics (resting on valley terrain or cozy bed)
+  const spring = useMemo(() => {
+    const isNight = isBedtimeHour(new Date());
+    if (isNight || storeState === "sleep") {
+      const bedGroundY = getTerrainHeightAt(JURO_BED_POS.x, JURO_BED_POS.z);
+      return new SpringOscillator3D(
+        new THREE.Vector3(JURO_BED_POS.x, bedGroundY + BODY_BOTTOM_OFFSET, JURO_BED_POS.z),
+        {
+          stiffness: 145,
+          damping: 10,
+          mass: 1,
+        }
+      );
+    }
+    return new SpringOscillator3D(new THREE.Vector3(0, BASE_GROUND_Y + BODY_BOTTOM_OFFSET, 0.2), {
+      stiffness: 145,
+      damping: 10,
+      mass: 1,
+    });
+  }, [storeState]);
 
   // Parabolic jump-up / hop-down state when climbing hills, bridges & stumps
   const jumpRef = useRef({
@@ -666,6 +682,17 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
       if (dizzyRef.current.timer > 0) {
         dizzyRef.current.timer = Math.max(0, dizzyRef.current.timer - delta);
       }
+
+      if (isHeadingToBedRef?.current) {
+        const distToBed = Math.hypot(
+          spring.position.x - JURO_BED_POS.x,
+          spring.position.z - JURO_BED_POS.z
+        );
+        if (distToBed < 0.32) {
+          onBedArrival?.();
+        }
+      }
+
       const currGroundY = getTerrainHeightAt(spring.position.x, spring.position.z);
       const restY = currGroundY + BODY_BOTTOM_OFFSET;
 
@@ -858,8 +885,13 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
             groupRef.current.rotation.y = lerpAngle(groupRef.current.rotation.y, 0, 0.08);
           }
         } else if (currentState === "sleep") {
-          // Cozy plump resting pose right where Juro is!
-          _targetVec.set(spring.position.x, currGroundY + BODY_BOTTOM_OFFSET * 0.96, spring.position.z);
+          const isAtBed =
+            Math.hypot(spring.position.x - JURO_BED_POS.x, spring.position.z - JURO_BED_POS.z) < 0.55;
+          const targetX = isAtBed ? JURO_BED_POS.x : spring.position.x;
+          const targetZ = isAtBed ? JURO_BED_POS.z : spring.position.z;
+          const targetGroundY = getTerrainHeightAt(targetX, targetZ);
+
+          _targetVec.set(targetX, targetGroundY + BODY_BOTTOM_OFFSET * 0.96, targetZ);
           spring.setTarget(_targetVec);
           if (groupRef.current) {
             const gentleSway = -0.055 + Math.sin(t * 1.1) * 0.02 * motionScale;
@@ -873,7 +905,8 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
               0.04,
               0.08
             );
-            groupRef.current.rotation.y = lerpAngle(groupRef.current.rotation.y, 0, 0.06);
+            const targetYaw = isAtBed ? 0.35 : 0;
+            groupRef.current.rotation.y = lerpAngle(groupRef.current.rotation.y, targetYaw, 0.06);
           }
         } else if (currentState === "eating") {
           const chewY = restY + Math.sin(t * 14) * 0.015 * motionScale;

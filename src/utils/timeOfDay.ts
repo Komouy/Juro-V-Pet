@@ -29,10 +29,19 @@ export interface TimeThemeConfig {
 
 export function getTimePhaseFromDate(date: Date = new Date()): TimePhase {
   const hour = date.getHours();
-  if (hour >= 5 && hour < 10) return "morning";
+  if (hour >= 6 && hour < 10) return "morning";
   if (hour >= 10 && hour < 16) return "day";
   if (hour >= 16 && hour < 19) return "sunset";
   return "night";
+}
+
+/**
+ * Deteksi jadwal tidur alami Juro:
+ * Malam hari pukul 19:00 (7 malam) s/d sebelum 06:00 (6 pagi)
+ */
+export function isBedtimeHour(date: Date = new Date()): boolean {
+  const hour = date.getHours();
+  return hour >= 19 || hour < 6;
 }
 
 export const TIME_THEMES: Record<TimePhase, TimeThemeConfig> = {

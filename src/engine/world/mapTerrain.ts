@@ -30,8 +30,8 @@ export const MAP_OBSTACLES: SolidObstacle[] = [
   // Wooden Park Bench atop East Knoll (2 overlapping circles along bench length)
   { x: 3.5, z: 0.82, radius: 0.28, topY: BASE_GROUND_Y + 0.9 },
   { x: 3.8, z: 1.08, radius: 0.28, topY: BASE_GROUND_Y + 0.9 },
-  // Mini Picnic Basket atop West Knoll
-  { x: -3.52, z: -0.86, radius: 0.24, topY: BASE_GROUND_Y + 0.8 },
+  // Nightstand & Bed Headboard atop West Knoll (keeps mattress clear for sleeping)
+  { x: -3.64, z: -0.76, radius: 0.22, topY: BASE_GROUND_Y + 0.85 },
   // Two Glowing Meadow Lantern Posts
   { x: -1.45, z: -1.65, radius: 0.16, topY: 0.5 },
   { x: 2.25, z: 0.22, radius: 0.16, topY: 0.5 },
@@ -66,6 +66,13 @@ export const MAP_BOUNDS = {
   maxZ: 2.35,
 } as const;
 
+// Cozy sleep bed location atop the West Knoll
+export const JURO_BED_POS = {
+  x: -3.25,
+  z: -0.55,
+  platformId: "west-knoll",
+} as const;
+
 // Elevated platforms, terraces, rock ledges & tree stumps Juro can climb/jump onto!
 export const MAP_PLATFORMS: ElevatedPlatform[] = [
   {
@@ -75,7 +82,7 @@ export const MAP_PLATFORMS: ElevatedPlatform[] = [
     z: -0.55,
     radius: 1.55,
     height: 0.46,
-    label: "Bukit Piknik Barat",
+    label: "Ranjang Tidur Juro",
   },
   {
     id: "east-knoll",

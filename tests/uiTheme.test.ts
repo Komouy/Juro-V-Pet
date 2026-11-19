@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { describe, it, expect, beforeEach } from "vitest";
 import { useUIStore } from "../src/stores/uiStore";
+import { getTimePhaseFromDate, isBedtimeHour } from "../src/utils/timeOfDay";
 
 describe("UI Store & Theme Mode", () => {
   beforeEach(() => {
@@ -65,5 +66,32 @@ describe("UI Store & Theme Mode", () => {
     expect(useUIStore.getState().cameraResetNonce).toBe(1);
     useUIStore.getState().triggerCameraReset();
     expect(useUIStore.getState().cameraResetNonce).toBe(2);
+  });
+
+  it("evaluates natural sleep & wake circadian hours correctly", () => {
+    const makeDate = (hour: number) => {
+      const d = new Date(2026, 10, 19, hour, 0, 0);
+      return d;
+    };
+
+    // Bedtime: 19:00 - 05:59 (7-8 PM through 5-6 AM)
+    expect(isBedtimeHour(makeDate(19))).toBe(true);
+    expect(isBedtimeHour(makeDate(20))).toBe(true);
+    expect(isBedtimeHour(makeDate(23))).toBe(true);
+    expect(isBedtimeHour(makeDate(0))).toBe(true);
+    expect(isBedtimeHour(makeDate(5))).toBe(true);
+
+    // Daytime / Awake: 06:00 - 18:59
+    expect(isBedtimeHour(makeDate(6))).toBe(false);
+    expect(isBedtimeHour(makeDate(9))).toBe(false);
+    expect(isBedtimeHour(makeDate(12))).toBe(false);
+    expect(isBedtimeHour(makeDate(16))).toBe(false);
+    expect(isBedtimeHour(makeDate(18))).toBe(false);
+
+    // Time phases
+    expect(getTimePhaseFromDate(makeDate(6))).toBe("morning");
+    expect(getTimePhaseFromDate(makeDate(12))).toBe("day");
+    expect(getTimePhaseFromDate(makeDate(17))).toBe("sunset");
+    expect(getTimePhaseFromDate(makeDate(20))).toBe("night");
   });
 });

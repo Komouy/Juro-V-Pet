@@ -32,9 +32,11 @@ import { SHOP_FOODS, SHOP_TOYS } from "../../data/economyCatalog";
 import { soundEffects } from "../../engine/audio/soundEffects";
 import {
   getTimePhaseFromDate,
+  isBedtimeHour,
   TIME_THEMES,
   type TimePhase,
 } from "../../utils/timeOfDay";
+import { JURO_BED_POS } from "../../engine/world/mapTerrain";
 import type { FoodItem, ToyItem } from "../../types/pet";
 
 type ActiveTray = "none" | "food" | "toy" | "bath";
@@ -132,6 +134,8 @@ export const PetViewport: React.FC = () => {
 
   const [isGrabActive, setIsGrabActive] = useState(false);
   const [isDraggingPet, setIsDraggingPet] = useState(false);
+  const isHeadingToBedRef = useRef<boolean>(false);
+  const wakeCooldownUntilRef = useRef<number>(0);
   const dragPointerNDC = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
 
   const juroMenuRef = useRef<HTMLDivElement>(null);
@@ -385,6 +389,8 @@ export const PetViewport: React.FC = () => {
   const triggerFeed = useCallback(
     (food: FoodItem) => {
       if (!consumeFood(food.id)) return;
+      wakeCooldownUntilRef.current = Date.now() + 120_000;
+      isHeadingToBedRef.current = false;
       feedWithItem(food);
       soundEffects.playFeed();
       addLog(
@@ -398,6 +404,8 @@ export const PetViewport: React.FC = () => {
 
   const triggerPlay = useCallback(
     (toy: ToyItem) => {
+      wakeCooldownUntilRef.current = Date.now() + 120_000;
+      isHeadingToBedRef.current = false;
       playWithItem(toy);
       soundEffects.playHappy();
       addLog(
@@ -410,6 +418,8 @@ export const PetViewport: React.FC = () => {
   );
 
   const finishBathRinse = useCallback(() => {
+    wakeCooldownUntilRef.current = Date.now() + 120_000;
+    isHeadingToBedRef.current = false;
     clean();
     soundEffects.playHappy();
     addLog("clean", "Juro selesai disabuni dan dibilas hingga bersih berkilau!");
@@ -635,18 +645,91 @@ export const PetViewport: React.FC = () => {
     }
   }, [cameraResetNonce]);
 
-  const handleToggleSleep = () => {
+  const handleBedArrival = useCallback(() => {
+    isHeadingToBedRef.current = false;
+    if (usePetStore.getState().currentState !== "sleep") {
+      sleep();
+      soundEffects.playSquish();
+      addLog("sleep", "Juro sampai di sofa tidurnya dan mulai tidur lelap. Zzz...");
+    }
+  }, [sleep, addLog]);
+
+  const handleBedClick = useCallback(() => {
+    soundEffects.playClick();
+    if (currentState === "sleep") {
+      wakeUp();
+      soundEffects.playBoing();
+      addLog("interaction", "Juro dibangunkan dari sofa tidurnya.");
+      wakeCooldownUntilRef.current = Date.now() + 180_000;
+      isHeadingToBedRef.current = false;
+    } else {
+      isHeadingToBedRef.current = true;
+      setWalkCommand({ x: JURO_BED_POS.x, z: JURO_BED_POS.z, nonce: Date.now() });
+      addLog("sleep", "Juro berjalan menuju sofa untuk tidur lelap.");
+      soundEffects.playSquish();
+    }
+  }, [currentState, wakeUp, addLog]);
+
+  const handleToggleSleep = useCallback(() => {
     if (currentState === "sleep") {
       wakeUp();
       soundEffects.playBoing();
       addLog("interaction", "Juro terbangun segar dari tidurnya!");
+      wakeCooldownUntilRef.current = Date.now() + 180_000;
+      isHeadingToBedRef.current = false;
     } else {
-      sleep();
+      isHeadingToBedRef.current = true;
+      setWalkCommand({ x: JURO_BED_POS.x, z: JURO_BED_POS.z, nonce: Date.now() });
+      addLog("sleep", "Juro berjalan menuju sofa untuk tidur lelap.");
       soundEffects.playSquish();
-      addLog("sleep", "Juro memejamkan mata dan tidur lelap.");
     }
     setActiveTray("none");
-  };
+  }, [currentState, wakeUp, addLog]);
+
+  // Circadian rhythm controller: sleep at 19:00 - 06:00, wake at 06:00
+  const isNightSleep = isBedtimeHour(now);
+
+  useEffect(() => {
+    // 1. Daytime / Morning wake-up (at 06:00)
+    if (!isNightSleep) {
+      if (currentState === "sleep") {
+        wakeUp();
+        soundEffects.playBoing();
+        addLog(
+          "interaction",
+          "Selamat pagi! Jam 6 pagi telah tiba, Juro bangun dari sofa tidurnya dan siap beraktivitas!"
+        );
+      }
+      isHeadingToBedRef.current = false;
+      return;
+    }
+
+    // 2. Nighttime bedtime (19:00 - 06:00)
+    if (currentState === "sleep") {
+      isHeadingToBedRef.current = false;
+      return;
+    }
+
+    // If player interacted or woke Juro recently, grant temporary grace period
+    if (Date.now() < wakeCooldownUntilRef.current) {
+      return;
+    }
+
+    // Don't interrupt feeding, scrubbing or grabbing
+    if (currentState === "eating" || currentState === "dragging" || isGrabActive) {
+      return;
+    }
+
+    // Automatically walk to bed to sleep
+    if (!isHeadingToBedRef.current) {
+      isHeadingToBedRef.current = true;
+      setWalkCommand({ x: JURO_BED_POS.x, z: JURO_BED_POS.z, nonce: Date.now() });
+      addLog(
+        "sleep",
+        `Waktu malam telah tiba (pukul ${now.getHours()}:00). Juro berjalan menuju sofa tidurnya untuk tidur pulas.`
+      );
+    }
+  }, [isNightSleep, currentState, isGrabActive, now, wakeUp, addLog]);
 
   const handleMenuAction = (action: "food" | "toy" | "sleep" | "bath" | "grab") => {
     soundEffects.playClick();
@@ -847,6 +930,7 @@ export const PetViewport: React.FC = () => {
             onWalkPointSelect={handleWalkPointSelect}
             onOpenShop={handleOpenShopFromMap}
             onOpenMine={handleOpenMineFromMap}
+            onBedClick={handleBedClick}
           />
 
           {/* Juro Pocket-Sized 3D Slime Model with Crawling, Jumping, Bathing & Pegang */}
@@ -858,6 +942,8 @@ export const PetViewport: React.FC = () => {
             onPetClick={handlePetClick}
             isGrabActive={isGrabActive}
             dragPointerNDC={dragPointerNDC}
+            isHeadingToBedRef={isHeadingToBedRef}
+            onBedArrival={handleBedArrival}
           />
 
           {/* Wide Diorama Orbit Controls — automatically paused while grabbing Juro or dragging any item */}
@@ -1074,9 +1160,6 @@ export const PetViewport: React.FC = () => {
                 <span className="pixel-text text-[9px] text-charcoal dark:text-white font-bold">
                   Sabun Busa
                 </span>
-                <span className="pixel-text text-[8px] text-pink-500 dark:text-pink-400">
-                  1. Gosok ke Juro
-                </span>
               </button>
 
               {/* Tool 2: Ember Air */}
@@ -1092,9 +1175,6 @@ export const PetViewport: React.FC = () => {
                 <ItemIllustration id="water-bucket" size={38} />
                 <span className="pixel-text text-[9px] text-charcoal dark:text-white font-bold">
                   Ember Air
-                </span>
-                <span className="pixel-text text-[8px] text-sky-600 dark:text-sky-400">
-                  2. Siram Juro
                 </span>
               </button>
             </div>
