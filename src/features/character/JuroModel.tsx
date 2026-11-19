@@ -75,6 +75,7 @@ export interface JuroModelProps {
   juroWorldPosRef?: React.RefObject<THREE.Vector3>;
   isHeadingToBedRef?: React.RefObject<boolean>;
   onBedArrival?: () => void;
+  isBlowingBubbles?: boolean;
 }
 
 export const JuroModel: React.FC<JuroModelProps> = React.memo(({
@@ -87,6 +88,7 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
   juroWorldPosRef,
   isHeadingToBedRef,
   onBedArrival,
+  isBlowingBubbles = false,
 }) => {
   const groupRef = useRef<THREE.Group>(null);
   const leftEyeRef = useRef<THREE.Group>(null);
@@ -140,6 +142,13 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
     rotZ: 0,
     bouncesPlayed: 0,
     scale: 1,
+  });
+
+  const bubbleStandRef = useRef({
+    active: false,
+    x: 0,
+    y: 0,
+    z: 0,
   });
 
   // Dynamic Expressions & Need-State Refs
@@ -831,6 +840,14 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
             groupRef.current.rotation.x = THREE.MathUtils.lerp(groupRef.current.rotation.x, 0.08, 0.15);
             groupRef.current.rotation.y = lerpAngle(groupRef.current.rotation.y, 0, 0.14);
           }
+        } else if (isBlowingBubbles) {
+          const bubbleExcitedHop = restY + Math.abs(Math.sin(t * 7.5)) * 0.1 * motionScale;
+          _targetVec.set(spring.position.x, bubbleExcitedHop, spring.position.z);
+          spring.setTarget(_targetVec);
+          if (groupRef.current) {
+            groupRef.current.rotation.z = Math.sin(t * 8) * 0.05 * motionScale;
+            groupRef.current.rotation.y = lerpAngle(groupRef.current.rotation.y, 0, 0.08);
+          }
         } else {
           const idleY = restY + Math.sin(t * 1.8) * 0.02 * motionScale;
           _targetVec.set(spring.position.x, idleY, spring.position.z);
@@ -1276,26 +1293,65 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
             playTimer.current = 0;
           }
         } else if (toyId === "bubble-blower") {
-          const yaw = groupRef.current ? groupRef.current.rotation.y : 0;
-          const wandX = spring.position.x + Math.sin(yaw + 0.4) * 0.48;
-          const wandZ = spring.position.z + Math.cos(yaw + 0.4) * 0.48;
+          const bs = bubbleStandRef.current;
+          if (!bs.active) {
+            bs.active = true;
+            // Place the bubble wand freestanding on the meadow at a comfortable distance (never attached to Juro's body!)
+            const yaw = groupRef.current ? groupRef.current.rotation.y : 0;
+            const placeAngle = yaw + 0.6;
+            const placeDist = 1.35;
+            const candX = THREE.MathUtils.clamp(
+              spring.position.x + Math.sin(placeAngle) * placeDist,
+              MAP_BOUNDS.minX + 0.6,
+              MAP_BOUNDS.maxX - 0.6
+            );
+            const candZ = THREE.MathUtils.clamp(
+              spring.position.z + Math.cos(placeAngle) * placeDist,
+              MAP_BOUNDS.minZ + 0.6,
+              MAP_BOUNDS.maxZ - 0.6
+            );
+            const safe = resolveHorizontalCollisions(candX, candZ, BASE_GROUND_Y, 0.28, false, false);
+            bs.x = safe.x;
+            bs.z = safe.z;
+            bs.y = getTerrainHeightAt(safe.x, safe.z) + 0.32;
+            soundEffects.playBubble();
+          }
+
+          // Freestanding 3D bubble wand waving gently on the meadow
           worldToyRef.current.position.set(
-            wandX,
-            spring.position.y + 0.12 + Math.sin(t * 3) * 0.04,
-            wandZ
+            bs.x,
+            bs.y + Math.sin(t * 3.5) * 0.03,
+            bs.z
           );
           worldToyRef.current.scale.setScalar(1);
+          if (worldToyMeshRef.current) {
+            worldToyMeshRef.current.rotation.set(0.18, Math.sin(t * 2.2) * 0.35, -0.2);
+          }
 
           if (worldToyShadowRef.current) {
-            worldToyShadowRef.current.visible = false;
+            worldToyShadowRef.current.visible = true;
+            const groundY = getTerrainHeightAt(bs.x, bs.z);
+            worldToyShadowRef.current.position.set(bs.x, groundY + 0.005, bs.z);
+            worldToyShadowRef.current.scale.set(0.65, 0.65, 1);
+            const mat = worldToyShadowRef.current.material as THREE.MeshBasicMaterial;
+            if (mat) mat.opacity = 0.25;
           }
 
+          // Juro is completely independent: on the grass looking up at the rising bubbles and hopping with joy!
+          const lookAngle = Math.atan2(bs.x - spring.position.x, bs.z - spring.position.z);
           if (groupRef.current) {
-            groupRef.current.position.y = -0.1 + Math.abs(Math.sin(playTimer.current * 6)) * 0.07;
+            groupRef.current.rotation.y = lerpAngle(groupRef.current.rotation.y, lookAngle, 0.12);
+            groupRef.current.rotation.z = Math.sin(t * 8) * 0.07 * motionScale;
+            // Playful hopping under the bubbles
+            const hop = Math.abs(Math.sin(playTimer.current * 7)) * 0.18 * motionScale;
+            _targetVec.set(spring.position.x, restY + hop, spring.position.z);
+            spring.setTarget(_targetVec);
           }
 
-          if (playTimer.current >= 4.5) {
+          if (playTimer.current >= 4.8) {
             soundEffects.playHappy();
+            soundEffects.playPop();
+            bs.active = false;
             clearToyBeingPlayed();
             fsm.transitionTo("happy", true);
             setBehaviorState("happy");
@@ -1306,6 +1362,7 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
     } else {
       playTimer.current = 0;
       fetchBallRef.current.active = false;
+      bubbleStandRef.current.active = false;
       if (worldToyRef.current) worldToyRef.current.visible = false;
       if (worldToyShadowRef.current) worldToyShadowRef.current.visible = false;
       if (!isCurrentlyEating && heartBubbleRef.current) {
@@ -1353,7 +1410,11 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
       (fetchBallRef.current.stage === "throwing" ||
         fetchBallRef.current.stage === "bouncing" ||
         fetchBallRef.current.stage === "ground");
-    const isHappyFace = (isPlayingToy && !isChasingBall) || currentState === "happy" || isPettingActive;
+    const isPlayingBubbles = isPlayingToy && currentToyBeingPlayed?.id === "bubble-blower";
+    const isHappyFace =
+      (isPlayingToy && !isChasingBall && !isPlayingBubbles) ||
+      currentState === "happy" ||
+      isPettingActive;
 
     const blinkScaleY = isRinsingNow
       ? 0.16
@@ -1380,6 +1441,12 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
           const distXZ = Math.hypot(dx, dz) || 1;
           lookX = THREE.MathUtils.clamp((dx / distXZ) * 0.06, -0.06, 0.06);
           lookY = THREE.MathUtils.clamp((fb.ballY - spring.position.y) * 0.05, -0.04, 0.08);
+        } else if (isPlayingBubbles) {
+          lookX = Math.sin(t * 3) * 0.04;
+          lookY = 0.068; // Eyes look up at the floating 3D bubbles in the meadow!
+        } else if (isBlowingBubbles) {
+          lookX = THREE.MathUtils.clamp(state.pointer.x * 0.08, -0.06, 0.06);
+          lookY = THREE.MathUtils.clamp(state.pointer.y * 0.06 + 0.04, -0.02, 0.08); // Eyes follow the bubbles on screen!
         } else if (isEating) {
           lookX = 0;
           lookY = -0.05;
@@ -1487,7 +1554,7 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
             mouthGroupRef.current.scale.set(1.2, 1.15, 1);
           }
           mouthGroupRef.current.position.set(0, -0.01, 1.035);
-        } else if (isHappyFace) {
+        } else if (isHappyFace || isBlowingBubbles || isPlayingBubbles) {
           mouthGroupRef.current.scale.set(1.18 + Math.sin(t * 8) * 0.08, 1.16, 1);
           mouthGroupRef.current.position.set(0, -0.01, 1.035);
         } else if (expression === "hungry") {
@@ -1518,7 +1585,7 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
     const isAngry = !isSleeping && expression === "angry";
     const cheekColor = isAngry
       ? "#DC2626"
-      : isPettingActive
+      : isPettingActive || isBlowingBubbles || isPlayingBubbles
       ? "#F43F5E"
       : "#F97316";
     if (leftCheekMatRef.current) leftCheekMatRef.current.color.set(cheekColor);
@@ -2326,7 +2393,7 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
           )}
           {currentToyBeingPlayed.id === "bubble-blower" && (
             <>
-              {[0, 1, 2, 3, 4, 5].map((idx) => (
+              {[0, 1, 2, 3, 4, 5, 6, 7].map((idx) => (
                 <PlayBubble3D
                   key={idx}
                   index={idx}

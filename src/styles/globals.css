@@ -278,6 +278,53 @@ body {
   animation: ui-pet-heart 850ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
+/* Floating Iridescent Soap Bubbles from Bubble Wand */
+@keyframes ui-soap-bubble {
+  0% {
+    opacity: 0;
+    transform: translate3d(-50%, -50%, 0) scale(0.35);
+  }
+  15% {
+    opacity: 0.95;
+    transform: translate3d(calc(-50% + var(--bubble-dx, 0px) * 0.2), calc(-50% - 18px), 0) scale(1);
+  }
+  50% {
+    opacity: 0.9;
+    transform: translate3d(calc(-50% + var(--bubble-dx, 0px) * 0.65), calc(-50% - 58px), 0) scale(1.08);
+  }
+  85% {
+    opacity: 0.75;
+    transform: translate3d(calc(-50% + var(--bubble-dx, 0px)), calc(-50% - 105px), 0) scale(1.16);
+  }
+  100% {
+    opacity: 0;
+    transform: translate3d(calc(-50% + var(--bubble-dx, 0px)), calc(-50% - 130px), 0) scale(1.35);
+  }
+}
+
+.animate-soap-bubble {
+  animation: ui-soap-bubble 1900ms cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+@keyframes ui-soap-pop {
+  0% {
+    opacity: 0.95;
+    transform: translate3d(-50%, -50%, 0) scale(1);
+  }
+  50% {
+    opacity: 0.65;
+    transform: translate3d(-50%, -50%, 0) scale(1.45);
+  }
+  100% {
+    opacity: 0;
+    transform: translate3d(-50%, -50%, 0) scale(1.85);
+  }
+}
+
+.animate-soap-pop {
+  animation: ui-soap-pop 180ms ease-out forwards;
+}
+
 @keyframes ui-tray-enter {
   0% {
     opacity: 0;

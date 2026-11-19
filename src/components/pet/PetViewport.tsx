@@ -90,6 +90,21 @@ export const PetViewport: React.FC = () => {
 
   const [isPettingActive, setIsPettingActive] = useState(false);
   const [hearts, setHearts] = useState<{ id: number; x: number; y: number; dx: number }[]>([]);
+  const [dragBubbles, setDragBubbles] = useState<
+    { id: number; x: number; y: number; size: number; dx: number; popped?: boolean }[]
+  >([]);
+  const lastBubbleSpawnRef = useRef<number>(0);
+  const lastBubbleSoundRef = useRef<number>(0);
+
+  const handlePopBubble = useCallback((bubbleId: number) => {
+    soundEffects.playPop();
+    setDragBubbles((prev) =>
+      prev.map((b) => (b.id === bubbleId ? { ...b, popped: true } : b))
+    );
+    setTimeout(() => {
+      setDragBubbles((prev) => prev.filter((b) => b.id !== bubbleId));
+    }, 180);
+  }, []);
   const savedInitialPos = usePetStore.getState().lastPosition;
   const juroWorldPosRef = useRef<THREE.Vector3>(
     savedInitialPos
@@ -607,6 +622,39 @@ export const PetViewport: React.FC = () => {
           stopRinseLoop();
         }
       }
+
+      // Real-time bubble blowing while dragging Bubble Wand!
+      if (
+        meta.payload.kind === "toy" &&
+        meta.payload.toy.id === "bubble-blower" &&
+        nextMoved
+      ) {
+        const now = Date.now();
+        if (now - lastBubbleSpawnRef.current > 115 && stepDist > 3.5) {
+          lastBubbleSpawnRef.current = now;
+          const bubbleId = now + Math.random();
+          const size = Math.floor(24 + Math.random() * 22);
+          const dx = (Math.random() - 0.5) * 50;
+
+          // Wand tip offset (near top-right of 60px dragged ghost)
+          const wandTipX = relX + 24;
+          const wandTipY = relY - 22;
+
+          setDragBubbles((prev) => [
+            ...prev.slice(-20),
+            { id: bubbleId, x: wandTipX, y: wandTipY, size, dx },
+          ]);
+
+          if (now - lastBubbleSoundRef.current > 150) {
+            lastBubbleSoundRef.current = now;
+            soundEffects.playBubble();
+          }
+
+          setTimeout(() => {
+            setDragBubbles((prev) => prev.filter((b) => b.id !== bubbleId));
+          }, 1900);
+        }
+      }
     };
 
     const handlePointerUp = () => {
@@ -896,6 +944,12 @@ export const PetViewport: React.FC = () => {
             isPettingActive={isPettingActive}
             isHeadingToBedRef={isHeadingToBedRef}
             onBedArrival={handleBedArrival}
+            isBlowingBubbles={
+              dragVisual !== null &&
+              dragVisual.moved &&
+              dragVisual.payload.kind === "toy" &&
+              dragVisual.payload.toy.id === "bubble-blower"
+            }
           />
 
           {/* Wide Diorama Orbit Controls — centered on Juro */}
@@ -988,6 +1042,32 @@ export const PetViewport: React.FC = () => {
           </button>
         </div>
       )}
+
+      {/* Floating Iridescent Soap Bubbles from dragging Bubble Wand */}
+      {dragBubbles.map((b) => (
+        <div
+          key={b.id}
+          onClick={() => handlePopBubble(b.id)}
+          style={
+            {
+              left: `${b.x}px`,
+              top: `${b.y}px`,
+              width: `${b.size}px`,
+              height: `${b.size}px`,
+              "--bubble-dx": `${b.dx}px`,
+            } as React.CSSProperties
+          }
+          className={`cursor-pointer absolute z-40 select-none will-change-transform ${
+            b.popped ? "animate-soap-pop" : "animate-soap-bubble"
+          }`}
+        >
+          <div className="relative w-full h-full rounded-full border border-white/70 shadow-[inset_0_0_8px_rgba(255,255,255,0.7),0_0_12px_rgba(56,189,248,0.4),inset_-3px_-3px_8px_rgba(244,114,182,0.45)] bg-[radial-gradient(circle_at_32%_28%,rgba(255,255,255,0.92)_0%,rgba(224,242,254,0.55)_32%,rgba(244,114,182,0.35)_68%,rgba(56,189,248,0.5)_100%)] backdrop-blur-[0.5px]">
+            {/* Glossy specular reflection highlights */}
+            <div className="absolute top-[16%] left-[20%] w-[26%] h-[26%] rounded-full bg-white/95" />
+            <div className="absolute bottom-[20%] right-[22%] w-[14%] h-[14%] rounded-full bg-pink-200/60" />
+          </div>
+        </div>
+      ))}
 
       {/* Floating Affection Hearts */}
       {hearts.map((h) => (

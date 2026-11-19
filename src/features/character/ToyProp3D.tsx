@@ -51,14 +51,14 @@ export const MusicalNote3D: React.FC<{ progress: number; offset: number }> = Rea
 
 export const PlayBubble3D: React.FC<{ progress: number; index: number }> = React.memo(
   ({ progress, index }) => {
-    const cycle = (progress + index * 0.16) % 1;
-    const angle = index * 1.05 + progress * 2.2;
-    const radius = 0.28 + (index % 3) * 0.12;
-    const x = Math.cos(angle) * radius;
-    const z = Math.sin(angle) * radius;
-    const y = cycle * 1.1;
-    const scale = (0.07 + (index % 3) * 0.035) * Math.sin(cycle * Math.PI);
-    const opacity = cycle < 0.15 ? cycle / 0.15 : cycle > 0.82 ? (1 - cycle) / 0.18 : 0.78;
+    const cycle = (progress + index * 0.125) % 1;
+    const angle = index * 0.95 + progress * 2.2;
+    const radius = 0.22 + (index % 4) * 0.14;
+    const x = Math.cos(angle) * radius + (index % 2 === 0 ? 0.18 : -0.18) * cycle;
+    const z = Math.sin(angle) * radius + (index % 3 === 0 ? 0.12 : -0.12) * cycle;
+    const y = cycle * 1.55;
+    const scale = (0.075 + (index % 3) * 0.035) * Math.sin(cycle * Math.PI);
+    const opacity = cycle < 0.12 ? cycle / 0.12 : cycle > 0.85 ? (1 - cycle) / 0.15 : 0.82;
 
     return (
       <group position={[x, y, z]} scale={[scale, scale, scale]}>
@@ -150,6 +150,11 @@ export const ToyProp3D: React.FC<ToyProp3DProps> = React.memo(
           <mesh position={[0, -0.22, 0]}>
             <cylinderGeometry args={[0.023, 0.023, 0.04, 12]} />
             <meshStandardMaterial color="#F43F5E" roughness={0.4} />
+          </mesh>
+          {/* Wooden Meadow Stand Fixture (keeps wand standing freestanding on grass) */}
+          <mesh position={[0, -0.31, 0]}>
+            <cylinderGeometry args={[0.065, 0.08, 0.035, 14]} />
+            <meshStandardMaterial color="#78350F" roughness={0.7} />
           </mesh>
           {/* Bubble Wand Ring */}
           <mesh position={[0, 0.07, 0]} rotation={[Math.PI / 2, 0, 0]}>
