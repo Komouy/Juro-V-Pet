@@ -61,13 +61,23 @@ export class BehaviorStateMachine {
     return true;
   }
 
-  private pickNewWanderTarget() {
+  public pickNewWanderTarget(currentPos?: THREE.Vector3) {
     // Pick an accessible scenic spot across the entire 3D map (meadow, hills, stumps, bridge)
-    const pt = pickScenicWaypoint();
+    let pt = pickScenicWaypoint();
+    if (currentPos) {
+      for (let attempt = 0; attempt < 8; attempt++) {
+        const candidate = pickScenicWaypoint();
+        if (Math.hypot(candidate.x - currentPos.x, candidate.z - currentPos.z) > 1.2) {
+          pt = candidate;
+          break;
+        }
+      }
+    }
     const clampedX = Math.max(this.minX, Math.min(this.maxX, pt.x));
     const clampedZ = Math.max(this.minZ, Math.min(this.maxZ, pt.z));
     const surfaceY = getTerrainHeightAt(clampedX, clampedZ);
     this.wanderTarget.set(clampedX, surfaceY, clampedZ);
+    this.timeInState = 0;
   }
 
   private pickCuriousTarget() {

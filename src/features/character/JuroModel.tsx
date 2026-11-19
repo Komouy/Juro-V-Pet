@@ -231,6 +231,9 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
     peakY: 0,
   });
 
+  // Timer to repath immediately if blocked by an obstacle while wandering
+  const blockedTimerRef = useRef(0);
+
   // Sync external store triggers (feed, play, sleep) with FSM
   useEffect(() => {
     if (storeState && storeState !== fsm.currentState && fsm.currentState !== "dragging") {
@@ -261,7 +264,8 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
         rawZ,
         rawSurface,
         JURO_COLLISION_RADIUS,
-        true
+        true,
+        false
       );
       targetX = safeTarget.x;
       targetZ = safeTarget.z;
@@ -571,14 +575,16 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
             const aheadGroundY = getTerrainHeightAt(probeX, probeZ);
 
             if (aheadGroundY > currGroundY + 0.05 || aheadGroundY < currGroundY - 0.14) {
-              const safeLanding = isHeadingToBedRef?.current
+              const isHeadingToBed = isHeadingToBedRef?.current ?? false;
+              const safeLanding = isHeadingToBed
                 ? { x: probeX, z: probeZ }
                 : resolveHorizontalCollisions(
                     probeX,
                     probeZ,
                     aheadGroundY,
                     JURO_COLLISION_RADIUS,
-                    true
+                    true,
+                    isHeadingToBed
                   );
               const landSurfaceY = getTerrainHeightAt(safeLanding.x, safeLanding.z);
               j.active = true;
@@ -596,14 +602,16 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
               const step = Math.min(dist, crawlSpeed * delta * motionScale);
               const rawNextX = spring.position.x + dirX * step;
               const rawNextZ = spring.position.z + dirZ * step;
-              const resolvedStep = isHeadingToBedRef?.current
+              const isHeadingToBed = isHeadingToBedRef?.current ?? false;
+              const resolvedStep = isHeadingToBed
                 ? { x: rawNextX, z: rawNextZ, hitObstacle: false }
                 : resolveHorizontalCollisions(
                     rawNextX,
                     rawNextZ,
                     currGroundY,
                     JURO_COLLISION_RADIUS,
-                    false
+                    false,
+                    isHeadingToBed
                   );
 
               // If grazing an obstacle, add subtle tangential slide so Juro curves around rocks/trees!
@@ -617,7 +625,8 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
                   finalZ + tangentZ,
                   currGroundY,
                   JURO_COLLISION_RADIUS,
-                  false
+                  false,
+                  isHeadingToBed
                 );
                 finalX = slid.x;
                 finalZ = slid.z;
@@ -734,15 +743,32 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
     // 3. Physics simulation step + solid obstacle collision enforcement
     spring.update(delta);
 
+    const isSleepingOrHeading =
+      currentState === "sleep" || (isHeadingToBedRef?.current ?? false);
+
     const postStepCollision = resolveHorizontalCollisions(
       spring.position.x,
       spring.position.z,
       spring.position.y - BODY_BOTTOM_OFFSET,
       JURO_COLLISION_RADIUS,
-      jumpRef.current.active
+      jumpRef.current.active,
+      isSleepingOrHeading
     );
     if (postStepCollision.hitObstacle) {
-      spring.resolveHorizontal(postStepCollision.x, postStepCollision.z, 0.35);
+      spring.resolveHorizontal(postStepCollision.x, postStepCollision.z, 0.1);
+      spring.target.x = postStepCollision.x;
+      spring.target.z = postStepCollision.z;
+
+      // If wandering and persistently blocked by an obstacle, pick a new path immediately!
+      if (currentState === "wander") {
+        blockedTimerRef.current += delta;
+        if (blockedTimerRef.current > 0.35) {
+          blockedTimerRef.current = 0;
+          fsm.pickNewWanderTarget(spring.position);
+        }
+      }
+    } else {
+      blockedTimerRef.current = 0;
     }
 
     // 4. Compute squash/stretch scale, enforce strict terrain collision, & apply position
@@ -753,9 +779,9 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
       const scale = spring.computeSquashAndStretch();
 
       if (currentState === "sleep") {
-        scale.x = 1.03 + sleepBreath * 0.028 * motionScale;
-        scale.z = 1.03 + sleepBreath * 0.028 * motionScale;
-        scale.y = 0.95 - sleepBreath * 0.032 * motionScale;
+        scale.x = 0.94 + sleepBreath * 0.02 * motionScale;
+        scale.z = 0.94 + sleepBreath * 0.02 * motionScale;
+        scale.y = 0.88 - sleepBreath * 0.025 * motionScale;
       } else if (currentState === "eating") {
         const chewSquash = Math.sin(t * 16) * 0.04;
         scale.y += chewSquash;
@@ -776,8 +802,12 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
       // Scale entire character cleanly to pocket-sized JURO_BASE_SCALE
       scale.multiplyScalar(JURO_BASE_SCALE);
 
-      // Hard terrain collision boundary: keep Juro's bottom resting cleanly on grass/hill/bridge/stump
-      const minCenterY = liveSurfaceY + 0.01 + BODY_BOTTOM_LOCAL * scale.y;
+      // Hard terrain collision boundary: keep Juro's bottom resting cleanly on grass/hill/bridge/stump/mattress
+      const isSleepingOnBed =
+        currentState === "sleep" &&
+        Math.hypot(spring.position.x - JURO_BED_POS.x, spring.position.z - JURO_BED_POS.z) < 0.6;
+      const bedMattressLift = isSleepingOnBed ? 0.125 : 0;
+      const minCenterY = liveSurfaceY + bedMattressLift + 0.01 + BODY_BOTTOM_LOCAL * scale.y;
       spring.clampFloor(minCenterY, 0.22);
 
       groupRef.current.position.copy(spring.position);
@@ -845,9 +875,20 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
 
     // 5. Soft Contact Shadow — sits directly on whatever ground/hill/stump/bridge Juro is above!
     if (shadowRef.current && groupRef.current) {
-      shadowRef.current.position.set(spring.position.x, liveSurfaceY + 0.008, spring.position.z);
+      const isSleepingOnBed =
+        currentState === "sleep" &&
+        Math.hypot(spring.position.x - JURO_BED_POS.x, spring.position.z - JURO_BED_POS.z) < 0.6;
+      const bedMattressLift = isSleepingOnBed ? 0.125 : 0;
+      shadowRef.current.position.set(
+        spring.position.x,
+        liveSurfaceY + bedMattressLift + 0.008,
+        spring.position.z
+      );
 
-      const lift = Math.max(0, spring.position.y - (liveSurfaceY + BODY_BOTTOM_OFFSET));
+      const lift = Math.max(
+        0,
+        spring.position.y - (liveSurfaceY + bedMattressLift + BODY_BOTTOM_OFFSET)
+      );
       const heightShrink = 1 / (1 + lift * 0.55);
       const bodyScaleX = groupRef.current.scale.x;
       const bodyScaleZ = groupRef.current.scale.z;

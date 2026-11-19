@@ -13,6 +13,7 @@ export interface SolidObstacle {
   z: number;
   radius: number;
   topY: number; // world Y above which Juro could jump/fly over it
+  tag?: "bed-frame";
 }
 
 export const BASE_GROUND_Y = -0.92;
@@ -20,42 +21,91 @@ export const BASE_GROUND_Y = -0.92;
 // Solid world props inside & bordering Juro's walkable valley so Juro NEVER clips through them
 export const MAP_OBSTACLES: SolidObstacle[] = [
   // Trees on knolls & bordering meadow
-  { x: -3.9, z: -1.35, radius: 0.34, topY: 1.4 },
-  { x: 4.2, z: 1.35, radius: 0.34, topY: 1.4 },
-  { x: -4.4, z: -4.5, radius: 0.4, topY: 1.4 },
-  { x: 3.2, z: -4.2, radius: 0.4, topY: 1.4 },
-  // Miniature Juro Shop Building (back-right) & Crystal Mine Cave (north across straight bridge)
-  { x: 4.55, z: -2.55, radius: 0.96, topY: 1.4 },
-  { x: -0.36, z: -4.55, radius: 1.05, topY: 1.5 },
-  // Wooden Park Bench atop East Knoll (2 overlapping circles along bench length)
-  { x: 3.5, z: 0.82, radius: 0.28, topY: BASE_GROUND_Y + 0.9 },
-  { x: 3.8, z: 1.08, radius: 0.28, topY: BASE_GROUND_Y + 0.9 },
-  // Nightstand & Bed Headboard atop West Knoll (keeps mattress clear for sleeping)
-  { x: -3.88, z: -0.52, radius: 0.18, topY: BASE_GROUND_Y + 0.85 },
+  { x: -3.9, z: -1.35, radius: 0.38, topY: 1.4 },
+  { x: 4.2, z: 1.35, radius: 0.38, topY: 1.4 },
+  { x: -4.4, z: -4.5, radius: 0.45, topY: 1.4 },
+  { x: 3.2, z: -4.2, radius: 0.45, topY: 1.4 },
+  { x: -2.8, z: -4.8, radius: 0.42, topY: 1.4 },
+  { x: 1.55, z: -4.7, radius: 0.42, topY: 1.4 },
+  { x: -4.8, z: 2.2, radius: 0.42, topY: 1.4 },
+  { x: 4.9, z: 2.35, radius: 0.42, topY: 1.4 },
+  // Pine trees bordering meadow
+  { x: -3.6, z: -5.3, radius: 0.45, topY: 1.4 },
+  { x: -1.4, z: -5.4, radius: 0.45, topY: 1.4 },
+  { x: 0.55, z: -5.4, radius: 0.45, topY: 1.4 },
+  { x: 2.4, z: -5.0, radius: 0.45, topY: 1.4 },
+  { x: 4.8, z: -4.9, radius: 0.45, topY: 1.4 },
+
+  // Miniature Juro Shop Building & Porch Counter
+  { x: 4.55, z: -2.55, radius: 1.12, topY: 1.5 },
+  { x: 4.35, z: -2.08, radius: 0.68, topY: 1.1 },
+
+  // Crystal Mine Cave Portal & Side Rock Mounds
+  { x: -0.36, z: -4.55, radius: 1.25, topY: 1.6 },
+  { x: -1.14, z: -4.4, radius: 0.75, topY: 1.2 },
+  { x: 0.42, z: -4.4, radius: 0.75, topY: 1.2 },
+
+  // Wooden Park Bench atop East Knoll (3 overlapping circles along bench length)
+  { x: 3.46, z: 0.77, radius: 0.24, topY: BASE_GROUND_Y + 0.82 },
+  { x: 3.65, z: 0.95, radius: 0.24, topY: BASE_GROUND_Y + 0.82 },
+  { x: 3.84, z: 1.13, radius: 0.24, topY: BASE_GROUND_Y + 0.82 },
+
+  // West Knoll Sofa Bed Frame (Backrest, Armrests & Nightstand)
+  { x: -3.88, z: -0.52, radius: 0.24, topY: BASE_GROUND_Y + 0.85, tag: "bed-frame" }, // Nightstand & Lamp
+  { x: -3.37, z: -0.82, radius: 0.28, topY: BASE_GROUND_Y + 0.78, tag: "bed-frame" }, // Backrest
+  { x: -3.60, z: -0.38, radius: 0.22, topY: BASE_GROUND_Y + 0.72, tag: "bed-frame" }, // Left Armrest
+  { x: -2.87, z: -0.65, radius: 0.22, topY: BASE_GROUND_Y + 0.72, tag: "bed-frame" }, // Right Armrest
+
   // Two Glowing Meadow Lantern Posts
-  { x: -1.45, z: -1.65, radius: 0.16, topY: 0.5 },
-  { x: 2.25, z: 0.22, radius: 0.16, topY: 0.5 },
-  // Bushes inside/bordering valley
-  { x: -4.2, z: -0.95, radius: 0.32, topY: 0.2 },
-  { x: 4.1, z: 1.85, radius: 0.3, topY: 0.2 },
-  { x: -3.9, z: 2.35, radius: 0.34, topY: 0.0 },
-  { x: 3.8, z: 2.55, radius: 0.32, topY: 0.0 },
+  { x: -1.45, z: -1.65, radius: 0.18, topY: 0.5 },
+  { x: 2.25, z: 0.22, radius: 0.18, topY: 0.5 },
+
+  // Bushes inside & bordering valley
+  { x: -5.1, z: -1.7, radius: 0.36, topY: BASE_GROUND_Y + 0.4 },
+  { x: -4.8, z: 0.85, radius: 0.34, topY: BASE_GROUND_Y + 0.4 },
+  { x: -4.2, z: -0.95, radius: 0.32, topY: BASE_GROUND_Y + 0.35 },
+  { x: -2.1, z: -3.95, radius: 0.34, topY: BASE_GROUND_Y + 0.4 },
+  { x: 0.85, z: -4.1, radius: 0.36, topY: BASE_GROUND_Y + 0.4 },
+  { x: 2.5, z: -3.8, radius: 0.34, topY: BASE_GROUND_Y + 0.4 },
+  { x: 4.2, z: -3.3, radius: 0.36, topY: BASE_GROUND_Y + 0.4 },
+  { x: 5.2, z: -1.4, radius: 0.34, topY: BASE_GROUND_Y + 0.4 },
+  { x: 5.0, z: 0.45, radius: 0.32, topY: BASE_GROUND_Y + 0.4 },
+  { x: 4.1, z: 1.85, radius: 0.30, topY: BASE_GROUND_Y + 0.35 },
+  { x: -3.9, z: 2.35, radius: 0.34, topY: BASE_GROUND_Y + 0.4 },
+  { x: 3.8, z: 2.55, radius: 0.32, topY: BASE_GROUND_Y + 0.4 },
+  { x: -1.48, z: -4.05, radius: 0.32, topY: BASE_GROUND_Y + 0.4 },
+  { x: 5.5, z: -2.65, radius: 0.34, topY: BASE_GROUND_Y + 0.4 },
+  { x: -5.6, z: -3.4, radius: 0.36, topY: BASE_GROUND_Y + 0.4 },
+
+  // Fences
+  { x: -5.2, z: 1.5, radius: 0.26, topY: BASE_GROUND_Y + 0.45 },
+  { x: -5.05, z: 0.8, radius: 0.26, topY: BASE_GROUND_Y + 0.45 },
+  { x: -4.95, z: 0.1, radius: 0.26, topY: BASE_GROUND_Y + 0.45 },
+  { x: -4.85, z: -0.6, radius: 0.26, topY: BASE_GROUND_Y + 0.45 },
+  { x: -4.65, z: -1.3, radius: 0.26, topY: BASE_GROUND_Y + 0.45 },
+  { x: 3.4, z: -2.95, radius: 0.26, topY: BASE_GROUND_Y + 0.45 },
+  { x: 4.1, z: -3.05, radius: 0.26, topY: BASE_GROUND_Y + 0.45 },
+  { x: 4.8, z: -3.1, radius: 0.26, topY: BASE_GROUND_Y + 0.45 },
+  { x: 5.5, z: -2.95, radius: 0.26, topY: BASE_GROUND_Y + 0.45 },
+
   // Rocks, scenic boulders & river pebbles in walkable zone
-  { x: 1.38, z: -0.82, radius: 0.18, topY: BASE_GROUND_Y + 0.22 },
-  { x: 1.56, z: -0.62, radius: 0.14, topY: BASE_GROUND_Y + 0.18 },
-  { x: 2.95, z: -0.45, radius: 0.2, topY: BASE_GROUND_Y + 0.24 },
-  { x: 3.22, z: -0.64, radius: 0.15, topY: BASE_GROUND_Y + 0.2 },
-  { x: 3.55, z: -1.3, radius: 0.18, topY: BASE_GROUND_Y + 0.22 },
-  { x: -0.95, z: -2.0, radius: 0.17, topY: BASE_GROUND_Y + 0.22 },
-  { x: 0.45, z: -1.58, radius: 0.15, topY: BASE_GROUND_Y + 0.18 },
-  { x: -4.32, z: -1.52, radius: 0.22, topY: BASE_GROUND_Y + 0.26 },
-  { x: -2.65, z: 1.75, radius: 0.24, topY: BASE_GROUND_Y + 0.24 },
-  { x: 2.25, z: 1.95, radius: 0.22, topY: BASE_GROUND_Y + 0.24 },
-  { x: 1.15, z: -3.25, radius: 0.32, topY: BASE_GROUND_Y + 0.32 },
-  { x: -3.45, z: 2.25, radius: 0.28, topY: BASE_GROUND_Y + 0.28 },
-  { x: -1.8, z: 0.35, radius: 0.21, topY: BASE_GROUND_Y + 0.22 },
-  { x: 2.05, z: 0.85, radius: 0.2, topY: BASE_GROUND_Y + 0.22 },
-  { x: -2.1, z: -1.6, radius: 0.22, topY: BASE_GROUND_Y + 0.24 },
+  { x: 1.38, z: -0.82, radius: 0.20, topY: BASE_GROUND_Y + 0.22 },
+  { x: 1.56, z: -0.62, radius: 0.16, topY: BASE_GROUND_Y + 0.18 },
+  { x: 2.95, z: -0.45, radius: 0.22, topY: BASE_GROUND_Y + 0.24 },
+  { x: 3.22, z: -0.64, radius: 0.18, topY: BASE_GROUND_Y + 0.20 },
+  { x: 3.55, z: -1.30, radius: 0.20, topY: BASE_GROUND_Y + 0.22 },
+  { x: -0.95, z: -2.00, radius: 0.19, topY: BASE_GROUND_Y + 0.22 },
+  { x: 0.45, z: -1.58, radius: 0.17, topY: BASE_GROUND_Y + 0.18 },
+  { x: -4.65, z: -1.75, radius: 0.38, topY: BASE_GROUND_Y + 0.35 },
+  { x: -4.32, z: -1.52, radius: 0.26, topY: BASE_GROUND_Y + 0.28 },
+  { x: -2.65, z: 1.75, radius: 0.26, topY: BASE_GROUND_Y + 0.26 },
+  { x: 2.25, z: 1.95, radius: 0.24, topY: BASE_GROUND_Y + 0.25 },
+  { x: 1.15, z: -3.25, radius: 0.34, topY: BASE_GROUND_Y + 0.34 },
+  { x: -3.45, z: 2.25, radius: 0.30, topY: BASE_GROUND_Y + 0.30 },
+  { x: 5.15, z: 1.55, radius: 0.36, topY: BASE_GROUND_Y + 0.35 },
+  { x: -1.80, z: 0.35, radius: 0.22, topY: BASE_GROUND_Y + 0.22 },
+  { x: 2.05, z: 0.85, radius: 0.22, topY: BASE_GROUND_Y + 0.22 },
+  { x: -2.10, z: -1.60, radius: 0.24, topY: BASE_GROUND_Y + 0.24 },
 ];
 
 // Wide explorable valley bounds for Juro
@@ -143,9 +193,17 @@ export function getBridgeElevation(x: number, z: number): number | null {
   return null;
 }
 
-// Check if (x, z) is inside the lily pond or winding brook (excluding bridge)
+// Check if (x, z) is inside the lily pond or winding brook (excluding bridge & dry platforms)
 export function isWaterAt(x: number, z: number): boolean {
   if (getBridgeElevation(x, z) !== null) return false;
+
+  // Stumps and platforms are elevated dry land above water
+  for (let i = 0; i < MAP_PLATFORMS.length; i++) {
+    const p = MAP_PLATFORMS[i];
+    if (Math.hypot(x - p.x, z - p.z) <= p.radius * 0.98) {
+      return false;
+    }
+  }
 
   // Pond oval centered at (2.45, -1.05)
   const pdx = (x - 2.45) / 1.15;
@@ -196,6 +254,10 @@ export function isInsideObstacle(x: number, z: number, pad = 0.35): boolean {
       return true;
     }
   }
+  // Check bed mattress
+  if (Math.hypot(x - JURO_BED_POS.x, z - JURO_BED_POS.z) < 0.44 + pad) {
+    return true;
+  }
   return false;
 }
 
@@ -205,7 +267,8 @@ export function resolveHorizontalCollisions(
   z: number,
   bottomY: number,
   petRadius = 0.38,
-  allowClimbing = false
+  allowClimbing = false,
+  isSleepingOrHeadingToBed = false
 ): { x: number; z: number; hitObstacle: boolean } {
   let rx = Math.max(MAP_BOUNDS.minX, Math.min(MAP_BOUNDS.maxX, x));
   let rz = Math.max(MAP_BOUNDS.minZ, Math.min(MAP_BOUNDS.maxZ, z));
@@ -213,9 +276,10 @@ export function resolveHorizontalCollisions(
 
   // 2 solver passes ensure clean resolution when wedged between two nearby objects
   for (let pass = 0; pass < 2; pass++) {
-    // 1. Push out of solid props (trees, bench, basket, lanterns, boulders, cottage, bushes)
+    // 1. Push out of solid props (trees, bench, sofa bed frame, lanterns, boulders, shop, mine, bushes, fences)
     for (let i = 0; i < MAP_OBSTACLES.length; i++) {
       const obs = MAP_OBSTACLES[i];
+      if (isSleepingOrHeadingToBed && obs.tag === "bed-frame") continue;
       if (bottomY >= obs.topY) continue;
       const dx = rx - obs.x;
       const dz = rz - obs.z;
@@ -230,22 +294,86 @@ export function resolveHorizontalCollisions(
       }
     }
 
-    // 2. Prevent clipping sideways into elevated terrace/stump/rock walls unless Juro is already high enough!
-    if (!allowClimbing) {
-      for (let i = 0; i < MAP_PLATFORMS.length; i++) {
-        const p = MAP_PLATFORMS[i];
-        const platformTopY = BASE_GROUND_Y + p.height;
-        // If Juro's bottom is well below the top ledge, treat the side wall as solid!
-        if (bottomY < platformTopY - 0.14) {
-          const dx = rx - p.x;
-          const dz = rz - p.z;
-          const dist = Math.hypot(dx, dz);
-          const minDist = p.radius * 1.02 + petRadius * 0.72;
-          if (dist < minDist) {
-            const nx = dist > 0.0001 ? dx / dist : 1;
-            const nz = dist > 0.0001 ? dz / dist : 0;
-            rx = p.x + nx * minDist;
-            rz = p.z + nz * minDist;
+    // 1b. Sofa Bed Mattress (impenetrable barrier while awake so Juro walks around it on the knoll grass)
+    if (!isSleepingOrHeadingToBed) {
+      const dx = rx - JURO_BED_POS.x;
+      const dz = rz - JURO_BED_POS.z;
+      const dist = Math.hypot(dx, dz);
+      const minDist = 0.44 + petRadius;
+      if (dist < minDist) {
+        const nx = dist > 0.0001 ? dx / dist : 1;
+        const nz = dist > 0.0001 ? dz / dist : 0;
+        rx = JURO_BED_POS.x + nx * minDist;
+        rz = JURO_BED_POS.z + nz * minDist;
+        hitObstacle = true;
+      }
+    }
+
+    // 2. Prevent clipping sideways into elevated terrace/stump/rock walls
+    for (let i = 0; i < MAP_PLATFORMS.length; i++) {
+      const p = MAP_PLATFORMS[i];
+      const platformTopY = BASE_GROUND_Y + p.height;
+      // If Juro's bottom is below the platform top rim, treat the wall as solid even during early jump arc
+      const threshold = allowClimbing ? platformTopY - 0.06 : platformTopY - 0.14;
+      if (bottomY < threshold) {
+        const dx = rx - p.x;
+        const dz = rz - p.z;
+        const dist = Math.hypot(dx, dz);
+        const minDist = p.radius * 1.02 + petRadius * 0.72;
+        if (dist < minDist) {
+          const nx = dist > 0.0001 ? dx / dist : 1;
+          const nz = dist > 0.0001 ? dz / dist : 0;
+          rx = p.x + nx * minDist;
+          rz = p.z + nz * minDist;
+          hitObstacle = true;
+        }
+      }
+    }
+
+    // 3. Water Collision (Lily Pond & Brook Stream) — Juro must never walk into water unless on the footbridge!
+    const bridgeElev = getBridgeElevation(rx, rz);
+    if (bridgeElev === null) {
+      // 3a. Lily Pond Oval centered at (2.45, -1.05) with outer bank margin
+      const pondCenterX = 2.45;
+      const pondCenterZ = -1.05;
+      const pondRadiusX = 1.18 + petRadius * 0.65;
+      const pondRadiusZ = 0.84 + petRadius * 0.65;
+      const pdx = rx - pondCenterX;
+      const pdz = rz - pondCenterZ;
+      const normX = pdx / pondRadiusX;
+      const normZ = pdz / pondRadiusZ;
+      const pondDistSq = normX * normX + normZ * normZ;
+      if (pondDistSq < 1.0) {
+        const dirX = Math.abs(pdx) > 0.0001 || Math.abs(pdz) > 0.0001 ? normX : 1.0;
+        const dirZ = Math.abs(pdx) > 0.0001 || Math.abs(pdz) > 0.0001 ? normZ : 0.0;
+        const pondDist = Math.hypot(dirX, dirZ) || 1.0;
+        rx = pondCenterX + (dirX / pondDist) * (pondRadiusX + 0.08);
+        rz = pondCenterZ + (dirZ / pondDist) * (pondRadiusZ + 0.08);
+        hitObstacle = true;
+      }
+
+      // 3b. Brook Stream Winding Ribbon between x = -5.5 and x = 2.2
+      if (rx >= -5.5 && rx <= 2.2) {
+        const t = (rx + 5.5) / 7.7;
+        const streamZ = -4.9 + t * 3.7 + Math.sin(t * Math.PI) * 0.35;
+        const halfWidth = 0.52 + petRadius * 0.62;
+        const streamDz = rz - streamZ;
+        if (Math.abs(streamDz) < halfWidth) {
+          const pushSign = streamDz >= 0 ? 1 : -1;
+          rz = streamZ + pushSign * (halfWidth + 0.08);
+          hitObstacle = true;
+        }
+      }
+    } else {
+      // 4. Wooden Footbridge Handrails: keep Juro centered safely on bridge planks (rx in [-0.56, -0.16])
+      if (Math.abs(rz - -2.32) <= 0.64) {
+        const localBridgeX = rx - -0.36;
+        if (Math.abs(localBridgeX) <= 0.44) {
+          if (rx < -0.56) {
+            rx = -0.56;
+            hitObstacle = true;
+          } else if (rx > -0.16) {
+            rx = -0.16;
             hitObstacle = true;
           }
         }
@@ -266,16 +394,22 @@ export function pickScenicWaypoint(): { x: number; z: number } {
   const roll = Math.random();
   if (roll < 0.35) {
     const platform = MAP_PLATFORMS[Math.floor(Math.random() * MAP_PLATFORMS.length)];
-    for (let attempt = 0; attempt < 8; attempt++) {
+    for (let attempt = 0; attempt < 12; attempt++) {
       const angle = Math.random() * Math.PI * 2;
-      const r = Math.random() * platform.radius * 0.52;
+      const r = Math.random() * platform.radius * 0.55;
       const px = platform.x + Math.cos(angle) * r;
       const pz = platform.z + Math.sin(angle) * r;
-      if (!isInsideObstacle(px, pz, 0.42)) {
+      if (!isInsideObstacle(px, pz, 0.42) && !isWaterAt(px, pz)) {
         return { x: px, z: pz };
       }
     }
-    return { x: platform.x, z: platform.z };
+    // If west-knoll, return a clear spot on the grassy rim rather than inside the bed
+    if (platform.id === "west-knoll") {
+      return { x: -2.6, z: -0.15 };
+    }
+    if (!isWaterAt(platform.x, platform.z) && !isInsideObstacle(platform.x, platform.z, 0.2)) {
+      return { x: platform.x, z: platform.z };
+    }
   }
   if (roll < 0.45) {
     // Visit the wooden footbridge!
@@ -283,7 +417,7 @@ export function pickScenicWaypoint(): { x: number; z: number } {
   }
 
   // Otherwise pick any clear dry spot across the wide valley meadow
-  for (let attempt = 0; attempt < 16; attempt++) {
+  for (let attempt = 0; attempt < 30; attempt++) {
     const x = MAP_BOUNDS.minX + Math.random() * (MAP_BOUNDS.maxX - MAP_BOUNDS.minX);
     const z = MAP_BOUNDS.minZ + Math.random() * (MAP_BOUNDS.maxZ - MAP_BOUNDS.minZ);
     if (!isWaterAt(x, z) && !isInsideObstacle(x, z, 0.45)) {
