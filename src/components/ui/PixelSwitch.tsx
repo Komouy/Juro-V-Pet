@@ -22,7 +22,7 @@ export const PixelSwitch: React.FC<PixelSwitchProps> = ({
   const handleToggle = () => {
     if (disabled) return;
     if (soundEnabled) {
-      soundEffects.playSquish();
+      soundEffects.playToggle(!checked);
     }
     onChange(!checked);
   };

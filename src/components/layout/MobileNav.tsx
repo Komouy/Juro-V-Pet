@@ -1,6 +1,7 @@
 import React from "react";
 import { Link, useLocation } from "react-router-dom";
 import { Home, Store, Pickaxe, Archive, TrendingUp } from "lucide-react";
+import { soundEffects } from "../../engine/audio/soundEffects";
 import { useGameStore } from "../../stores/gameStore";
 
 const MOBILE_LINKS = [
@@ -32,6 +33,9 @@ export const MobileNav: React.FC = () => {
             <Link
               key={path}
               to={path}
+              onClick={() => {
+                if (!isActive) soundEffects.playTab();
+              }}
               className={`
                 flex flex-col items-center justify-center flex-1 h-full py-1 transition-all select-none
                 ${

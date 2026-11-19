@@ -27,7 +27,7 @@ export function PixelSegmented<T extends string = string>({
   const handleSelect = (val: T) => {
     if (val === value) return;
     if (soundEnabled) {
-      soundEffects.playClick();
+      soundEffects.playTab();
     }
     onChange(val);
   };

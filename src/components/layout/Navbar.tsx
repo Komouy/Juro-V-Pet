@@ -2,6 +2,7 @@ import React from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { Settings, Sun, Moon, Volume2, VolumeX, RotateCcw } from "lucide-react";
 import { IconButton } from "../ui/IconButton";
+import { soundEffects } from "../../engine/audio/soundEffects";
 import { useUIStore } from "../../stores/uiStore";
 import { useGameStore } from "../../stores/gameStore";
 
@@ -27,10 +28,26 @@ export const Navbar: React.FC = () => {
   );
 
   const handleResetCamera = () => {
+    soundEffects.playClick();
     triggerCameraReset();
     if (location.pathname !== "/") {
       navigate("/");
     }
+  };
+
+  const handleToggleSound = () => {
+    if (!soundEnabled) {
+      toggleSound();
+      setTimeout(() => soundEffects.playToggle(true), 10);
+    } else {
+      soundEffects.playToggle(false);
+      toggleSound();
+    }
+  };
+
+  const handleToggleTheme = () => {
+    soundEffects.playToggle(theme === "dark");
+    toggleTheme();
   };
 
   return (
@@ -57,6 +74,9 @@ export const Navbar: React.FC = () => {
               <Link
                 key={path}
                 to={path}
+                onClick={() => {
+                  if (!isActive) soundEffects.playTab();
+                }}
                 className={`
                   relative pixel-text text-[11px] px-3 py-1.5 border-2 transition-all duration-75 select-none
                   ${
@@ -91,17 +111,17 @@ export const Navbar: React.FC = () => {
             icon={soundEnabled ? Volume2 : VolumeX}
             label={soundEnabled ? "Nonaktifkan suara" : "Aktifkan suara"}
             size="sm"
-            onClick={toggleSound}
+            onClick={handleToggleSound}
           />
 
           <IconButton
             icon={theme === "light" ? Moon : Sun}
             label="Ganti mode tema"
             size="sm"
-            onClick={toggleTheme}
+            onClick={handleToggleTheme}
           />
 
-          <Link to="/settings">
+          <Link to="/settings" onClick={() => soundEffects.playTab()}>
             <IconButton
               icon={Settings}
               label="Pengaturan"

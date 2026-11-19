@@ -5,6 +5,7 @@ import { PixelInput } from "../components/ui/PixelInput";
 import { PixelSwitch } from "../components/ui/PixelSwitch";
 import { usePetStore } from "../stores/petStore";
 import { useUIStore } from "../stores/uiStore";
+import { soundEffects } from "../engine/audio/soundEffects";
 import { persistenceService } from "../services/persistenceService";
 import {
   User,
@@ -44,6 +45,7 @@ export const SettingsPage: React.FC = () => {
     setDraftName(null);
     persistenceService.saveNow();
     setSavedSuccess(true);
+    soundEffects.playSuccess();
     showToast("Nama tersimpan", "success");
     if (savedTimerRef.current) clearTimeout(savedTimerRef.current);
     savedTimerRef.current = setTimeout(() => {
@@ -61,6 +63,7 @@ export const SettingsPage: React.FC = () => {
     a.download = `juro-save-${new Date().toISOString().slice(0, 10)}.json`;
     a.click();
     URL.revokeObjectURL(url);
+    soundEffects.playSuccess();
     showToast("Cadangan diunduh", "success");
   };
 
@@ -75,8 +78,10 @@ export const SettingsPage: React.FC = () => {
         const success = await persistenceService.importSaveFile(content);
         if (success) {
           setDraftName(null);
+          soundEffects.playSuccess();
           showToast("Data dipulihkan", "success");
         } else {
+          soundEffects.playError();
           showToast("File cadangan tidak valid", "warn");
         }
       }
@@ -89,6 +94,7 @@ export const SettingsPage: React.FC = () => {
     await persistenceService.resetAll();
     setDraftName(null);
     setConfirmingReset(false);
+    soundEffects.playWarning();
     showToast("Seluruh data diatur ulang", "info");
   };
 

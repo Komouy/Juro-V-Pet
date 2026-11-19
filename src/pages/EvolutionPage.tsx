@@ -4,6 +4,7 @@ import { Badge } from "../components/ui/Badge";
 import { ProgressBar } from "../components/ui/ProgressBar";
 import { usePetStore } from "../stores/petStore";
 import { TrendingUp, CheckCircle2 } from "lucide-react";
+import { soundEffects } from "../engine/audio/soundEffects";
 
 const StageEmblem: React.FC<{ stage: 1 | 2 | 3; unlocked: boolean }> = ({
   stage,
@@ -138,7 +139,8 @@ export const EvolutionPage: React.FC = () => {
             <Card
               key={stage.stageName}
               shadowOffset="sm"
-              className={`p-3.5 flex flex-col justify-between gap-3 transition-opacity ${
+              onClick={() => soundEffects.playClick()}
+              className={`p-3.5 flex flex-col justify-between gap-3 transition-all cursor-pointer ${
                 stage.current
                   ? "border-juro-orange ring-2 ring-juro-orange/25"
                   : !isUnlocked

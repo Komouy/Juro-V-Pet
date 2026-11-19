@@ -149,6 +149,7 @@ export const PetViewport: React.FC = () => {
   const handleFinishGrab = useCallback(() => {
     setIsGrabActive(false);
     soundEffects.playBoing();
+    soundEffects.playPlop();
     addLog("interaction", "Juro ditaruh kembali dengan aman di tanah.");
   }, [addLog]);
 
@@ -158,6 +159,7 @@ export const PetViewport: React.FC = () => {
         handleFinishGrab();
         return;
       }
+      soundEffects.playGuideTap();
       setJuroMenu({ open: false, x: 0, y: 0, isNearTop: false });
       setActiveTray("none");
       setShowStatDetails(false);
@@ -182,14 +184,16 @@ export const PetViewport: React.FC = () => {
 
   const handlePetClick = useCallback(
     (screenPos?: { x: number; y: number }) => {
-      soundEffects.playSquish();
       setShowStatDetails(false);
       setActiveTray("none");
 
       if (juroMenu.open) {
+        soundEffects.playDismiss();
         setJuroMenu({ open: false, x: 0, y: 0, isNearTop: false });
         return;
       }
+
+      soundEffects.playPop();
 
       const contRect = containerRef.current?.getBoundingClientRect();
       const contW = contRect?.width || window.innerWidth;
@@ -421,6 +425,7 @@ export const PetViewport: React.FC = () => {
     wakeCooldownUntilRef.current = Date.now() + 120_000;
     isHeadingToBedRef.current = false;
     clean();
+    soundEffects.playSparkle();
     soundEffects.playHappy();
     addLog("clean", "Juro selesai disabuni dan dibilas hingga bersih berkilau!");
     hadMeaningfulSoapRef.current = false;
@@ -496,7 +501,7 @@ export const PetViewport: React.FC = () => {
     if (controlsRef.current) {
       controlsRef.current.enabled = false;
     }
-    soundEffects.playClick();
+    soundEffects.playPickup();
 
     dragMetaRef.current = {
       payload,
@@ -577,7 +582,7 @@ export const PetViewport: React.FC = () => {
           const nowMs = Date.now();
           if (nowMs - lastBathSoundRef.current > 210) {
             lastBathSoundRef.current = nowMs;
-            soundEffects.playSquish();
+            soundEffects.playBubble();
           }
         } else {
           bathStateRef.current.isScrubbing = false;
@@ -614,6 +619,10 @@ export const PetViewport: React.FC = () => {
 
       if (!finalMeta) return;
 
+      if (finalMeta.moved && !finalMeta.overJuro) {
+        soundEffects.playDrop();
+      }
+
       // Food & Toy support BOTH manual drag-and-drop onto Juro AND quick tap
       if (finalMeta.payload.kind === "food") {
         if (finalMeta.overJuro || !finalMeta.moved) {
@@ -649,7 +658,7 @@ export const PetViewport: React.FC = () => {
     isHeadingToBedRef.current = false;
     if (usePetStore.getState().currentState !== "sleep") {
       sleep();
-      soundEffects.playSquish();
+      soundEffects.playSleep();
       addLog("sleep", "Juro sampai di sofa tidurnya dan mulai tidur lelap. Zzz...");
     }
   }, [sleep, addLog]);
@@ -658,7 +667,7 @@ export const PetViewport: React.FC = () => {
     soundEffects.playClick();
     if (currentState === "sleep") {
       wakeUp();
-      soundEffects.playBoing();
+      soundEffects.playWakeUp();
       addLog("interaction", "Juro dibangunkan dari sofa tidurnya.");
       wakeCooldownUntilRef.current = Date.now() + 180_000;
       isHeadingToBedRef.current = false;
@@ -666,14 +675,14 @@ export const PetViewport: React.FC = () => {
       isHeadingToBedRef.current = true;
       setWalkCommand({ x: JURO_BED_POS.x, z: JURO_BED_POS.z, nonce: Date.now() });
       addLog("sleep", "Juro berjalan menuju sofa untuk tidur lelap.");
-      soundEffects.playSquish();
+      soundEffects.playClick();
     }
   }, [currentState, wakeUp, addLog]);
 
   const handleToggleSleep = useCallback(() => {
     if (currentState === "sleep") {
       wakeUp();
-      soundEffects.playBoing();
+      soundEffects.playWakeUp();
       addLog("interaction", "Juro terbangun segar dari tidurnya!");
       wakeCooldownUntilRef.current = Date.now() + 180_000;
       isHeadingToBedRef.current = false;
@@ -681,7 +690,7 @@ export const PetViewport: React.FC = () => {
       isHeadingToBedRef.current = true;
       setWalkCommand({ x: JURO_BED_POS.x, z: JURO_BED_POS.z, nonce: Date.now() });
       addLog("sleep", "Juro berjalan menuju sofa untuk tidur lelap.");
-      soundEffects.playSquish();
+      soundEffects.playClick();
     }
     setActiveTray("none");
   }, [currentState, wakeUp, addLog]);
@@ -747,21 +756,23 @@ export const PetViewport: React.FC = () => {
   }, [isNightSleep, currentState, isGrabActive, now, wakeUp, addLog]);
 
   const handleMenuAction = (action: "food" | "toy" | "sleep" | "bath" | "grab") => {
-    soundEffects.playClick();
     setJuroMenu({ open: false, x: 0, y: 0, isNearTop: false });
     setShowStatDetails(false);
 
     switch (action) {
       case "food":
+        soundEffects.playPop();
         setActiveTray("food");
         break;
       case "toy":
+        soundEffects.playPop();
         setActiveTray("toy");
         break;
       case "sleep":
         handleToggleSleep();
         break;
       case "bath":
+        soundEffects.playPop();
         setActiveTray("bath");
         break;
       case "grab":
@@ -1033,7 +1044,10 @@ export const PetViewport: React.FC = () => {
                     <span>Toko</span>
                   </Link>
                   <button
-                    onClick={() => setActiveTray("none")}
+                    onClick={() => {
+                      soundEffects.playDismiss();
+                      setActiveTray("none");
+                    }}
                     className="p-0.5 text-charcoal dark:text-neutral-300 hover:text-juro-orange cursor-pointer"
                     aria-label="Tutup menu makanan"
                   >
@@ -1109,7 +1123,10 @@ export const PetViewport: React.FC = () => {
                     </Link>
                   )}
                   <button
-                    onClick={() => setActiveTray("none")}
+                    onClick={() => {
+                      soundEffects.playDismiss();
+                      setActiveTray("none");
+                    }}
                     className="p-0.5 text-charcoal dark:text-neutral-300 hover:text-juro-orange cursor-pointer"
                     aria-label="Tutup menu mainan"
                   >
@@ -1161,7 +1178,10 @@ export const PetViewport: React.FC = () => {
                 </span>
               </div>
               <button
-                onClick={() => setActiveTray("none")}
+                onClick={() => {
+                  soundEffects.playDismiss();
+                  setActiveTray("none");
+                }}
                 className="p-0.5 text-charcoal dark:text-neutral-300 hover:text-juro-orange cursor-pointer"
                 aria-label="Tutup alat mandi"
               >

@@ -86,7 +86,7 @@ export const ShopPage: React.FC = () => {
       addLog("interaction", `Membeli ${qty}× ${name} di Toko (-${unitPrice * qty} koin).`);
       showToast(`+${qty} ${name}`, "success");
     } else {
-      soundEffects.playClick();
+      soundEffects.playError();
       showToast("Koin belum cukup", "warn");
     }
   };
@@ -94,12 +94,12 @@ export const ShopPage: React.FC = () => {
   const handleBuyToy = (toyId: string, name: string, price: number) => {
     const success = buyToy(toyId);
     if (success) {
-      soundEffects.playHappy();
+      soundEffects.playUnlock();
       triggerWalletPulse();
       addLog("interaction", `Membeli mainan permanen ${name} (-${price} koin).`);
       showToast(`${name} dimiliki`, "success");
     } else {
-      soundEffects.playClick();
+      soundEffects.playError();
       showToast("Koin belum cukup", "warn");
     }
   };
@@ -127,12 +127,12 @@ export const ShopPage: React.FC = () => {
   const handleUpgradePickaxe = (tierName: string, price: number) => {
     const success = upgradePickaxe();
     if (success) {
-      soundEffects.playHappy();
+      soundEffects.playUnlock();
       triggerWalletPulse();
       addLog("interaction", `Upgrade beliung ke ${tierName} (-${price} koin).`);
       showToast(`Upgrade: ${tierName}`, "success");
     } else {
-      soundEffects.playClick();
+      soundEffects.playError();
       showToast("Koin belum cukup", "warn");
     }
   };

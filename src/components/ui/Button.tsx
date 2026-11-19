@@ -29,7 +29,7 @@ export const Button: React.FC<ButtonProps> = ({
   const handleClick = (e: React.MouseEvent<HTMLButtonElement>) => {
     if (disabled || loading) return;
     if (playClickSound && soundEnabled) {
-      soundEffects.playSquish();
+      soundEffects.playClick();
     }
     onClick?.(e);
   };

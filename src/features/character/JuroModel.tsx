@@ -883,6 +883,7 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
 
           if (p >= 1) {
             j.active = false;
+            soundEffects.playPlop();
           }
         } else {
           const currentTarget = isHeadingToBedRef?.current
@@ -963,6 +964,7 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
               const landSurfaceY = getTerrainHeightAt(safeLanding.x, safeLanding.z);
               j.active = true;
               j.elapsed = 0;
+              soundEffects.playHop();
               j.duration = 0.52;
               j.startX = spring.position.x;
               j.startY = spring.position.y;
@@ -1548,6 +1550,7 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
         onClick={(e) => {
           e.stopPropagation();
           if (isDragging || isGrabActive) return;
+          soundEffects.playPet();
           if (fsm.currentState === "wander") {
             jumpRef.current.active = false;
             fsm.transitionTo("idle", true);

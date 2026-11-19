@@ -187,7 +187,7 @@ export const MiningPage: React.FC = () => {
   const handleDescendFloor = useCallback(() => {
     const nextFloor = descendMineFloor();
     if (nextFloor === null) return;
-    soundEffects.playBoing();
+    soundEffects.playStairs();
     setFloorTransitionKey((k) => k + 1);
     setBursts([]);
     showToast(`Turun ke Lantai ${nextFloor}`, "info");
@@ -208,6 +208,7 @@ export const MiningPage: React.FC = () => {
         const secs = Math.ceil((res.remainingMs ?? 0) / 1000);
         showToast(`Tunggu ${secs} detik lagi`, "warn");
       } else if (res.reason === "no-stamina") {
+        soundEffects.playError();
         showToast(`Butuh minimal ${MINE_RESET_COST} stamina`, "warn");
       }
       return;
@@ -251,6 +252,7 @@ export const MiningPage: React.FC = () => {
 
     if (!result.ok) {
       if (result.reason === "no-stamina") {
+        soundEffects.playTired();
         showToast(
           `Stamina habis! Pulih +1 ${formatCountdownSeconds(
             STAMINA_REGEN_MS - Math.max(0, now - miningStaminaUpdatedAt)

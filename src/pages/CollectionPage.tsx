@@ -16,7 +16,7 @@ export const CollectionPage: React.FC = () => {
 
   const handleEquip = (skinId: string, name: string) => {
     if (equipSkin(skinId)) {
-      soundEffects.playClick();
+      soundEffects.playEquip();
       addLog("interaction", `Mengganti tampilan warna Juro ke ${name}.`);
       showToast(`Warna: ${name}`, "info");
     }
@@ -24,11 +24,11 @@ export const CollectionPage: React.FC = () => {
 
   const handleUnlock = (skinId: string, name: string, costLabel: string) => {
     if (unlockSkin(skinId)) {
-      soundEffects.playHappy();
+      soundEffects.playUnlock();
       addLog("interaction", `Membuka koleksi warna ${name} (-${costLabel})!`);
       showToast(`Terbuka: ${name}`, "success");
     } else {
-      soundEffects.playClick();
+      soundEffects.playError();
       showToast("Kristal belum cukup", "warn");
     }
   };

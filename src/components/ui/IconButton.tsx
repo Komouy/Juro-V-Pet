@@ -29,7 +29,7 @@ export const IconButton: React.FC<IconButtonProps> = ({
   const handleClick = (e: React.MouseEvent<HTMLButtonElement>) => {
     if (disabled) return;
     if (playClickSound && soundEnabled) {
-      soundEffects.playSquish();
+      soundEffects.playClick();
     }
     onClick?.(e);
   };

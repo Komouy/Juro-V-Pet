@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import type { PetMood, PetBehaviorState, PetAttributes, FoodItem, ToyItem } from "../types/pet";
+import { soundEffects } from "../engine/audio/soundEffects";
 
 export const DEFAULT_FOODS: FoodItem[] = [
   {
@@ -144,6 +145,10 @@ export const usePetStore = create<PetState>((set, get) => ({
       xpToNextLevel: targetXP,
       recentlyLeveledUp: leveledUp ? true : state.recentlyLeveledUp,
     });
+
+    if (leveledUp) {
+      soundEffects.playLevelUp();
+    }
 
     return leveledUp;
   },
