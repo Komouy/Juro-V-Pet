@@ -36,6 +36,9 @@ import {
   chatWithJuro,
   computePetExpression,
   computePetActivity,
+  computePetLocation,
+  computePetEnvironment,
+  getContextualFallbackReply,
   type PetChatContext,
 } from "../../services/geminiService";
 
@@ -132,6 +135,8 @@ export const PetViewport: React.FC = () => {
   >([]);
   const lastBubbleSpawnRef = useRef<number>(0);
   const lastBubbleSoundRef = useRef<number>(0);
+  const lastInteractionSpeechAtRef = useRef<Record<string, number>>({});
+  const petStrokeCountRef = useRef<number>(0);
 
   const handlePopBubble = useCallback((bubbleId: number) => {
     soundEffects.playPop();
@@ -365,6 +370,20 @@ export const PetViewport: React.FC = () => {
         currentToyName: petState.currentToyBeingPlayed?.name,
       });
 
+      const loc = computePetLocation({
+        isSittingOnBench,
+        isInWater: inWater,
+        isSleeping,
+        currentState: petState.currentState,
+        position: { x: lastX, z: lastZ },
+      });
+
+      const ambient = computePetEnvironment({
+        isRaining: weather === "rain",
+        isNight,
+        isNightSleepy,
+      });
+
       return {
         name: petState.name,
         hunger: petState.hunger,
@@ -393,6 +412,9 @@ export const PetViewport: React.FC = () => {
         isSpontaneous,
         cognitiveTier,
         emotionalState,
+        locationName: loc.locationName,
+        locationDescription: loc.locationDescription,
+        ambientDescription: ambient,
       };
     },
     [weather, isPettingActive, isDraggingPet, isSittingOnBench]
@@ -489,6 +511,77 @@ export const PetViewport: React.FC = () => {
     isDraggingPet,
     getLiveChatContext,
   ]);
+
+  // Dynamic situational interaction speech (when fed, played with, bathed, or petted)
+  const triggerInteractionSpeech = useCallback(
+    async (
+      interaction: "feed" | "play" | "bath_scrub" | "bath_rinse" | "pet",
+      detail?: { food?: FoodItem; toy?: ToyItem }
+    ) => {
+      // Don't interrupt if user is actively in chat or if busy
+      if (speechBubble.isLoading) return;
+
+      // Throttle rapid repeated triggers of the same interaction type
+      const now = Date.now();
+      const lastTrigger = lastInteractionSpeechAtRef.current[interaction] ?? 0;
+      const cooldownMs =
+        interaction === "feed" || interaction === "play" || interaction === "bath_rinse"
+          ? 3500
+          : 9000;
+      if (now - lastTrigger < cooldownMs) return;
+      lastInteractionSpeechAtRef.current[interaction] = now;
+
+      const baseContext = getLiveChatContext(true);
+      const context: PetChatContext = {
+        ...baseContext,
+        isEating: interaction === "feed",
+        isPlaying: interaction === "play",
+        isBathing: interaction === "bath_scrub" || interaction === "bath_rinse",
+        isPetting: interaction === "pet",
+        currentFoodName: detail?.food?.name ?? baseContext.currentFoodName,
+        currentToyName: detail?.toy?.name ?? baseContext.currentToyName,
+        interactionType: interaction,
+      };
+
+      const promptInstruction =
+        interaction === "feed"
+          ? `[REAKSI MAKAN]: Kamu baru saja memakan ${detail?.food?.name || "makanan lezat"}. Bicaralah dengan gembira sambil mengunyah sesuai kesadaran dirimu di ${context.locationName}!`
+          : interaction === "play"
+          ? `[REAKSI MAIN]: Kamu baru saja bermain ${detail?.toy?.name || "mainan favorit"}. Bicaralah dengan riang gembira sesuai kesadaran dirimu di ${context.locationName}!`
+          : interaction === "bath_scrub"
+          ? `[REAKSI MANDI SABUN]: Tubuhmu sedang disabuni dengan busa wangi buah. Bicaralah merasa geli dan segar di ${context.locationName}!`
+          : interaction === "bath_rinse"
+          ? `[REAKSI BILAS AIR]: Kamu selesai dibilas air sejuk lembah dan berkilau bersih. Bicaralah segar dan senang!`
+          : `[REAKSI DIELUS]: Pemilikmu sedang mengelus tubuh jelimu dengan hangat. Bicaralah manja dan nyaman di ${context.locationName}!`;
+
+      try {
+        const reply = await chatWithJuro(promptInstruction, context);
+        setSpeechBubble({
+          text: reply,
+          isLoading: false,
+          visible: true,
+        });
+        soundEffects.playPop();
+
+        if (speechTimerRef.current) clearTimeout(speechTimerRef.current);
+        speechTimerRef.current = window.setTimeout(() => {
+          setSpeechBubble((prev) => ({ ...prev, visible: false }));
+        }, 7500);
+      } catch {
+        const fallback = getContextualFallbackReply(context, promptInstruction);
+        setSpeechBubble({
+          text: fallback,
+          isLoading: false,
+          visible: true,
+        });
+        if (speechTimerRef.current) clearTimeout(speechTimerRef.current);
+        speechTimerRef.current = window.setTimeout(() => {
+          setSpeechBubble((prev) => ({ ...prev, visible: false }));
+        }, 6500);
+      }
+    },
+    [speechBubble.isLoading, getLiveChatContext]
+  );
 
   // Autonomous Spontaneous Chatter Loop (every 24 - 50 seconds randomly)
   useEffect(() => {
@@ -604,6 +697,11 @@ export const PetViewport: React.FC = () => {
           soundEffects.playPurr();
         }
         strokePet();
+        petStrokeCountRef.current += 1;
+        if (petStrokeCountRef.current >= 4) {
+          petStrokeCountRef.current = 0;
+          triggerInteractionSpeech("pet");
+        }
 
         const juroPos = juroScreenPosRef.current;
         if (juroPos) {
@@ -633,7 +731,7 @@ export const PetViewport: React.FC = () => {
       window.removeEventListener("pointermove", onPointerMove);
       window.removeEventListener("pointerup", onPointerUp);
     };
-  }, [isPettingActive, strokePet]);
+  }, [isPettingActive, strokePet, triggerInteractionSpeech]);
 
   // Lightweight 60fps RAF loop to keep Juro menu anchored directly above Juro in screen coordinates
   useEffect(() => {
@@ -754,8 +852,9 @@ export const PetViewport: React.FC = () => {
         `Memberikan ${food.name} kepada Juro. (+${food.hungerRestore} Lapar, +${food.xpReward} XP)`
       );
       setActiveTray("none");
+      triggerInteractionSpeech("feed", { food });
     },
-    [consumeFood, feedWithItem, addLog, setActiveTray]
+    [consumeFood, feedWithItem, addLog, setActiveTray, triggerInteractionSpeech]
   );
 
   const triggerPlay = useCallback(
@@ -770,8 +869,9 @@ export const PetViewport: React.FC = () => {
         `${actionVerb} ${toy.name}. (+${toy.happinessGain} Bahagia, +${toy.xpReward} XP)`
       );
       setActiveTray("none");
+      triggerInteractionSpeech("play", { toy });
     },
-    [playWithItem, addLog, setActiveTray]
+    [playWithItem, addLog, setActiveTray, triggerInteractionSpeech]
   );
 
   const finishBathRinse = useCallback(() => {
@@ -783,7 +883,8 @@ export const PetViewport: React.FC = () => {
     addLog("clean", "Juro selesai disabuni dan dibilas hingga bersih berkilau!");
     hadMeaningfulSoapRef.current = false;
     setSoapBadgePercent(0);
-  }, [clean, addLog]);
+    triggerInteractionSpeech("bath_rinse");
+  }, [clean, addLog, triggerInteractionSpeech]);
 
   // Imperatively start/stop water rinse timer without React re-renders
   const stopRinseLoop = useCallback(() => {
@@ -930,6 +1031,7 @@ export const PetViewport: React.FC = () => {
           bathStateRef.current.soapLevel = nextSoap;
           if (nextSoap >= 0.3) {
             hadMeaningfulSoapRef.current = true;
+            triggerInteractionSpeech("bath_scrub");
           }
 
           const nowMs = Date.now();
@@ -1032,7 +1134,16 @@ export const PetViewport: React.FC = () => {
       window.removeEventListener("pointerup", handlePointerUp);
       window.removeEventListener("pointercancel", handlePointerUp);
     };
-  }, [isDraggingTool, checkOverJuro, startRinseLoop, stopRinseLoop, triggerFeed, triggerPlay, wakeUp]);
+  }, [
+    isDraggingTool,
+    checkOverJuro,
+    startRinseLoop,
+    stopRinseLoop,
+    triggerFeed,
+    triggerPlay,
+    triggerInteractionSpeech,
+    wakeUp,
+  ]);
 
   // Synchronize camera reset triggered globally from Navbar
   const cameraResetNonce = useUIStore((s) => s.cameraResetNonce);
