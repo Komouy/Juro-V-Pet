@@ -1,5 +1,5 @@
 import React from "react";
-import { Utensils, Gamepad2, Sun, Moon, Droplets, Hand } from "lucide-react";
+import { Utensils, Gamepad2, Sun, Moon, Droplets, HandHeart } from "lucide-react";
 
 export interface JuroContextMenuProps {
   open: boolean;
@@ -8,7 +8,7 @@ export interface JuroContextMenuProps {
   isNearTop: boolean;
   currentState: string;
   totalFoodStock: number;
-  onAction: (action: "food" | "toy" | "sleep" | "bath" | "grab") => void;
+  onAction: (action: "food" | "toy" | "sleep" | "bath" | "pet") => void;
   menuRef?: React.RefObject<HTMLDivElement | null>;
   tailRef?: React.RefObject<HTMLDivElement | null>;
 }
@@ -104,14 +104,14 @@ export const JuroContextMenu: React.FC<JuroContextMenuProps> = ({
           <span className="leading-none">Mandi</span>
         </button>
 
-        {/* 5. Pegang */}
+        {/* 5. Elus */}
         <button
           type="button"
-          onClick={() => onAction("grab")}
-          className="relative flex flex-col sm:flex-row items-center justify-center gap-0.5 sm:gap-1.5 px-1.5 sm:px-2.5 py-1.5 bg-white dark:bg-neutral-800 text-charcoal dark:text-white border-2 border-charcoal dark:border-neutral-600 shadow-[2px_2px_0px_#171717] dark:shadow-[2px_2px_0px_#000000] hover:border-juro-orange hover:text-juro-orange active:translate-x-[1px] active:translate-y-[1px] active:shadow-none pixel-text text-[7.5px] sm:text-[9.5px] uppercase font-bold tracking-tight sm:tracking-wider transition-all cursor-pointer select-none min-w-[48px] sm:min-w-0"
+          onClick={() => onAction("pet")}
+          className="relative flex flex-col sm:flex-row items-center justify-center gap-0.5 sm:gap-1.5 px-1.5 sm:px-2.5 py-1.5 bg-white dark:bg-neutral-800 text-charcoal dark:text-white border-2 border-charcoal dark:border-neutral-600 shadow-[2px_2px_0px_#171717] dark:shadow-[2px_2px_0px_#000000] hover:border-rose-500 hover:text-rose-500 active:translate-x-[1px] active:translate-y-[1px] active:shadow-none pixel-text text-[7.5px] sm:text-[9.5px] uppercase font-bold tracking-tight sm:tracking-wider transition-all cursor-pointer select-none min-w-[48px] sm:min-w-0"
         >
-          <Hand size={14} strokeWidth={2.5} className="text-juro-orange shrink-0" />
-          <span className="leading-none">Pegang</span>
+          <HandHeart size={14} strokeWidth={2.5} className="text-rose-500 shrink-0" />
+          <span className="leading-none">Elus</span>
         </button>
       </div>
     </div>

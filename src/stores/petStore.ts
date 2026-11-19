@@ -68,6 +68,7 @@ interface PetState {
   lastUpdated: number;
   lastSleepRewardAt: number;
   lastCleanRewardAt: number;
+  lastPetRewardAt: number;
 
   // Level Up Alert State
   recentlyLeveledUp: boolean;
@@ -83,6 +84,7 @@ interface PetState {
   wakeUp: () => void;
   recoverSleepEnergy: (amount?: number) => void;
   clean: () => void;
+  strokePet: () => void;
   setBehaviorState: (state: PetBehaviorState) => void;
   recalculateFromTimestamp: () => void;
   getMood: () => PetMood;
@@ -104,6 +106,7 @@ export const usePetStore = create<PetState>((set, get) => ({
   lastUpdated: Date.now(),
   lastSleepRewardAt: 0,
   lastCleanRewardAt: 0,
+  lastPetRewardAt: 0,
   recentlyLeveledUp: false,
 
   clearLevelUpAlert: () => set({ recentlyLeveledUp: false }),
@@ -246,6 +249,23 @@ export const usePetStore = create<PetState>((set, get) => ({
 
     if (canRewardXp) {
       get().addXP(15);
+    }
+  },
+
+  strokePet: () => {
+    const now = Date.now();
+    const canRewardXp = now - get().lastPetRewardAt >= 4_000;
+
+    set((s) => ({
+      affection: Math.min(100, s.affection + 6),
+      happiness: Math.min(100, s.happiness + 4),
+      currentState: s.currentState === "sleep" ? "sleep" : "happy",
+      lastUpdated: now,
+      lastPetRewardAt: canRewardXp ? now : s.lastPetRewardAt,
+    }));
+
+    if (canRewardXp) {
+      get().addXP(6);
     }
   },
 

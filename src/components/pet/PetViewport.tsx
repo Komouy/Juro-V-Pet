@@ -12,7 +12,7 @@ import {
 } from "../../features/character/JuroModel";
 import { OutdoorEnvironment } from "./OutdoorEnvironment";
 import { ItemIllustration } from "../items/ItemIllustration";
-import { Hand } from "lucide-react";
+import { HandHeart } from "lucide-react";
 import { usePetStore } from "../../stores/petStore";
 import { useGameStore } from "../../stores/gameStore";
 import { useUIStore } from "../../stores/uiStore";
@@ -70,6 +70,7 @@ export const PetViewport: React.FC = () => {
     wakeUp,
     recoverSleepEnergy,
     clean,
+    strokePet,
   } = usePetStore();
   const { addLog, addCoins, foodInventory, ownedToys, consumeFood } = useGameStore();
 
@@ -87,11 +88,12 @@ export const PetViewport: React.FC = () => {
     isNearTop: false,
   });
 
-  const [isGrabActive, setIsGrabActive] = useState(false);
+  const [isPettingActive, setIsPettingActive] = useState(false);
+  const [hearts, setHearts] = useState<{ id: number; x: number; y: number; dx: number }[]>([]);
+  const juroWorldPosRef = useRef<THREE.Vector3>(new THREE.Vector3(0, -0.45, -0.35));
   const [isDraggingPet, setIsDraggingPet] = useState(false);
   const isHeadingToBedRef = useRef<boolean>(false);
   const wakeCooldownUntilRef = useRef<number>(0);
-  const dragPointerNDC = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
 
   const juroMenuRef = useRef<HTMLDivElement>(null);
   const tailRef = useRef<HTMLDivElement>(null);
@@ -101,18 +103,10 @@ export const PetViewport: React.FC = () => {
   const [soapBadgePercent, setSoapBadgePercent] = useState(0);
   const [walkCommand, setWalkCommand] = useState<WalkCommand | null>(null);
 
-  const handleFinishGrab = useCallback(() => {
-    setIsGrabActive(false);
-    soundEffects.playBoing();
-    soundEffects.playPlop();
-    addLog("interaction", "Juro ditaruh kembali dengan aman di tanah.");
-  }, [addLog]);
-
   const handleWalkPointSelect = useCallback(
     (x: number, z: number) => {
-      if (isGrabActive) {
-        handleFinishGrab();
-        return;
+      if (isPettingActive) {
+        setIsPettingActive(false);
       }
       soundEffects.playGuideTap();
       setJuroMenu({ open: false, x: 0, y: 0, isNearTop: false });
@@ -120,22 +114,22 @@ export const PetViewport: React.FC = () => {
       setShowStatDetails(false);
       setWalkCommand({ x, z, nonce: Date.now() });
     },
-    [isGrabActive, handleFinishGrab, setActiveTray, setShowStatDetails]
+    [isPettingActive, setActiveTray, setShowStatDetails]
   );
 
   const handleOpenShopFromMap = useCallback(() => {
-    if (isGrabActive) handleFinishGrab();
+    if (isPettingActive) setIsPettingActive(false);
     setJuroMenu({ open: false, x: 0, y: 0, isNearTop: false });
     soundEffects.playClick();
     navigate("/shop");
-  }, [isGrabActive, handleFinishGrab, navigate]);
+  }, [isPettingActive, navigate]);
 
   const handleOpenMineFromMap = useCallback(() => {
-    if (isGrabActive) handleFinishGrab();
+    if (isPettingActive) setIsPettingActive(false);
     setJuroMenu({ open: false, x: 0, y: 0, isNearTop: false });
     soundEffects.playClick();
     navigate("/mine");
-  }, [isGrabActive, handleFinishGrab, navigate]);
+  }, [isPettingActive, navigate]);
 
   const handlePetClick = useCallback(
     (screenPos?: { x: number; y: number }) => {
@@ -192,12 +186,12 @@ export const PetViewport: React.FC = () => {
     [juroMenu.open]
   );
 
-  // Dismiss open trays / stat popover / Juro menu on Escape key
+  // Dismiss open trays / stat popover / Juro menu / Petting Mode on Escape key
   useEffect(() => {
-    if (activeTray === "none" && !showStatDetails && !juroMenu.open && !isGrabActive) return;
+    if (activeTray === "none" && !showStatDetails && !juroMenu.open && !isPettingActive) return;
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
-        if (isGrabActive) handleFinishGrab();
+        if (isPettingActive) setIsPettingActive(false);
         setActiveTray("none");
         setShowStatDetails(false);
         setJuroMenu({ open: false, x: 0, y: 0, isNearTop: false });
@@ -205,7 +199,7 @@ export const PetViewport: React.FC = () => {
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [activeTray, showStatDetails, juroMenu.open, isGrabActive, handleFinishGrab]);
+  }, [activeTray, showStatDetails, juroMenu.open, isPettingActive]);
 
   // Dismiss Juro menu when tapping/clicking outside (supporting both mouse and touch)
   useEffect(() => {
@@ -236,40 +230,56 @@ export const PetViewport: React.FC = () => {
     return () => controls.removeEventListener("start", onOrbitStart);
   }, []);
 
-  // Continuous pointer tracking during Grab Mode (Pegang)
+  // Continuous pointer tracking during Direct Petting Mode
   useEffect(() => {
-    if (!isGrabActive) return;
-    let downTime = 0;
-    let movedDistance = 0;
-    let startX = 0;
-    let startY = 0;
+    if (!isPettingActive) return;
+    let lastX = 0;
+    let lastY = 0;
+    let strokeDist = 0;
+    let lastSoundAt = 0;
+    let isDown = false;
 
     const onPointerDown = (e: PointerEvent) => {
-      downTime = Date.now();
-      movedDistance = 0;
-      startX = e.clientX;
-      startY = e.clientY;
+      isDown = true;
+      lastX = e.clientX;
+      lastY = e.clientY;
+      strokeDist = 0;
     };
 
     const onPointerMove = (e: PointerEvent) => {
-      if (downTime > 0) {
-        const dist = Math.hypot(e.clientX - startX, e.clientY - startY);
-        movedDistance = Math.max(movedDistance, dist);
-      }
-      if (containerRef.current) {
-        const rect = containerRef.current.getBoundingClientRect();
-        const nx = ((e.clientX - rect.left) / rect.width) * 2 - 1;
-        const ny = -(((e.clientY - rect.top) / rect.height) * 2 - 1);
-        dragPointerNDC.current = { x: nx, y: ny };
+      if (!isDown) return;
+      const step = Math.hypot(e.clientX - lastX, e.clientY - lastY);
+      lastX = e.clientX;
+      lastY = e.clientY;
+      strokeDist += step;
+
+      if (strokeDist > 26) {
+        strokeDist = 0;
+        const nowMs = Date.now();
+        if (nowMs - lastSoundAt > 200) {
+          lastSoundAt = nowMs;
+          soundEffects.playPet();
+        }
+        strokePet();
+
+        const juroPos = juroScreenPosRef.current;
+        if (juroPos) {
+          const heartId = nowMs + Math.random();
+          const spawnX = juroPos.x + (Math.random() - 0.5) * 44;
+          const spawnY = (juroPos.headY ?? (juroPos.y - juroPos.radiusPx)) - 14;
+          setHearts((prev) => [
+            ...prev.slice(-5),
+            { id: heartId, x: spawnX, y: spawnY, dx: (Math.random() - 0.5) * 28 },
+          ]);
+          setTimeout(() => {
+            setHearts((prev) => prev.filter((h) => h.id !== heartId));
+          }, 850);
+        }
       }
     };
 
     const onPointerUp = () => {
-      // If user dragged on screen (> 18px moved), releasing finger drops Juro at that spot
-      if (downTime > 0 && movedDistance > 18) {
-        handleFinishGrab();
-      }
-      downTime = 0;
+      isDown = false;
     };
 
     window.addEventListener("pointerdown", onPointerDown);
@@ -280,7 +290,7 @@ export const PetViewport: React.FC = () => {
       window.removeEventListener("pointermove", onPointerMove);
       window.removeEventListener("pointerup", onPointerUp);
     };
-  }, [isGrabActive, handleFinishGrab]);
+  }, [isPettingActive, strokePet]);
 
   // Lightweight 60fps RAF loop to keep Juro menu anchored directly above Juro in screen coordinates
   useEffect(() => {
@@ -730,8 +740,8 @@ export const PetViewport: React.FC = () => {
       return;
     }
 
-    // Don't interrupt feeding, scrubbing or grabbing
-    if (currentState === "eating" || currentState === "dragging" || isGrabActive) {
+    // Don't interrupt feeding, scrubbing or petting
+    if (currentState === "eating" || isPettingActive) {
       return;
     }
 
@@ -744,9 +754,9 @@ export const PetViewport: React.FC = () => {
         `Waktu malam telah tiba (pukul ${now.getHours()}:00). Juro berjalan menuju sofa tidurnya untuk tidur pulas.`
       );
     }
-  }, [isNightSleep, currentState, isGrabActive, now, wakeUp, addLog]);
+  }, [isNightSleep, currentState, isPettingActive, now, wakeUp, addLog]);
 
-  const handleMenuAction = (action: "food" | "toy" | "sleep" | "bath" | "grab") => {
+  const handleMenuAction = (action: "food" | "toy" | "sleep" | "bath" | "pet") => {
     setJuroMenu({ open: false, x: 0, y: 0, isNearTop: false });
     setShowStatDetails(false);
 
@@ -766,9 +776,10 @@ export const PetViewport: React.FC = () => {
         soundEffects.playPop();
         setActiveTray("bath");
         break;
-      case "grab":
-        setIsGrabActive(true);
-        soundEffects.playSquish();
+      case "pet":
+        soundEffects.playHappy();
+        setIsPettingActive(true);
+        addLog("play", "Mengelus tubuh Juro dengan penuh kasih sayang! 💕");
         break;
     }
   };
@@ -788,14 +799,14 @@ export const PetViewport: React.FC = () => {
 
   const totalFoodStock = SHOP_FOODS.reduce((acc, f) => acc + (foodInventory[f.id] ?? 0), 0);
 
-  const orbitEnabled = !isGrabActive && !isDraggingPet && !isDraggingTool;
+  const orbitEnabled = !isPettingActive && !isDraggingPet && !isDraggingTool;
 
   return (
     <div
       ref={containerRef}
       style={{ background: activeTheme.skyGradient }}
       className={`relative flex-1 min-h-0 w-full overflow-hidden select-none touch-none transition-all duration-700 ${
-        isGrabActive || isDraggingPet ? "cursor-grabbing" : "cursor-default"
+        isPettingActive ? "cursor-grab" : isDraggingPet ? "cursor-grabbing" : "cursor-default"
       }`}
     >
       {/* Top Overlay Bar: Compact Tap-to-Peek Stat Strip */}
@@ -824,8 +835,8 @@ export const PetViewport: React.FC = () => {
         }}
       >
         <Suspense fallback={null}>
-          {/* Adaptive Responsive Camera Distance for Desktop & Mobile */}
-          <ResponsiveCamera controlsRef={controlsRef} />
+          {/* Adaptive Responsive Camera Following Juro Across Valley */}
+          <ResponsiveCamera controlsRef={controlsRef} targetPosRef={juroWorldPosRef} />
 
           {/* Dynamic Lighting Synced to User's Time of Day */}
           <ambientLight
@@ -865,20 +876,20 @@ export const PetViewport: React.FC = () => {
             onBedClick={handleBedClick}
           />
 
-          {/* Juro Pocket-Sized 3D Slime Model with Crawling, Jumping, Bathing & Pegang */}
+          {/* Juro Pocket-Sized 3D Slime Model with Crawling, Jumping, Bathing & Elus */}
           <JuroModel
             onDraggingChange={handleDraggingPetChange}
             bathStateRef={bathStateRef}
             juroScreenPosRef={juroScreenPosRef}
+            juroWorldPosRef={juroWorldPosRef}
             walkCommand={walkCommand}
             onPetClick={handlePetClick}
-            isGrabActive={isGrabActive}
-            dragPointerNDC={dragPointerNDC}
+            isPettingActive={isPettingActive}
             isHeadingToBedRef={isHeadingToBedRef}
             onBedArrival={handleBedArrival}
           />
 
-          {/* Wide Diorama Orbit Controls — automatically paused while grabbing Juro or dragging any item */}
+          {/* Wide Diorama Orbit Controls — centered on Juro */}
           <OrbitControls
             ref={controlsRef}
             enabled={orbitEnabled}
@@ -944,22 +955,39 @@ export const PetViewport: React.FC = () => {
         tailRef={tailRef}
       />
 
-      {/* Floating Grab Guide Pill when Juro is actively held */}
-      {isGrabActive && (
+      {/* Floating Petting Guide Pill when Petting Mode is active */}
+      {isPettingActive && (
         <div className="animate-tray-enter fixed sm:absolute bottom-6 inset-x-0 mx-auto w-fit z-30 flex items-center gap-2 px-3 py-1.5 bg-warm-white/95 dark:bg-neutral-900/95 border-2 border-charcoal dark:border-neutral-600 shadow-[3px_3px_0px_#171717] dark:shadow-[3px_3px_0px_#000000]">
-          <Hand size={14} className="text-juro-orange animate-bounce shrink-0" />
+          <HandHeart size={14} className="text-rose-500 animate-pulse shrink-0" />
           <span className="pixel-text text-[9px] sm:text-[10px] uppercase font-bold text-charcoal dark:text-white">
-            Seret Juro ke Mana Saja
+            Elus Tubuh Juro 💕
           </span>
           <button
             type="button"
-            onClick={handleFinishGrab}
-            className="px-2 py-0.5 bg-juro-orange text-white border border-charcoal hover:bg-orange-600 active:translate-x-[1px] active:translate-y-[1px] pixel-text text-[8px] sm:text-[9px] uppercase font-bold cursor-pointer"
+            onClick={() => setIsPettingActive(false)}
+            className="px-2 py-0.5 bg-rose-500 text-white border border-charcoal hover:bg-rose-600 active:translate-x-[1px] active:translate-y-[1px] pixel-text text-[8px] sm:text-[9px] uppercase font-bold cursor-pointer"
           >
-            Taruh
+            Selesai
           </button>
         </div>
       )}
+
+      {/* Floating Affection Hearts */}
+      {hearts.map((h) => (
+        <div
+          key={h.id}
+          style={
+            {
+              left: `${h.x}px`,
+              top: `${h.y}px`,
+              "--dx": `${h.dx}px`,
+            } as React.CSSProperties
+          }
+          className="pointer-events-none absolute z-40 animate-pet-heart text-rose-500 font-bold select-none text-xl drop-shadow-[0_1px_2px_rgba(0,0,0,0.3)]"
+        >
+          💕
+        </div>
+      ))}
     </div>
   );
 };

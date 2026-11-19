@@ -1,4 +1,4 @@
-import React, { useRef, useState, useMemo, useEffect } from "react";
+import React, { useRef, useMemo, useEffect } from "react";
 import { useFrame, useThree } from "@react-three/fiber";
 import * as THREE from "three";
 import { SpringOscillator3D } from "../../engine/physics/SpringOscillator";
@@ -34,11 +34,8 @@ const JURO_COLLISION_RADIUS = 1.14 * JURO_BASE_SCALE;
 const _projCenter = new THREE.Vector3();
 const _projEdge = new THREE.Vector3();
 const _bathDummy = new THREE.Object3D();
-const _camDir = new THREE.Vector3();
 const _targetVec = new THREE.Vector3();
 const _bedTargetVec = new THREE.Vector3();
-const _intersectVec = new THREE.Vector3();
-const _activePointerVec = new THREE.Vector2();
 
 function lerpAngle(current: number, target: number, alpha: number): number {
   let diff = ((target - current + Math.PI) % (Math.PI * 2)) - Math.PI;
@@ -71,20 +68,20 @@ export interface JuroModelProps {
   juroScreenPosRef?: React.RefObject<JuroScreenTarget>;
   walkCommand?: WalkCommand | null;
   onPetClick?: (screenPos: { x: number; y: number }) => void;
-  isGrabActive?: boolean;
-  dragPointerNDC?: React.RefObject<{ x: number; y: number }>;
+  isPettingActive?: boolean;
+  juroWorldPosRef?: React.RefObject<THREE.Vector3>;
   isHeadingToBedRef?: React.RefObject<boolean>;
   onBedArrival?: () => void;
 }
 
 export const JuroModel: React.FC<JuroModelProps> = React.memo(({
-  onDraggingChange,
+  onDraggingChange: _onDraggingChange,
   bathStateRef,
   juroScreenPosRef,
   walkCommand,
   onPetClick,
-  isGrabActive = false,
-  dragPointerNDC,
+  isPettingActive = false,
+  juroWorldPosRef,
   isHeadingToBedRef,
   onBedArrival,
 }) => {
@@ -232,12 +229,6 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
     fsm.timeInState = 0;
     setBehaviorState("wander");
   }, [walkCommand, fsm, setBehaviorState, isHeadingToBedRef]);
-
-  // Interaction state
-  const [isDragging, setIsDragging] = useState(false);
-  const dragPlane = useMemo(() => new THREE.Plane(new THREE.Vector3(0, 0, 1), 0), []);
-  const lastPointerPos = useRef(new THREE.Vector3());
-  const pointerSpeed = useRef(0);
 
   // Eye blinking state
   const blinkState = useRef({ timer: 0, nextBlink: 2.5, isBlinking: false });
@@ -392,61 +383,33 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
     return shape;
   }, []);
 
-  // Handle Grab Mode (Pegang) activation / release
+  // Handle Petting Mode (Elus) activation / focus
   useEffect(() => {
-    if (isGrabActive) {
-      onDraggingChange?.(true);
-      setIsDragging(true);
+    if (isPettingActive) {
       jumpRef.current.active = false;
-      fsm.transitionTo("dragging", true);
-      setBehaviorState("dragging");
-      soundEffects.playSquish();
-
-      camera.getWorldDirection(_camDir);
-      dragPlane.setFromNormalAndCoplanarPoint(_camDir, spring.position);
-
-      lastPointerPos.current.copy(spring.position);
-      pointerSpeed.current = 0;
-      dizzyRef.current.buildup = 0;
-      dizzyRef.current.dragAge = 0;
-
-      spring.applyImpulse(new THREE.Vector3(0, 0.55, 0));
-    } else {
-      if (isDragging) {
-        onDraggingChange?.(false);
-        setIsDragging(false);
-        const nextState = dizzyRef.current.timer > 0.2 ? "idle" : "happy";
-        fsm.transitionTo(nextState, true);
-        setBehaviorState(nextState);
-        const landX = THREE.MathUtils.clamp(spring.position.x, MAP_BOUNDS.minX, MAP_BOUNDS.maxX);
-        const landZ = THREE.MathUtils.clamp(spring.position.z, MAP_BOUNDS.minZ, MAP_BOUNDS.maxZ);
-        const landY = getTerrainHeightAt(landX, landZ) + BODY_BOTTOM_OFFSET;
-        spring.setTarget(new THREE.Vector3(landX, landY, landZ));
-        if (dizzyRef.current.timer <= 0.2) {
-          soundEffects.playBoing();
-        }
+      if (fsm.currentState !== "sleep") {
+        fsm.transitionTo("happy", true);
+        setBehaviorState("happy");
       }
     }
-  }, [isGrabActive, isDragging, camera, dragPlane, fsm, onDraggingChange, setBehaviorState, spring]);
+  }, [isPettingActive, fsm, setBehaviorState]);
 
   useFrame((state, delta) => {
     const t = state.clock.getElapsedTime();
 
     // 1. Update Autonomous Behavior Engine
-    if (!isDragging) {
-      if (isHeadingToBedRef?.current) {
-        // Keep Juro locked into wander mode moving towards bed without autonomous distraction
-        if (fsm.currentState !== "wander") {
-          fsm.transitionTo("wander", true);
-          setBehaviorState("wander");
-        }
-        fsm.stateDuration = 24.0;
-        fsm.timeInState = 0;
-      } else {
-        const activeState = fsm.update(delta, attributes, mood);
-        if (activeState !== storeState) {
-          setBehaviorState(activeState);
-        }
+    if (isHeadingToBedRef?.current) {
+      // Keep Juro locked into wander mode moving towards bed without autonomous distraction
+      if (fsm.currentState !== "wander") {
+        fsm.transitionTo("wander", true);
+        setBehaviorState("wander");
+      }
+      fsm.stateDuration = 24.0;
+      fsm.timeInState = 0;
+    } else {
+      const activeState = fsm.update(delta, attributes, mood);
+      if (activeState !== storeState) {
+        setBehaviorState(activeState);
       }
     }
 
@@ -461,90 +424,18 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
     let crawlScaleY = 1;
     let crawlScaleZ = 1;
 
-    if (isDragging) {
-      if (dragPointerNDC?.current) {
-        _activePointerVec.set(dragPointerNDC.current.x, dragPointerNDC.current.y);
-      } else {
-        _activePointerVec.copy(state.pointer);
+    if (isHeadingToBedRef?.current) {
+      const distToBed = Math.hypot(
+        spring.position.x - JURO_BED_POS.x,
+        spring.position.z - JURO_BED_POS.z
+      );
+      if (distToBed < 0.45) {
+        onBedArrival?.();
       }
-      state.raycaster.setFromCamera(_activePointerVec, camera);
-      if (state.raycaster.ray.intersectPlane(dragPlane, _intersectVec)) {
-        const resolvedDrag = resolveHorizontalCollisions(
-          _intersectVec.x,
-          _intersectVec.z,
-          _intersectVec.y,
-          JURO_COLLISION_RADIUS,
-          false
-        );
-        _targetVec.x = resolvedDrag.x;
-        _targetVec.z = resolvedDrag.z;
-        const groundAtDrag = getTerrainHeightAt(_targetVec.x, _targetVec.z);
-        _targetVec.y = groundAtDrag + BODY_BOTTOM_OFFSET + 0.35;
+    }
 
-        spring.setTarget(_targetVec);
-
-        const dt = Math.max(delta, 0.016);
-        dizzyRef.current.dragAge += dt;
-
-        const vx = (_targetVec.x - lastPointerPos.current.x) / dt;
-        const vy = (_targetVec.y - lastPointerPos.current.y) / dt;
-        const rawSpeed = Math.hypot(vx, vy);
-        pointerSpeed.current = THREE.MathUtils.lerp(pointerSpeed.current, rawSpeed, 0.25);
-
-        // Ignore initial 0.08s grab settle; require genuinely fast upward/right/left fling or rapid shake
-        if (dizzyRef.current.dragAge > 0.08) {
-          const isFastUpOrSide =
-            (vy > 7.5 || Math.abs(vx) > 8.5) && pointerSpeed.current > 7.5;
-          const isVeryFastShake = pointerSpeed.current > 10.5;
-
-          if (isFastUpOrSide || isVeryFastShake) {
-            dizzyRef.current.buildup = Math.min(
-              2.2,
-              dizzyRef.current.buildup + dt * (pointerSpeed.current * 0.42)
-            );
-            if (dizzyRef.current.buildup >= 1.35) {
-              dizzyRef.current.timer = 3.2;
-              if (t - dizzyRef.current.lastSoundAt > 1.35) {
-                dizzyRef.current.lastSoundAt = t;
-                soundEffects.playDizzy();
-              }
-            }
-          } else {
-            dizzyRef.current.buildup = Math.max(0, dizzyRef.current.buildup - dt * 2.2);
-          }
-        }
-
-        // Tilt Juro subtly into fast drag momentum
-        if (groupRef.current) {
-          const targetTiltZ = THREE.MathUtils.clamp(-vx * 0.024, -0.3, 0.3) * motionScale;
-          groupRef.current.rotation.z = THREE.MathUtils.lerp(
-            groupRef.current.rotation.z,
-            targetTiltZ,
-            0.22
-          );
-        }
-
-        lastPointerPos.current.copy(_targetVec);
-      }
-    } else {
-      pointerSpeed.current = THREE.MathUtils.lerp(pointerSpeed.current, 0, 0.1);
-      dizzyRef.current.buildup = Math.max(0, dizzyRef.current.buildup - delta * 1.8);
-      if (dizzyRef.current.timer > 0) {
-        dizzyRef.current.timer = Math.max(0, dizzyRef.current.timer - delta);
-      }
-
-      if (isHeadingToBedRef?.current) {
-        const distToBed = Math.hypot(
-          spring.position.x - JURO_BED_POS.x,
-          spring.position.z - JURO_BED_POS.z
-        );
-        if (distToBed < 0.45) {
-          onBedArrival?.();
-        }
-      }
-
-      const currGroundY = getTerrainHeightAt(spring.position.x, spring.position.z);
-      const restY = currGroundY + BODY_BOTTOM_OFFSET;
+    const currGroundY = getTerrainHeightAt(spring.position.x, spring.position.z);
+    const restY = currGroundY + BODY_BOTTOM_OFFSET;
 
       if (currentState === "wander") {
         const j = jumpRef.current;
@@ -789,7 +680,6 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
           }
         }
       }
-    }
 
     // 3. Physics simulation step + solid obstacle collision enforcement
     spring.update(delta);
@@ -860,7 +750,13 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
         groupRef.current.rotation.z = Math.sin(t * 24) * 0.05 * motionScale;
         groupRef.current.scale.y *= 0.94 + Math.sin(t * 20) * 0.025;
         groupRef.current.scale.x *= 1.04;
-      } else if (isDizzyActive && !isDragging) {
+      } else if (isPettingActive) {
+        // Sweet affectionate purr vibration and squishy cozy loaf pose!
+        groupRef.current.rotation.z = Math.sin(t * 14) * 0.035 * motionScale;
+        groupRef.current.scale.y *= 0.93 + Math.sin(t * 12) * 0.02;
+        groupRef.current.scale.x *= 1.05;
+        groupRef.current.scale.z *= 1.05;
+      } else if (isDizzyActive) {
         // Woozy circular sway + soft jelly wobble while recovering from being flung fast
         groupRef.current.rotation.z = Math.sin(t * 5.4) * 0.24 * dizzyFade * motionScale;
         groupRef.current.rotation.x = Math.cos(t * 5.4) * 0.12 * dizzyFade * motionScale;
@@ -892,11 +788,8 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
         juroScreenPosRef.current.radiusPx = Math.max(52, Math.abs(ex - cx) * 1.55);
       }
 
-      if (isDragging) {
-        const leanZ = -spring.velocity.x * 0.08;
-        const leanX = spring.velocity.y * 0.04;
-        groupRef.current.rotation.z = THREE.MathUtils.lerp(groupRef.current.rotation.z, leanZ, 0.15);
-        groupRef.current.rotation.x = THREE.MathUtils.lerp(groupRef.current.rotation.x, leanX, 0.15);
+      if (juroWorldPosRef?.current) {
+        juroWorldPosRef.current.copy(spring.position);
       }
     }
 
@@ -1005,8 +898,8 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
       : 1;
 
     if (leftEyeRef.current && rightEyeRef.current) {
-      leftEyeRef.current.visible = !isSleeping && !isDizzy;
-      rightEyeRef.current.visible = !isSleeping && !isDizzy;
+      leftEyeRef.current.visible = !isSleeping && !isDizzy && !isPettingActive;
+      rightEyeRef.current.visible = !isSleeping && !isDizzy && !isPettingActive;
 
       if (!isSleeping && !isDizzy) {
         let lookX = state.pointer.x * 0.08;
@@ -1044,14 +937,14 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
     }
 
     if (leftCatchlightRef.current && rightCatchlightRef.current) {
-      leftCatchlightRef.current.visible = !isSleeping && !isDizzy && !isChewing && !isBathSquint;
-      rightCatchlightRef.current.visible = !isSleeping && !isDizzy && !isChewing && !isBathSquint;
+      leftCatchlightRef.current.visible = !isSleeping && !isDizzy && !isChewing && !isBathSquint && !isPettingActive;
+      rightCatchlightRef.current.visible = !isSleeping && !isDizzy && !isChewing && !isBathSquint && !isPettingActive;
     }
 
-    // Peaceful Sleeping Closed Eyelids (︶ ︶)
+    // Peaceful Sleeping Closed Eyelids or Sweet Petting Eyes (︶ ︶)
     if (sleepEyesRef.current) {
-      sleepEyesRef.current.visible = isSleeping;
-      if (isSleeping) {
+      sleepEyesRef.current.visible = isSleeping || isPettingActive;
+      if (isSleeping || isPettingActive) {
         sleepEyesRef.current.position.y = 0.01 - sleepBreath * 0.012;
       }
     }
@@ -1060,9 +953,7 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
     if (mouthGroupRef.current) {
       mouthGroupRef.current.visible = !isSleeping && !isDizzy;
       if (!isSleeping && !isDizzy) {
-        if (isDragging) {
-          mouthGroupRef.current.scale.set(1.15, 1.35, 1);
-        } else if (isEating) {
+        if (isEating) {
           const eatT = eatingTimer.current;
           if (eatT < 0.7) {
             mouthGroupRef.current.scale.set(1.25, 1.4, 1);
@@ -1072,8 +963,8 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
           } else {
             mouthGroupRef.current.scale.set(1.2, 1.15, 1);
           }
-        } else if (currentState === "happy" || currentState === "play") {
-          mouthGroupRef.current.scale.set(1.15 + Math.sin(t * 5) * 0.08, 1.15, 1);
+        } else if (currentState === "happy" || currentState === "play" || isPettingActive) {
+          mouthGroupRef.current.scale.set(1.18 + Math.sin(t * 8) * 0.08, 1.16, 1);
         } else {
           mouthGroupRef.current.scale.set(1, 1, 1);
         }
@@ -1222,7 +1113,6 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
         }}
         onClick={(e) => {
           e.stopPropagation();
-          if (isDragging || isGrabActive) return;
           soundEffects.playPet();
           if (fsm.currentState === "wander") {
             jumpRef.current.active = false;
