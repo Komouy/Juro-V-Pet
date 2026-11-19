@@ -377,21 +377,36 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
     if (usePetStore.getState().currentState === "sleep") return;
     const rawX = THREE.MathUtils.clamp(walkCommand.x, MAP_BOUNDS.minX, MAP_BOUNDS.maxX);
     const rawZ = THREE.MathUtils.clamp(walkCommand.z, MAP_BOUNDS.minZ, MAP_BOUNDS.maxZ);
-    const rawSurface = getTerrainHeightAt(rawX, rawZ);
-    const safeTarget = resolveHorizontalCollisions(
-      rawX,
-      rawZ,
-      rawSurface,
-      JURO_COLLISION_RADIUS,
-      true
-    );
-    const ty = getTerrainHeightAt(safeTarget.x, safeTarget.z);
-    fsm.wanderTarget.set(safeTarget.x, ty, safeTarget.z);
+    const isBedTarget =
+      Boolean(isHeadingToBedRef?.current) ||
+      Math.hypot(rawX - JURO_BED_POS.x, rawZ - JURO_BED_POS.z) < 0.25;
+
+    let targetX = rawX;
+    let targetZ = rawZ;
+
+    if (isBedTarget) {
+      targetX = JURO_BED_POS.x;
+      targetZ = JURO_BED_POS.z;
+    } else {
+      const rawSurface = getTerrainHeightAt(rawX, rawZ);
+      const safeTarget = resolveHorizontalCollisions(
+        rawX,
+        rawZ,
+        rawSurface,
+        JURO_COLLISION_RADIUS,
+        true
+      );
+      targetX = safeTarget.x;
+      targetZ = safeTarget.z;
+    }
+
+    const ty = getTerrainHeightAt(targetX, targetZ);
+    fsm.wanderTarget.set(targetX, ty, targetZ);
     fsm.transitionTo("wander", true);
-    fsm.stateDuration = 9.0;
+    fsm.stateDuration = isBedTarget ? 14.0 : 9.0;
     fsm.timeInState = 0;
     setBehaviorState("wander");
-  }, [walkCommand, fsm, setBehaviorState]);
+  }, [walkCommand, fsm, setBehaviorState, isHeadingToBedRef]);
 
   // Interaction state
   const [isDragging, setIsDragging] = useState(false);

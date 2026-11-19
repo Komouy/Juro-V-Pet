@@ -688,10 +688,19 @@ export const PetViewport: React.FC = () => {
 
   // Circadian rhythm controller: sleep at 19:00 - 06:00, wake at 06:00
   const isNightSleep = isBedtimeHour(now);
+  const prevHourRef = useRef<number>(now.getHours());
 
   useEffect(() => {
-    // 1. Daytime / Morning wake-up (at 06:00)
-    if (!isNightSleep) {
+    const prevHour = prevHourRef.current;
+    const currentHour = now.getHours();
+    prevHourRef.current = currentHour;
+
+    // Detect transition crossing into morning (06:00)
+    const crossedToMorning =
+      (prevHour < 6 || prevHour >= 19) && currentHour >= 6 && currentHour < 10;
+
+    // 1. Daytime / Morning wake-up (ONLY when clock actually crosses into 06:00 morning)
+    if (crossedToMorning) {
       if (currentState === "sleep") {
         wakeUp();
         soundEffects.playBoing();
@@ -701,6 +710,12 @@ export const PetViewport: React.FC = () => {
         );
       }
       isHeadingToBedRef.current = false;
+      return;
+    }
+
+    // Daytime check: during daytime (06:00 - 18:59), do NOT automatically wake or force sleep.
+    // Allow daytime naps initiated by the player!
+    if (!isNightSleep) {
       return;
     }
 
