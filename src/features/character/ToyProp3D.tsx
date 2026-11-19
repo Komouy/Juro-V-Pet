@@ -87,19 +87,16 @@ export const PlayBubble3D: React.FC<{ progress: number; index: number }> = React
 );
 
 export const ToyProp3D: React.FC<ToyProp3DProps> = React.memo(
-  ({ toyId = "bounce-ball", bounceHeight = 0 }) => {
-    // 1. Bola Pantul Karet (Striped Retro Bouncy Rubber Ball)
+  ({ toyId = "bounce-ball" }) => {
+    // 1. Bola Pantul Karet (Cute Small Round Retro Bouncy Rubber Ball)
     if (toyId === "bounce-ball") {
-      const isSquash = bounceHeight < 0.08;
-      const scaleX = isSquash ? 1.35 : 0.92;
-      const scaleY = isSquash ? 0.68 : 1.12;
-      const scaleZ = isSquash ? 1.35 : 0.92;
+      const ballRadius = 0.082; // Cute pocket-sized radius (proportional to Juro)
 
       return (
-        <group scale={[scaleX, scaleY, scaleZ]}>
-          {/* Main Core Sphere */}
+        <group scale={[1, 1, 1]}>
+          {/* Main Core Sphere - Perfectly Round */}
           <mesh>
-            <sphereGeometry args={[0.22, 24, 24]} />
+            <sphereGeometry args={[ballRadius, 24, 24]} />
             <meshPhysicalMaterial
               color="#EF4444"
               roughness={0.18}
@@ -109,8 +106,8 @@ export const ToyProp3D: React.FC<ToyProp3DProps> = React.memo(
             />
           </mesh>
           {/* Cyan Center Waist Band */}
-          <mesh scale={[1.01, 0.38, 1.01]}>
-            <sphereGeometry args={[0.22, 24, 16]} />
+          <mesh scale={[1.01, 0.36, 1.01]}>
+            <sphereGeometry args={[ballRadius, 24, 16]} />
             <meshPhysicalMaterial
               color="#06B6D4"
               roughness={0.18}
@@ -119,8 +116,8 @@ export const ToyProp3D: React.FC<ToyProp3DProps> = React.memo(
             />
           </mesh>
           {/* Yellow Center Stripe Band */}
-          <mesh scale={[1.02, 0.18, 1.02]}>
-            <sphereGeometry args={[0.22, 24, 16]} />
+          <mesh scale={[1.02, 0.16, 1.02]}>
+            <sphereGeometry args={[ballRadius, 24, 16]} />
             <meshPhysicalMaterial
               color="#F59E0B"
               roughness={0.18}
@@ -129,7 +126,7 @@ export const ToyProp3D: React.FC<ToyProp3DProps> = React.memo(
             />
           </mesh>
           {/* Glossy White Catchlight */}
-          <mesh position={[-0.07, 0.08, 0.16]} scale={[0.045, 0.045, 0.02]}>
+          <mesh position={[-0.026, 0.032, 0.06]} scale={[0.016, 0.016, 0.008]}>
             <sphereGeometry args={[1, 10, 10]} />
             <meshBasicMaterial color="#FFFFFF" />
           </mesh>

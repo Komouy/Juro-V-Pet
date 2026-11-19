@@ -1223,7 +1223,7 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
             const arcY = Math.sin(p * Math.PI) * 1.5;
             fb.ballX = THREE.MathUtils.lerp(fb.startX, fb.targetX, p);
             fb.ballZ = THREE.MathUtils.lerp(fb.startZ, fb.targetZ, p);
-            fb.ballY = THREE.MathUtils.lerp(fb.startY, fb.targetY + 0.12, p) + arcY;
+            fb.ballY = THREE.MathUtils.lerp(fb.startY, fb.targetY + 0.082, p) + arcY;
             fb.rotX += delta * 12;
             fb.rotZ += delta * 8;
 
@@ -1253,19 +1253,19 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
             }
             fb.ballX = fb.targetX;
             fb.ballZ = fb.targetZ;
-            fb.ballY = fb.targetY + 0.12 + Math.max(0, bounceY);
+            fb.ballY = fb.targetY + 0.082 + Math.max(0, bounceY);
           } else if (fb.stage === "ground") {
             // Ball rests waiting on the grass
             fb.ballX = fb.targetX;
             fb.ballZ = fb.targetZ;
-            fb.ballY = fb.targetY + 0.12 + Math.sin(t * 3) * 0.008;
+            fb.ballY = fb.targetY + 0.082 + Math.sin(t * 3) * 0.005;
           } else if (fb.stage === "caught") {
             // Held happily in front of Juro's mouth with heart celebration
             fb.timer += delta;
             const yaw = groupRef.current ? groupRef.current.rotation.y : 0;
-            fb.ballX = spring.position.x + Math.sin(yaw) * 0.36;
-            fb.ballY = spring.position.y - 0.02 + Math.sin(t * 10) * 0.04;
-            fb.ballZ = spring.position.z + Math.cos(yaw) * 0.36;
+            fb.ballX = spring.position.x + Math.sin(yaw) * 0.28;
+            fb.ballY = spring.position.y - 0.04 + Math.sin(t * 10) * 0.03;
+            fb.ballZ = spring.position.z + Math.cos(yaw) * 0.28;
             fb.rotX = 0;
             fb.rotZ = 0;
 
@@ -1287,9 +1287,9 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
             const p = Math.min(1, fb.timer / 0.4);
             fb.scale = 1 - p;
             const yaw = groupRef.current ? groupRef.current.rotation.y : 0;
-            fb.ballX = spring.position.x + Math.sin(yaw) * 0.36;
-            fb.ballY = spring.position.y - 0.02 + p * 0.2;
-            fb.ballZ = spring.position.z + Math.cos(yaw) * 0.36;
+            fb.ballX = spring.position.x + Math.sin(yaw) * 0.28;
+            fb.ballY = spring.position.y - 0.04 + p * 0.2;
+            fb.ballZ = spring.position.z + Math.cos(yaw) * 0.28;
 
             if (p >= 1) {
               fb.active = false;
@@ -1305,17 +1305,8 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
           worldToyRef.current.scale.setScalar(fb.scale);
           if (worldToyMeshRef.current) {
             worldToyMeshRef.current.rotation.set(fb.rotX, 0, fb.rotZ);
-            if (fb.stage === "bouncing") {
-              const bounceDist = fb.ballY - fb.targetY - 0.12;
-              const isSquash = bounceDist < 0.05;
-              if (isSquash) {
-                worldToyMeshRef.current.scale.set(1.35, 0.68, 1.35);
-              } else {
-                worldToyMeshRef.current.scale.set(0.92, 1.12, 0.92);
-              }
-            } else {
-              worldToyMeshRef.current.scale.set(1, 1, 1);
-            }
+            // Crisp, perfectly round sphere with no squashing or gepeng distortion
+            worldToyMeshRef.current.scale.set(1, 1, 1);
           }
 
           // Ball contact shadow on the ground
@@ -1323,12 +1314,12 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
             worldToyShadowRef.current.visible = true;
             const groundY = getTerrainHeightAt(fb.ballX, fb.ballZ);
             worldToyShadowRef.current.position.set(fb.ballX, groundY + 0.005, fb.ballZ);
-            const heightAboveGround = Math.max(0, fb.ballY - 0.12 - groundY);
-            const shadowScale = Math.max(0.15, 1 / (1 + heightAboveGround * 1.5)) * fb.scale;
+            const heightAboveGround = Math.max(0, fb.ballY - 0.082 - groundY);
+            const shadowScale = Math.max(0.12, 0.55 / (1 + heightAboveGround * 2.2)) * fb.scale;
             worldToyShadowRef.current.scale.setScalar(shadowScale);
             const mat = worldToyShadowRef.current.material as THREE.MeshBasicMaterial;
             if (mat) {
-              mat.opacity = Math.max(0.06, 0.35 / (1 + heightAboveGround * 1.2)) * fb.scale;
+              mat.opacity = Math.max(0.06, 0.35 / (1 + heightAboveGround * 1.5)) * fb.scale;
             }
           }
         } else if (toyId === "music-box") {
@@ -2645,7 +2636,7 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
           rotation={[-Math.PI / 2, 0, 0]}
           visible={false}
         >
-          <planeGeometry args={[0.36, 0.36]} />
+          <planeGeometry args={[0.22, 0.22]} />
           <meshBasicMaterial
             map={softShadowTexture ?? undefined}
             color={softShadowTexture ? "#FFFFFF" : "#1C1410"}
