@@ -354,12 +354,9 @@ export const ShopPage: React.FC = () => {
                         <ItemIllustration id={c.illustrationId} size={40} />
                       </div>
                       <div className="flex-1 min-w-0">
-                        <div className="flex items-center justify-between gap-2">
-                          <h3 className="pixel-text text-[11px] text-charcoal dark:text-white font-bold truncate">
-                            {c.name}
-                          </h3>
-                          <Badge label={c.rarity} variant={c.rarityVariant} size="sm" />
-                        </div>
+                        <h3 className="pixel-text text-[11px] text-charcoal dark:text-white font-bold truncate">
+                          {c.name}
+                        </h3>
                         <div className="mt-1.5 flex items-center justify-between pixel-text text-[9px] sm:text-[10px]">
                           <span className="text-charcoal dark:text-neutral-200">
                             Stok: <strong className="text-juro-orange">×{count}</strong>
