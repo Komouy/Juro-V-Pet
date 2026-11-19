@@ -31,9 +31,17 @@ export const JURO_FALLBACK_REPLIES = [
 
 /**
  * Retrieve the active Gemini API key:
- * Prioritizes user's custom personal key (localStorage), then falls back to global site key (import.meta.env.VITE_GEMINI_API_KEY)
+ * Priority #1: Built-in web key from Vercel / .env.local (always used for all visitors)
+ * Priority #2: Fallback to localStorage personal key if no built-in web key is set
  */
 export function getGeminiApiKey(): string | null {
+  // 1. Built-in web key takes top priority so the website always uses the site's default key
+  const fromEnv = import.meta.env.VITE_GEMINI_API_KEY;
+  if (fromEnv && fromEnv.trim().length > 0) {
+    return fromEnv.trim();
+  }
+
+  // 2. Fallback to localStorage if no environment key is embedded
   try {
     const fromStorage = localStorage.getItem(STORAGE_KEY);
     if (fromStorage && fromStorage.trim().length > 0) {
@@ -43,22 +51,21 @@ export function getGeminiApiKey(): string | null {
     // LocalStorage unavailable (e.g. sandboxed test)
   }
 
-  // Fallback to Vite environment variable (literal for build-time replacement by Vite)
-  const fromEnv = import.meta.env.VITE_GEMINI_API_KEY;
-  if (fromEnv && fromEnv.trim().length > 0) {
-    return fromEnv.trim();
-  }
-
   return null;
 }
 
 /**
  * Determine the source of the active Gemini API key:
+ * - "env": global site key provided via VITE_GEMINI_API_KEY (always used)
  * - "custom": personal key stored in this browser's localStorage
- * - "env": global site key provided via VITE_GEMINI_API_KEY in .env / Vercel
  * - "none": no key set, running in offline/default fallback mode
  */
-export function getGeminiKeySource(): "custom" | "env" | "none" {
+export function getGeminiKeySource(): "env" | "custom" | "none" {
+  const fromEnv = import.meta.env.VITE_GEMINI_API_KEY;
+  if (fromEnv && fromEnv.trim().length > 0) {
+    return "env";
+  }
+
   try {
     const fromStorage = localStorage.getItem(STORAGE_KEY);
     if (fromStorage && fromStorage.trim().length > 0) {
@@ -66,11 +73,6 @@ export function getGeminiKeySource(): "custom" | "env" | "none" {
     }
   } catch {
     // Ignored
-  }
-
-  const fromEnv = import.meta.env.VITE_GEMINI_API_KEY;
-  if (fromEnv && fromEnv.trim().length > 0) {
-    return "env";
   }
 
   return "none";

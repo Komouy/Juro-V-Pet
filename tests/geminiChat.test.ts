@@ -113,6 +113,13 @@ describe("Gemini AI Chat Service", () => {
       expect(getCustomGeminiApiKey()).toBe("AIzaSyTest12345");
     });
 
+    it("stores and retrieves both AQ... and AIzaSy... formatted keys", () => {
+      setGeminiApiKey("AQ.TestKey.NewFormat123");
+      expect(getGeminiApiKey()).toBe("AQ.TestKey.NewFormat123");
+      expect(getCustomGeminiApiKey()).toBe("AQ.TestKey.NewFormat123");
+      expect(getGeminiKeySource()).toBe("custom");
+    });
+
     it("removes the API key when set to empty string", () => {
       setGeminiApiKey("AIzaSyTest12345");
       expect(getGeminiApiKey()).toBe("AIzaSyTest12345");

@@ -213,7 +213,7 @@ export const SettingsPage: React.FC = () => {
           </div>
 
           <p className="pixel-text text-[8px] sm:text-[9px] text-neutral-600 dark:text-neutral-400 leading-relaxed">
-            Agar <strong>semua pengunjung web</strong> bisa langsung ngobrol dengan Juro tanpa memasukkan kunci, isi <code className="px-1 py-0.5 bg-neutral-200 dark:bg-neutral-800 text-charcoal dark:text-neutral-200 font-mono">VITE_GEMINI_API_KEY</code> di file <code className="px-1 py-0.5 bg-neutral-200 dark:bg-neutral-800 text-charcoal dark:text-neutral-200 font-mono">.env.local</code> atau di Pengaturan Environment Variables hosting (Vercel). Anda juga bisa memasukkan kunci pribadi di bawah ini untuk menimpanya khusus di browser ini.
+            Agar <strong>semua pengunjung web</strong> selalu bisa langsung ngobrol dengan Juro tanpa perlu memasukkan kunci, isi <code className="px-1 py-0.5 bg-neutral-200 dark:bg-neutral-800 text-charcoal dark:text-neutral-200 font-mono">VITE_GEMINI_API_KEY</code> di file <code className="px-1 py-0.5 bg-neutral-200 dark:bg-neutral-800 text-charcoal dark:text-neutral-200 font-mono">.env.local</code> atau di Pengaturan Environment Variables hosting (Vercel). Kunci dapat berawalan <code className="font-mono">AQ...</code> atau <code className="font-mono">AIzaSy...</code>.
           </p>
 
           <form onSubmit={handleSaveGeminiKey} className="flex flex-col sm:flex-row sm:items-end gap-2.5">
@@ -223,7 +223,7 @@ export const SettingsPage: React.FC = () => {
                 value={geminiKeyInput}
                 onChange={(e) => setGeminiKeyInput(e.target.value)}
                 onClear={() => setGeminiKeyInput("")}
-                placeholder={keySource === "env" ? "Menimpa kunci bawaan web (opsional)..." : "AIzaSy..."}
+                placeholder={keySource === "env" ? "Kunci bawaan web aktif (selalu dipakai)" : "AQ... atau AIzaSy..."}
                 isSuccess={geminiSavedSuccess}
               />
             </div>
