@@ -31,7 +31,12 @@ import { StatBars } from "./viewport/StatBars";
 import { ActionTray, type DragPayload } from "./viewport/ActionTray";
 import { JuroContextMenu } from "./viewport/JuroContextMenu";
 import { JuroSpeechBubble } from "./viewport/JuroSpeechBubble";
-import { chatWithJuro } from "../../services/geminiService";
+import {
+  chatWithJuro,
+  computePetExpression,
+  computePetActivity,
+  type PetChatContext,
+} from "../../services/geminiService";
 
 type ActiveTray = "none" | "food" | "toy" | "bath";
 
@@ -75,6 +80,9 @@ export const PetViewport: React.FC = () => {
     strokePet,
   } = usePetStore();
   const { addLog, addCoins, foodInventory, ownedToys, consumeFood } = useGameStore();
+  const weather = useUIStore((s) => s.weather);
+  const toggleWeather = useUIStore((s) => s.toggleWeather);
+  const showToast = useUIStore((s) => s.showToast);
 
   const [activeTray, setActiveTray] = useState<ActiveTray>("none");
   const [showStatDetails, setShowStatDetails] = useState(false);
@@ -100,11 +108,16 @@ export const PetViewport: React.FC = () => {
     visible: false,
   });
   const speechTimerRef = useRef<number | null>(null);
+  const spontaneousTimerRef = useRef<number | null>(null);
+  const isChatBusyRef = useRef<boolean>(false);
 
   useEffect(() => {
     return () => {
       if (speechTimerRef.current) {
         clearTimeout(speechTimerRef.current);
+      }
+      if (spontaneousTimerRef.current) {
+        clearTimeout(spontaneousTimerRef.current);
       }
     };
   }, []);
@@ -135,6 +148,7 @@ export const PetViewport: React.FC = () => {
   const [isDraggingPet, setIsDraggingPet] = useState(false);
   const isHeadingToBedRef = useRef<boolean>(false);
   const wakeCooldownUntilRef = useRef<number>(0);
+  const isDizzyRef = useRef<boolean>(false);
 
   const juroMenuRef = useRef<HTMLDivElement>(null);
   const tailRef = useRef<HTMLDivElement>(null);
@@ -243,26 +257,46 @@ export const PetViewport: React.FC = () => {
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [activeTray, showStatDetails, juroMenu.open, isPettingActive, speechBubble.visible]);
 
-  // AI Pet Chat message handler (triggers Gemini API or fallback & shows speech bubble)
-  const handleSendMessage = useCallback(async (userMessage: string) => {
-    if (speechTimerRef.current) {
-      clearTimeout(speechTimerRef.current);
-    }
-
-    setSpeechBubble({
-      text: "",
-      isLoading: true,
-      visible: true,
-    });
-
-    soundEffects.playPop();
-
-    try {
+  // Dynamically assemble pet context: activities, emotions, sensations & environmental state
+  const getLiveChatContext = useCallback(
+    (isSpontaneous = false): PetChatContext => {
       const petState = usePetStore.getState();
       const currentHour = new Date().getHours();
       const isNight = currentHour >= 18 || currentHour < 6;
+      const isDizzy = isDizzyRef.current;
+      const isSleeping = petState.currentState === "sleep";
+      const isBathing =
+        bathStateRef.current.isScrubbing ||
+        bathStateRef.current.isRinsing ||
+        bathStateRef.current.soapLevel > 0;
+      const isEating = petState.currentState === "eating";
+      const isPlaying = petState.currentState === "play";
+      const isDragging = isDraggingPet || petState.currentState === "dragging";
 
-      const reply = await chatWithJuro(userMessage, {
+      const expression = computePetExpression({
+        hunger: petState.hunger,
+        energy: petState.energy,
+        cleanliness: petState.cleanliness,
+        happiness: petState.happiness,
+        affection: petState.affection,
+        isDizzy,
+        isSleeping,
+      });
+
+      const currentActivity = computePetActivity({
+        currentState: petState.currentState,
+        isSleeping,
+        isEating,
+        isBathing,
+        isPetting: isPettingActive,
+        isPlaying,
+        isDragging,
+        isDizzy,
+        currentFoodName: petState.currentFoodBeingEaten?.name,
+        currentToyName: petState.currentToyBeingPlayed?.name,
+      });
+
+      return {
         name: petState.name,
         hunger: petState.hunger,
         energy: petState.energy,
@@ -270,31 +304,138 @@ export const PetViewport: React.FC = () => {
         happiness: petState.happiness,
         affection: petState.affection,
         currentState: petState.currentState,
+        expression,
+        currentActivity,
+        currentFoodName: petState.currentFoodBeingEaten?.name,
+        currentToyName: petState.currentToyBeingPlayed?.name,
+        isSleeping,
+        isPetting: isPettingActive,
+        isBathing,
+        isEating,
+        isPlaying,
+        isDragging,
+        isDizzy,
         isNight,
+        isRaining: weather === "rain",
+        isSpontaneous,
+      };
+    },
+    [weather, isPettingActive, isDraggingPet]
+  );
+
+  // AI Pet Chat message handler (triggers Gemini API or fallback & shows speech bubble)
+  const handleSendMessage = useCallback(
+    async (userMessage: string) => {
+      if (speechTimerRef.current) {
+        clearTimeout(speechTimerRef.current);
+        speechTimerRef.current = null;
+      }
+
+      setSpeechBubble({
+        text: "",
+        isLoading: true,
+        visible: true,
       });
+
+      soundEffects.playPop();
+
+      try {
+        const context = getLiveChatContext(false);
+        const reply = await chatWithJuro(userMessage, context);
+
+        setSpeechBubble({
+          text: reply,
+          isLoading: false,
+          visible: true,
+        });
+
+        soundEffects.playHappy();
+
+        speechTimerRef.current = window.setTimeout(() => {
+          setSpeechBubble((prev) => ({ ...prev, visible: false }));
+        }, 8000);
+      } catch {
+        const fallbackContext = getLiveChatContext(false);
+        setSpeechBubble({
+          text: fallbackContext.isSleeping
+            ? "Hwaaam... Zzz... Bloop? Juro lagi mimpi rebahan di kasur empuk... Zzz..."
+            : "Bloop! Juro lagi asyik bergoyang dan agak melamun nih... bloop!",
+          isLoading: false,
+          visible: true,
+        });
+        speechTimerRef.current = window.setTimeout(() => {
+          setSpeechBubble((prev) => ({ ...prev, visible: false }));
+        }, 6000);
+      }
+    },
+    [getLiveChatContext]
+  );
+
+  // Autonomous spontaneous chatter (Juro randomly blurts out cute thoughts based on his activity)
+  const triggerSpontaneousChatter = useCallback(async () => {
+    if (
+      juroMenu.open ||
+      speechBubble.visible ||
+      speechBubble.isLoading ||
+      isDraggingPet ||
+      isChatBusyRef.current
+    ) {
+      return;
+    }
+
+    isChatBusyRef.current = true;
+    try {
+      const context = getLiveChatContext(true);
+      const reply = await chatWithJuro("", context);
 
       setSpeechBubble({
         text: reply,
         isLoading: false,
         visible: true,
       });
+      soundEffects.playPop();
 
-      soundEffects.playHappy();
-
+      if (speechTimerRef.current) clearTimeout(speechTimerRef.current);
       speechTimerRef.current = window.setTimeout(() => {
         setSpeechBubble((prev) => ({ ...prev, visible: false }));
-      }, 8000);
+      }, 7500);
     } catch {
-      setSpeechBubble({
-        text: "Bloop! Juro lagi asyik bergoyang dan agak melamun nih... bloop!",
-        isLoading: false,
-        visible: true,
-      });
-      speechTimerRef.current = window.setTimeout(() => {
-        setSpeechBubble((prev) => ({ ...prev, visible: false }));
-      }, 6000);
+      // Ignored for background spontaneous chatter
+    } finally {
+      isChatBusyRef.current = false;
     }
-  }, []);
+  }, [
+    juroMenu.open,
+    speechBubble.visible,
+    speechBubble.isLoading,
+    isDraggingPet,
+    getLiveChatContext,
+  ]);
+
+  // Autonomous Spontaneous Chatter Loop (every 24 - 50 seconds randomly)
+  useEffect(() => {
+    let isCancelled = false;
+
+    const scheduleNextChatter = () => {
+      const delay = 24000 + Math.random() * 26000;
+      spontaneousTimerRef.current = setTimeout(async () => {
+        if (isCancelled) return;
+        await triggerSpontaneousChatter();
+        if (!isCancelled) {
+          scheduleNextChatter();
+        }
+      }, delay);
+    };
+
+    scheduleNextChatter();
+
+    return () => {
+      isCancelled = true;
+      if (spontaneousTimerRef.current) {
+        clearTimeout(spontaneousTimerRef.current);
+      }
+    };
+  }, [triggerSpontaneousChatter]);
 
   // Dismiss Juro menu when tapping/clicking outside (supporting both mouse and touch)
   useEffect(() => {
@@ -828,10 +969,6 @@ export const PetViewport: React.FC = () => {
     setActiveTray("none");
   }, [currentState, wakeUp, addLog]);
 
-  const weather = useUIStore((s) => s.weather);
-  const toggleWeather = useUIStore((s) => s.toggleWeather);
-  const showToast = useUIStore((s) => s.showToast);
-
   const handleToggleWeather = useCallback(() => {
     const nextWeather = weather === "clear" ? "rain" : "clear";
     soundEffects.playWeatherChange(nextWeather === "rain");
@@ -1083,6 +1220,7 @@ export const PetViewport: React.FC = () => {
             isHeadingToBedRef={isHeadingToBedRef}
             onBedArrival={handleBedArrival}
             isRaining={weather === "rain"}
+            isDizzyRef={isDizzyRef}
             isBlowingBubbles={
               dragVisual !== null &&
               dragVisual.moved &&

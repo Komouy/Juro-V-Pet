@@ -8,6 +8,9 @@ import {
   getGeminiKeySource,
   getCustomGeminiApiKey,
   chatWithJuro,
+  computePetExpression,
+  computePetActivity,
+  getContextualFallbackReply,
   JURO_FALLBACK_REPLIES,
 } from "../src/services/geminiService";
 
@@ -80,6 +83,138 @@ describe("Gemini AI Chat Service", () => {
     it("falls back to default pet name when context is undefined", () => {
       const prompt = buildJuroSystemPrompt();
       expect(prompt).toContain("Juro");
+    });
+
+    it("includes spontaneous monologue directive when isSpontaneous is true", () => {
+      const prompt = buildJuroSystemPrompt({
+        name: "Juro",
+        hunger: 80,
+        energy: 80,
+        cleanliness: 80,
+        happiness: 80,
+        affection: 80,
+        currentState: "idle",
+        isSpontaneous: true,
+      });
+      expect(prompt).toContain("celetukan spontan/gumamanmu sendiri");
+    });
+
+    it("includes explicit condition and expression behavioral instructions", () => {
+      const prompt = buildJuroSystemPrompt({
+        name: "Juro",
+        hunger: 20,
+        energy: 80,
+        cleanliness: 80,
+        happiness: 80,
+        affection: 80,
+        currentState: "idle",
+      });
+      expect(prompt).toContain("KONDISI & EKSPRESI JURO SAAT INI");
+      expect(prompt).toContain("lapar");
+    });
+  });
+
+  describe("computePetExpression & computePetActivity", () => {
+    it("computes dizzy expression when isDizzy is true", () => {
+      const expr = computePetExpression({
+        hunger: 80,
+        energy: 80,
+        cleanliness: 80,
+        happiness: 80,
+        affection: 80,
+        isDizzy: true,
+      });
+      expect(expr).toContain("pusing");
+    });
+
+    it("computes sleeping expression when isSleeping is true", () => {
+      const expr = computePetExpression({
+        hunger: 80,
+        energy: 80,
+        cleanliness: 80,
+        happiness: 80,
+        affection: 80,
+        isSleeping: true,
+      });
+      expect(expr).toContain("tertidur lelap");
+    });
+
+    it("prioritizes lowest stat below 45 (hunger, energy, affection, happiness)", () => {
+      expect(
+        computePetExpression({
+          hunger: 30,
+          energy: 90,
+          cleanliness: 90,
+          happiness: 90,
+          affection: 90,
+        })
+      ).toContain("lapar");
+
+      expect(
+        computePetExpression({
+          hunger: 90,
+          energy: 25,
+          cleanliness: 90,
+          happiness: 90,
+          affection: 90,
+        })
+      ).toContain("lelah / mengantuk");
+
+      expect(
+        computePetExpression({
+          hunger: 90,
+          energy: 90,
+          cleanliness: 90,
+          happiness: 90,
+          affection: 20,
+        })
+      ).toContain("cemberut / ngambek");
+
+      expect(
+        computePetExpression({
+          hunger: 90,
+          energy: 90,
+          cleanliness: 90,
+          happiness: 35,
+          affection: 90,
+        })
+      ).toContain("bosan");
+    });
+
+    it("computes human-readable activity strings for various interactions", () => {
+      expect(
+        computePetActivity({
+          currentState: "eating",
+          currentFoodName: "Puding Mangga",
+        })
+      ).toContain("Puding Mangga");
+
+      expect(
+        computePetActivity({
+          currentState: "play",
+          currentToyName: "Bola Pantul",
+        })
+      ).toContain("Bola Pantul");
+
+      expect(
+        computePetActivity({
+          isPetting: true,
+        })
+      ).toContain("dielus-elus");
+
+      expect(
+        computePetActivity({
+          isBathing: true,
+        })
+      ).toContain("dimandikan");
+    });
+
+    it("returns immediate contextual fallback replies matching the pet state", () => {
+      expect(getContextualFallbackReply({ hunger: 20 } as any)).toMatch(/Perut|camilan/i);
+      expect(getContextualFallbackReply({ isSleeping: true } as any)).toMatch(/Zzz|tidur|mimpi/i);
+      expect(getContextualFallbackReply({ isDizzy: true } as any)).toMatch(/berputar|pusing/i);
+      expect(getContextualFallbackReply({ isPetting: true } as any)).toMatch(/elus/i);
+      expect(getContextualFallbackReply({ isBathing: true } as any)).toMatch(/busa|sabun|bersih/i);
     });
   });
 

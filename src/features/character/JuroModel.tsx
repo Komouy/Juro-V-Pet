@@ -77,6 +77,7 @@ export interface JuroModelProps {
   onBedArrival?: () => void;
   isBlowingBubbles?: boolean;
   isRaining?: boolean;
+  isDizzyRef?: React.RefObject<boolean>;
 }
 
 export const JuroModel: React.FC<JuroModelProps> = React.memo(({
@@ -91,6 +92,7 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
   onBedArrival,
   isBlowingBubbles = false,
   isRaining = false,
+  isDizzyRef,
 }) => {
   const groupRef = useRef<THREE.Group>(null);
   const leftEyeRef = useRef<THREE.Group>(null);
@@ -1542,6 +1544,9 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
 
     const isSleeping = currentState === "sleep";
     const isDizzy = !isSleeping && dizzyRef.current.timer > 0;
+    if (isDizzyRef) {
+      isDizzyRef.current = isDizzy;
+    }
     const dizzyFade = isDizzy ? Math.min(1, dizzyRef.current.timer / 0.65) : 0;
     const isChewing = isEating && eatingTimer.current > 0.7 && eatingTimer.current < 2.6;
     const isBathSquint = isScrubbingNow || isRinsingNow;
