@@ -2,7 +2,9 @@ import { describe, it, expect } from "vitest";
 import {
   BASE_GROUND_Y,
   MAP_OBSTACLES,
+  MAP_PLATFORMS,
   JURO_BED_POS,
+  JURO_BENCH_POS,
   getTerrainHeightAt,
   getBridgeElevation,
   isWaterAt,
@@ -66,6 +68,38 @@ describe("Terrain & Object Collision Hull System", () => {
     );
     expect(sleepCol.x).toBeCloseTo(JURO_BED_POS.x, 2);
     expect(sleepCol.z).toBeCloseTo(JURO_BED_POS.z, 2);
+  });
+
+  it("verifies left tree stump is removed from MAP_PLATFORMS leaving open meadow", () => {
+    const leftStump = MAP_PLATFORMS.find((p) => p.id === "stump-sw");
+    expect(leftStump).toBeUndefined();
+  });
+
+  it("treats park bench as solid obstacle while wandering, but allows Juro to sit on it", () => {
+    // When wandering normally, walking directly into bench is blocked
+    const wanderCol = resolveHorizontalCollisions(
+      JURO_BENCH_POS.x,
+      JURO_BENCH_POS.z,
+      BASE_GROUND_Y + 0.42,
+      0.38,
+      false,
+      false,
+      false
+    );
+    expect(wanderCol.hitObstacle).toBe(true);
+
+    // When sitting on bench: can occupy the bench seat position
+    const sitCol = resolveHorizontalCollisions(
+      JURO_BENCH_POS.x,
+      JURO_BENCH_POS.z,
+      JURO_BENCH_POS.seatY,
+      0.38,
+      false,
+      false,
+      true
+    );
+    expect(sitCol.x).toBeCloseTo(JURO_BENCH_POS.x, 2);
+    expect(sitCol.z).toBeCloseTo(JURO_BENCH_POS.z, 2);
   });
 
   it("blocks Juro from walking into the lily pond water", () => {

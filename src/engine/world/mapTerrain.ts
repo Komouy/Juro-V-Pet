@@ -13,7 +13,7 @@ export interface SolidObstacle {
   z: number;
   radius: number;
   topY: number; // world Y above which Juro could jump/fly over it
-  tag?: "bed-frame";
+  tag?: "bed-frame" | "bench";
 }
 
 export const BASE_GROUND_Y = -0.92;
@@ -22,7 +22,7 @@ export const BASE_GROUND_Y = -0.92;
 export const MAP_OBSTACLES: SolidObstacle[] = [
   // Trees on knolls & bordering meadow
   { x: -3.9, z: -1.35, radius: 0.38, topY: 1.4 },
-  { x: 4.2, z: 1.35, radius: 0.38, topY: 1.4 },
+  { x: 4.25, z: 1.40, radius: 0.26, topY: 1.4 },
   { x: -4.4, z: -4.5, radius: 0.45, topY: 1.4 },
   { x: 3.2, z: -4.2, radius: 0.45, topY: 1.4 },
   { x: -2.8, z: -4.8, radius: 0.42, topY: 1.4 },
@@ -46,9 +46,9 @@ export const MAP_OBSTACLES: SolidObstacle[] = [
   { x: 0.42, z: -4.4, radius: 0.75, topY: 1.2 },
 
   // Wooden Park Bench atop East Knoll (3 overlapping circles along bench length)
-  { x: 3.46, z: 0.77, radius: 0.24, topY: BASE_GROUND_Y + 0.82 },
-  { x: 3.65, z: 0.95, radius: 0.24, topY: BASE_GROUND_Y + 0.82 },
-  { x: 3.84, z: 1.13, radius: 0.24, topY: BASE_GROUND_Y + 0.82 },
+  { x: 3.46, z: 0.77, radius: 0.24, topY: BASE_GROUND_Y + 0.82, tag: "bench" },
+  { x: 3.65, z: 0.95, radius: 0.24, topY: BASE_GROUND_Y + 0.82, tag: "bench" },
+  { x: 3.84, z: 1.13, radius: 0.24, topY: BASE_GROUND_Y + 0.82, tag: "bench" },
 
   // West Knoll Sofa Bed Frame (Backrest, Armrests & Nightstand)
   { x: -3.88, z: -0.52, radius: 0.24, topY: BASE_GROUND_Y + 0.85, tag: "bed-frame" }, // Nightstand & Lamp
@@ -123,6 +123,15 @@ export const JURO_BED_POS = {
   platformId: "west-knoll",
 } as const;
 
+// Cozy wooden park bench atop East Knoll where Juro can sit and look over the meadow
+export const JURO_BENCH_POS = {
+  x: 3.65,
+  z: 0.95,
+  seatY: BASE_GROUND_Y + 0.42 + 0.175,
+  rotY: -0.75,
+  platformId: "east-knoll",
+} as const;
+
 // Elevated platforms, terraces, rock ledges & tree stumps Juro can climb/jump onto!
 export const MAP_PLATFORMS: ElevatedPlatform[] = [
   {
@@ -151,15 +160,6 @@ export const MAP_PLATFORMS: ElevatedPlatform[] = [
     radius: 0.85,
     height: 0.34,
     label: "Batu Datar Utara",
-  },
-  {
-    id: "stump-sw",
-    kind: "stump",
-    x: -1.55,
-    z: 1.35,
-    radius: 0.42,
-    height: 0.28,
-    label: "Tunggul Kayu Barat",
   },
   {
     id: "stump-se",
@@ -266,11 +266,15 @@ export function isInsideObstacle(
   x: number,
   z: number,
   pad = 0.35,
-  isSleepingOrHeading = false
+  isSleepingOrHeading = false,
+  isSittingOrHeadingToBench = false
 ): boolean {
   for (let i = 0; i < MAP_OBSTACLES.length; i++) {
     const obs = MAP_OBSTACLES[i];
     if (isSleepingOrHeading && (obs.tag === "bed-frame" || Math.hypot(obs.x - JURO_BED_POS.x, obs.z - JURO_BED_POS.z) < 0.95)) {
+      continue;
+    }
+    if (isSittingOrHeadingToBench && (obs.tag === "bench" || Math.hypot(obs.x - JURO_BENCH_POS.x, obs.z - JURO_BENCH_POS.z) < 0.65)) {
       continue;
     }
     if (Math.hypot(x - obs.x, z - obs.z) < obs.radius + pad) {
@@ -291,7 +295,8 @@ export function resolveHorizontalCollisions(
   bottomY: number,
   petRadius = 0.38,
   allowClimbing = false,
-  isSleepingOrHeadingToBed = false
+  isSleepingOrHeadingToBed = false,
+  isSittingOrHeadingToBench = false
 ): { x: number; z: number; hitObstacle: boolean } {
   let rx = Math.max(MAP_BOUNDS.minX, Math.min(MAP_BOUNDS.maxX, x));
   let rz = Math.max(MAP_BOUNDS.minZ, Math.min(MAP_BOUNDS.maxZ, z));
@@ -305,6 +310,12 @@ export function resolveHorizontalCollisions(
       if (
         isSleepingOrHeadingToBed &&
         (obs.tag === "bed-frame" || Math.hypot(obs.x - JURO_BED_POS.x, obs.z - JURO_BED_POS.z) < 0.95)
+      ) {
+        continue;
+      }
+      if (
+        isSittingOrHeadingToBench &&
+        (obs.tag === "bench" || Math.hypot(obs.x - JURO_BENCH_POS.x, obs.z - JURO_BENCH_POS.z) < 0.65)
       ) {
         continue;
       }
@@ -341,6 +352,7 @@ export function resolveHorizontalCollisions(
     for (let i = 0; i < MAP_PLATFORMS.length; i++) {
       const p = MAP_PLATFORMS[i];
       if (isSleepingOrHeadingToBed && p.id === "west-knoll") continue;
+      if (isSittingOrHeadingToBench && p.id === "east-knoll") continue;
       const platformTopY = BASE_GROUND_Y + p.height;
       // If Juro's bottom is below the platform top rim, treat the wall as solid even during early jump arc
       const threshold = allowClimbing ? platformTopY - 0.06 : platformTopY - 0.14;

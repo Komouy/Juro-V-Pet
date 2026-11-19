@@ -36,6 +36,8 @@ interface OutdoorEnvironmentProps {
   onOpenShop?: () => void;
   onOpenMine?: () => void;
   onBedClick?: () => void;
+  onBenchClick?: (screenPos?: { x: number; y: number }) => void;
+  isSittingOnBench?: boolean;
 }
 
 // Reusable scratch objects at module scope (zero GC allocations per frame, 0 lint warnings)
@@ -43,8 +45,17 @@ const _dummy = new THREE.Object3D();
 const _color = new THREE.Color();
 
 export const OutdoorEnvironment: React.FC<OutdoorEnvironmentProps> = React.memo(
-  ({ theme, weather = "clear", onWalkPointSelect, onOpenShop, onOpenMine, onBedClick }) => {
-    const [hoveredLandmark, setHoveredLandmark] = useState<"none" | "shop" | "mine" | "bed">("none");
+  ({
+    theme,
+    weather = "clear",
+    onWalkPointSelect,
+    onOpenShop,
+    onOpenMine,
+    onBedClick,
+    onBenchClick,
+    isSittingOnBench = false,
+  }) => {
+    const [hoveredLandmark, setHoveredLandmark] = useState<"none" | "shop" | "mine" | "bed" | "bench">("none");
 
     // Signboard textures for interactive 3D Shop ("TOKO") & Mine Cave ("TAMBANG")
     const shopSignTex = useMemo(
@@ -629,8 +640,15 @@ export const OutdoorEnvironment: React.FC<OutdoorEnvironmentProps> = React.memo(
           onHoverChange={(hovered) => setHoveredLandmark(hovered ? "bed" : "none")}
         />
 
-        {/* East Knoll Wooden Park Bench */}
-        <ParkBench woodColor={woodColor} woodDarkColor={woodDarkColor} />
+        {/* East Knoll Wooden Park Bench with Interactive "Duduk" (Sit) Trigger */}
+        <ParkBench
+          woodColor={woodColor}
+          woodDarkColor={woodDarkColor}
+          onBenchClick={onBenchClick}
+          onHoverChange={(hovered) => setHoveredLandmark(hovered ? "bench" : "none")}
+          isHovered={hoveredLandmark === "bench"}
+          isSitting={isSittingOnBench}
+        />
 
         {/* Interactive 3D Juro Shop Building ("TOKO") on Back-Right Hillside — Click to open /shop! */}
         <ShopBuildingLandmark

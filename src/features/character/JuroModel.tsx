@@ -20,6 +20,7 @@ import {
   BASE_GROUND_Y,
   MAP_BOUNDS,
   JURO_BED_POS,
+  JURO_BENCH_POS,
   getTerrainHeightAt,
   resolveHorizontalCollisions,
   isWaterAt,
@@ -39,6 +40,7 @@ const _projEdge = new THREE.Vector3();
 const _bathDummy = new THREE.Object3D();
 const _targetVec = new THREE.Vector3();
 const _bedTargetVec = new THREE.Vector3();
+const _benchTargetVec = new THREE.Vector3();
 
 function lerpAngle(current: number, target: number, alpha: number): number {
   let diff = ((target - current + Math.PI) % (Math.PI * 2)) - Math.PI;
@@ -75,6 +77,9 @@ export interface JuroModelProps {
   juroWorldPosRef?: React.RefObject<THREE.Vector3>;
   isHeadingToBedRef?: React.RefObject<boolean>;
   onBedArrival?: () => void;
+  isHeadingToBenchRef?: React.RefObject<boolean>;
+  onBenchArrival?: () => void;
+  isSittingOnBench?: boolean;
   isBlowingBubbles?: boolean;
   isRaining?: boolean;
   isDizzyRef?: React.RefObject<boolean>;
@@ -91,6 +96,9 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
   juroWorldPosRef,
   isHeadingToBedRef,
   onBedArrival,
+  isHeadingToBenchRef,
+  onBenchArrival,
+  isSittingOnBench = false,
   isBlowingBubbles = false,
   isRaining = false,
   isDizzyRef,
@@ -303,6 +311,9 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
     const isBedTarget =
       Boolean(isHeadingToBedRef?.current) ||
       Math.hypot(rawX - JURO_BED_POS.x, rawZ - JURO_BED_POS.z) < 0.25;
+    const isBenchTarget =
+      Boolean(isHeadingToBenchRef?.current) ||
+      Math.hypot(rawX - JURO_BENCH_POS.x, rawZ - JURO_BENCH_POS.z) < 0.25;
 
     let targetX = rawX;
     let targetZ = rawZ;
@@ -310,6 +321,9 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
     if (isBedTarget) {
       targetX = JURO_BED_POS.x;
       targetZ = JURO_BED_POS.z;
+    } else if (isBenchTarget) {
+      targetX = JURO_BENCH_POS.x;
+      targetZ = JURO_BENCH_POS.z;
     } else {
       const rawSurface = getTerrainHeightAt(rawX, rawZ);
       const safeTarget = resolveHorizontalCollisions(
@@ -318,19 +332,20 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
         rawSurface,
         JURO_COLLISION_RADIUS,
         true,
+        false,
         false
       );
       targetX = safeTarget.x;
       targetZ = safeTarget.z;
     }
 
-    const ty = getTerrainHeightAt(targetX, targetZ);
+    const ty = isBenchTarget ? JURO_BENCH_POS.seatY : getTerrainHeightAt(targetX, targetZ);
     fsm.wanderTarget.set(targetX, ty, targetZ);
     fsm.transitionTo("wander", true);
-    fsm.stateDuration = isBedTarget ? 24.0 : 9.0;
+    fsm.stateDuration = isBedTarget || isBenchTarget ? 24.0 : 9.0;
     fsm.timeInState = 0;
     setBehaviorState("wander");
-  }, [walkCommand, fsm, setBehaviorState, isHeadingToBedRef]);
+  }, [walkCommand, fsm, setBehaviorState, isHeadingToBedRef, isHeadingToBenchRef]);
 
   // Eye blinking state
   const blinkState = useRef({ timer: 0, nextBlink: 2.5, isBlinking: false });
@@ -544,6 +559,22 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
       }
       fsm.stateDuration = 24.0;
       fsm.timeInState = 0;
+    } else if (isHeadingToBenchRef?.current) {
+      // Keep Juro locked into wander mode moving towards park bench without autonomous distraction
+      if (fsm.currentState !== "wander") {
+        fsm.transitionTo("wander", true);
+        setBehaviorState("wander");
+      }
+      fsm.stateDuration = 24.0;
+      fsm.timeInState = 0;
+    } else if (isSittingOnBench) {
+      // Keep Juro sitting contentedly on the park bench
+      if (fsm.currentState !== "idle") {
+        fsm.transitionTo("idle", true);
+        setBehaviorState("idle");
+      }
+      fsm.stateDuration = 999.0;
+      fsm.timeInState = 0;
     } else {
       const activeState = fsm.update(delta, liveAttributes, liveMood);
       if (activeState !== storeState) {
@@ -629,6 +660,21 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
       }
     }
 
+    if (isHeadingToBenchRef?.current) {
+      const distToBench = Math.hypot(
+        spring.position.x - JURO_BENCH_POS.x,
+        spring.position.z - JURO_BENCH_POS.z
+      );
+      if (distToBench < 0.38) {
+        spring.position.x = JURO_BENCH_POS.x;
+        spring.position.z = JURO_BENCH_POS.z;
+        spring.target.x = JURO_BENCH_POS.x;
+        spring.target.z = JURO_BENCH_POS.z;
+        spring.velocity.set(0, 0, 0);
+        onBenchArrival?.();
+      }
+    }
+
     const currGroundY = getTerrainHeightAt(spring.position.x, spring.position.z);
     const restY = currGroundY + currentBottomOffset;
 
@@ -672,6 +718,12 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
                 getTerrainHeightAt(JURO_BED_POS.x, JURO_BED_POS.z),
                 JURO_BED_POS.z
               )
+            : isHeadingToBenchRef?.current
+            ? _benchTargetVec.set(
+                JURO_BENCH_POS.x,
+                JURO_BENCH_POS.seatY,
+                JURO_BENCH_POS.z
+              )
             : fsm.wanderTarget;
           const dx = currentTarget.x - spring.position.x;
           const dz = currentTarget.z - spring.position.z;
@@ -684,11 +736,11 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
             // Smoothly face 3D direction of travel
             if (groupRef.current) {
               const targetYaw = Math.atan2(dirX, dirZ);
-              groupRef.current.rotation.y = lerpAngle(groupRef.current.rotation.y, targetYaw, 0.12);
+              groupRef.current.rotation.y = lerpAngle(groupRef.current.rotation.y, targetYaw, 0.16);
             }
 
             // Authentic Slime Drag-Stretch Crawl (reach front forward -> drag rear body in!)
-            const cycle = t * 5.6;
+            const cycle = t * 6.8;
             const wave = Math.sin(cycle);
             let crawlSpeed: number;
             if (wave >= 0) {
@@ -696,14 +748,14 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
               crawlScaleZ = 1 + wave * 0.24 * motionScale;
               crawlScaleX = 1 - wave * 0.11 * motionScale;
               crawlScaleY = 1 - wave * 0.12 * motionScale;
-              crawlSpeed = 0.42;
+              crawlSpeed = 0.65;
             } else {
               // Drag trailing jelly body forward in a plump surge!
               const pull = -wave;
               crawlScaleZ = 1 - pull * 0.16 * motionScale;
               crawlScaleX = 1 + pull * 0.13 * motionScale;
               crawlScaleY = 1 + pull * 0.14 * motionScale;
-              crawlSpeed = 1.55;
+              crawlSpeed = 2.25;
             }
 
             // Check ahead for higher elevation (hill, stump, rock ledge, bridge) -> trigger jump!
@@ -721,8 +773,9 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
             const aheadGroundY = getTerrainHeightAt(probeX, probeZ);
 
             if (aheadGroundY > currGroundY + 0.05 || aheadGroundY < currGroundY - 0.14) {
-              const isHeadingToBed = isHeadingToBedRef?.current ?? false;
-              const safeLanding = isHeadingToBed
+              const isHeadingSpecial =
+                (isHeadingToBedRef?.current ?? false) || (isHeadingToBenchRef?.current ?? false);
+              const safeLanding = isHeadingSpecial
                 ? { x: probeX, z: probeZ }
                 : resolveHorizontalCollisions(
                     probeX,
@@ -730,13 +783,14 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
                     aheadGroundY,
                     JURO_COLLISION_RADIUS,
                     true,
-                    isHeadingToBed
+                    isHeadingToBedRef?.current ?? false,
+                    isHeadingToBenchRef?.current ?? false
                   );
               const landSurfaceY = getTerrainHeightAt(safeLanding.x, safeLanding.z);
               j.active = true;
               j.elapsed = 0;
               soundEffects.playHop();
-              j.duration = 0.52;
+              j.duration = 0.42;
               j.startX = spring.position.x;
               j.startY = spring.position.y;
               j.startZ = spring.position.z;
@@ -748,8 +802,9 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
               const step = Math.min(dist, crawlSpeed * delta * motionScale);
               const rawNextX = spring.position.x + dirX * step;
               const rawNextZ = spring.position.z + dirZ * step;
-              const isHeadingToBed = isHeadingToBedRef?.current ?? false;
-              const resolvedStep = isHeadingToBed
+              const isHeadingSpecial =
+                (isHeadingToBedRef?.current ?? false) || (isHeadingToBenchRef?.current ?? false);
+              const resolvedStep = isHeadingSpecial
                 ? { x: rawNextX, z: rawNextZ, hitObstacle: false }
                 : resolveHorizontalCollisions(
                     rawNextX,
@@ -757,7 +812,8 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
                     currGroundY,
                     JURO_COLLISION_RADIUS,
                     false,
-                    isHeadingToBed
+                    isHeadingToBedRef?.current ?? false,
+                    isHeadingToBenchRef?.current ?? false
                   );
 
               // If grazing an obstacle, add subtle tangential slide so Juro curves around rocks/trees!
@@ -772,7 +828,8 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
                   currGroundY,
                   JURO_COLLISION_RADIUS,
                   false,
-                  isHeadingToBed
+                  isHeadingToBedRef?.current ?? false,
+                  isHeadingToBenchRef?.current ?? false
                 );
                 finalX = slid.x;
                 finalZ = slid.z;
@@ -870,7 +927,7 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
 
                 const cycle = t * 7.5;
                 const wave = Math.sin(cycle);
-                const stepSpeed = wave >= 0 ? 1.8 : 2.5;
+                const stepSpeed = wave >= 0 ? 2.4 : 3.4;
                 const step = Math.min(dist, stepSpeed * delta * motionScale);
                 const rawNextX = spring.position.x + dirX * step;
                 const rawNextZ = spring.position.z + dirZ * step;
@@ -922,6 +979,41 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
               groupRef.current.rotation.z = Math.sin(t * 7) * 0.07 * motionScale;
               groupRef.current.rotation.y = lerpAngle(groupRef.current.rotation.y, 0, 0.08);
             }
+          }
+        } else if (isSittingOnBench) {
+          // Anchor Juro comfortably atop the wooden park bench on East Knoll
+          const distToBench = Math.hypot(
+            spring.position.x - JURO_BENCH_POS.x,
+            spring.position.z - JURO_BENCH_POS.z
+          );
+          if (distToBench > 0.04) {
+            spring.position.x = THREE.MathUtils.lerp(spring.position.x, JURO_BENCH_POS.x, 0.2);
+            spring.position.z = THREE.MathUtils.lerp(spring.position.z, JURO_BENCH_POS.z, 0.2);
+          } else {
+            spring.position.x = JURO_BENCH_POS.x;
+            spring.position.z = JURO_BENCH_POS.z;
+          }
+          spring.target.x = JURO_BENCH_POS.x;
+          spring.target.z = JURO_BENCH_POS.z;
+          spring.velocity.x *= 0.1;
+          spring.velocity.z *= 0.1;
+
+          const sitY = JURO_BENCH_POS.seatY + currentBottomOffset * 0.92 + Math.sin(t * 2.2) * 0.008 * motionScale;
+          _targetVec.set(JURO_BENCH_POS.x, sitY, JURO_BENCH_POS.z);
+          spring.setTarget(_targetVec);
+
+          crawlScaleY = 0.94 + Math.sin(t * 2.2) * 0.02 * motionScale;
+          crawlScaleX = 1.04;
+          crawlScaleZ = 1.04;
+
+          if (groupRef.current) {
+            groupRef.current.rotation.y = lerpAngle(groupRef.current.rotation.y, JURO_BENCH_POS.rotY, 0.08);
+            groupRef.current.rotation.x = THREE.MathUtils.lerp(groupRef.current.rotation.x, 0.03, 0.08);
+            groupRef.current.rotation.z = THREE.MathUtils.lerp(
+              groupRef.current.rotation.z,
+              Math.sin(t * 1.6) * 0.015 * motionScale,
+              0.08
+            );
           }
         } else if (currentState === "sleep") {
           // Whether Juro fell asleep from night time, low energy, or player command,
@@ -998,6 +1090,8 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
       currentState === "sleep" ||
       storeState === "sleep" ||
       (isHeadingToBedRef?.current ?? false);
+    const isSittingOrHeadingToBench =
+      isSittingOnBench || (isHeadingToBenchRef?.current ?? false);
 
     const postStepCollision = resolveHorizontalCollisions(
       spring.position.x,
@@ -1005,7 +1099,8 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
       spring.position.y - currentBottomOffset,
       JURO_COLLISION_RADIUS,
       jumpRef.current.active,
-      isSleepingOrHeading
+      isSleepingOrHeading,
+      isSittingOrHeadingToBench
     );
     if (postStepCollision.hitObstacle) {
       spring.resolveHorizontal(postStepCollision.x, postStepCollision.z, 0.1);
@@ -1055,12 +1150,17 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
       // Scale entire character cleanly to pocket-sized currentPetScale
       scale.multiplyScalar(currentPetScale);
 
-      // Hard terrain collision boundary: keep Juro's bottom resting cleanly on grass/hill/bridge/stump/mattress
+      // Hard terrain collision boundary: keep Juro's bottom resting cleanly on grass/hill/bridge/stump/mattress/bench
       const isSleepingOnBed =
         currentState === "sleep" &&
         Math.hypot(spring.position.x - JURO_BED_POS.x, spring.position.z - JURO_BED_POS.z) < 0.85;
-      const bedMattressLift = isSleepingOnBed ? 0.120 : 0;
-      const minCenterY = liveSurfaceY + bedMattressLift + BODY_BOTTOM_LOCAL * scale.y;
+      const isSittingOnBenchNear =
+        isSittingOnBench &&
+        Math.hypot(spring.position.x - JURO_BENCH_POS.x, spring.position.z - JURO_BENCH_POS.z) < 0.65;
+      const surfaceBaseY = isSittingOnBenchNear
+        ? JURO_BENCH_POS.seatY
+        : liveSurfaceY + (isSleepingOnBed ? 0.120 : 0);
+      const minCenterY = surfaceBaseY + BODY_BOTTOM_LOCAL * scale.y;
       spring.clampFloor(minCenterY, 0.22);
 
       groupRef.current.position.copy(spring.position);
@@ -1148,12 +1248,17 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
       }
     }
 
-    // 5. Soft Contact Shadow — sits directly on whatever ground/hill/stump/bridge Juro is above!
+    // 5. Soft Contact Shadow — sits directly on whatever ground/hill/stump/bridge/bench Juro is above!
     if (shadowRef.current && groupRef.current) {
       const isSleepingOnBed =
         currentState === "sleep" &&
         Math.hypot(spring.position.x - JURO_BED_POS.x, spring.position.z - JURO_BED_POS.z) < 0.85;
-      const contactSurfaceY = liveSurfaceY + (isSleepingOnBed ? 0.132 : 0);
+      const isSittingOnBenchNear =
+        isSittingOnBench &&
+        Math.hypot(spring.position.x - JURO_BENCH_POS.x, spring.position.z - JURO_BENCH_POS.z) < 0.65;
+      const contactSurfaceY = isSittingOnBenchNear
+        ? JURO_BENCH_POS.seatY + 0.003
+        : liveSurfaceY + (isSleepingOnBed ? 0.132 : 0);
       shadowRef.current.position.set(
         spring.position.x,
         contactSurfaceY + 0.005,
