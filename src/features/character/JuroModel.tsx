@@ -284,6 +284,8 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
 
   // Timer to repath immediately if blocked by an obstacle while wandering
   const blockedTimerRef = useRef(0);
+  const snoreTimerRef = useRef(0);
+  const scrubSoundTimerRef = useRef(0);
 
   // Sync external store triggers (feed, play, sleep) with FSM
   useEffect(() => {
@@ -1069,6 +1071,28 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
       const isScrubbingNow = liveBath?.isScrubbing ?? false;
       const isRinsingNow = liveBath?.isRinsing ?? false;
 
+      // Periodic gentle snoring audio when Juro is asleep
+      if (currentState === "sleep") {
+        snoreTimerRef.current += delta;
+        if (snoreTimerRef.current >= 4.2) {
+          snoreTimerRef.current = 0;
+          soundEffects.playSnore();
+        }
+      } else {
+        snoreTimerRef.current = 0;
+      }
+
+      // Foamy soap bubble scrub sound when user is lathering Juro
+      if (isScrubbingNow) {
+        scrubSoundTimerRef.current += delta;
+        if (scrubSoundTimerRef.current >= 0.22) {
+          scrubSoundTimerRef.current = 0;
+          soundEffects.playScrub();
+        }
+      } else {
+        scrubSoundTimerRef.current = 0;
+      }
+
       // Playful bath reactions & woozy dizzy body sway
       const isDizzyActive = currentState !== "sleep" && dizzyRef.current.timer > 0;
       const dizzyFade = isDizzyActive ? Math.min(1, dizzyRef.current.timer / 0.65) : 0;
@@ -1170,7 +1194,7 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
         } else if (eatT < 1.4) {
           if (lastBiteSoundRef.current < 1) {
             lastBiteSoundRef.current = 1;
-            soundEffects.playSquish();
+            soundEffects.playMunch();
           }
           foodPropRef.current.position.set(0, -0.14, 1.28);
           foodPropRef.current.scale.setScalar(0.92);
@@ -1181,7 +1205,7 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
         } else if (eatT < 2.1) {
           if (lastBiteSoundRef.current < 2) {
             lastBiteSoundRef.current = 2;
-            soundEffects.playSquish();
+            soundEffects.playMunch();
           }
           foodPropRef.current.position.set(0, -0.14, 1.2);
           foodPropRef.current.scale.setScalar(0.48);

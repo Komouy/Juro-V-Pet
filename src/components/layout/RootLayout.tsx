@@ -1,14 +1,30 @@
-import React from "react";
+import React, { useEffect } from "react";
 import { Outlet, useLocation } from "react-router-dom";
 import { Navbar } from "./Navbar";
 import { MobileNav } from "./MobileNav";
 import { PixelToast } from "../ui/PixelToast";
+import { soundEffects } from "../../engine/audio/soundEffects";
+import { isBedtimeHour } from "../../utils/timeOfDay";
 
 const SUB_ROUTES = new Set(["/shop", "/mine", "/collection", "/evolution", "/settings"]);
 
 export const RootLayout: React.FC = () => {
   const location = useLocation();
   const isHome = !SUB_ROUTES.has(location.pathname);
+
+  // Seamless procedural retro BGM switching per page/environment
+  useEffect(() => {
+    if (location.pathname === "/") {
+      const isNight = isBedtimeHour(new Date());
+      soundEffects.setBgmTrack(isNight ? "lullaby" : "meadow");
+    } else if (location.pathname === "/shop") {
+      soundEffects.setBgmTrack("shop");
+    } else if (location.pathname === "/mine") {
+      soundEffects.setBgmTrack("mine");
+    } else {
+      soundEffects.setBgmTrack("cozy");
+    }
+  }, [location.pathname]);
 
   return (
     <div

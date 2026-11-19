@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { Utensils, Gamepad2, Sun, Moon, Droplets, HandHeart, MessageSquare, Send } from "lucide-react";
+import { soundEffects } from "../../../engine/audio/soundEffects";
 
 export interface JuroContextMenuProps {
   open: boolean;
@@ -73,7 +74,10 @@ export const JuroContextMenu: React.FC<JuroContextMenuProps> = ({
           <input
             type="text"
             value={chatInput}
-            onChange={(e) => setChatInput(e.target.value)}
+            onChange={(e) => {
+              soundEffects.playKeyTap();
+              setChatInput(e.target.value);
+            }}
             placeholder="Tulis pesan untuk Juro..."
             maxLength={100}
             disabled={isChatLoading}

@@ -1,5 +1,6 @@
 import React from "react";
 import { type LucideIcon, X, AlertCircle, CheckCircle2 } from "lucide-react";
+import { soundEffects } from "../../engine/audio/soundEffects";
 
 export interface PixelInputProps extends React.InputHTMLAttributes<HTMLInputElement> {
   label?: string;
@@ -21,9 +22,15 @@ export const PixelInput: React.FC<PixelInputProps> = ({
   maxLength,
   className = "",
   disabled,
+  onChange,
   ...props
 }) => {
   const currentLength = typeof value === "string" ? value.length : 0;
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    soundEffects.playKeyTap();
+    onChange?.(e);
+  };
 
   return (
     <div className="space-y-1.5 w-full select-none">
@@ -74,6 +81,7 @@ export const PixelInput: React.FC<PixelInputProps> = ({
             disabled:opacity-50 disabled:cursor-not-allowed
             ${className}
           `}
+          onChange={handleChange}
           {...props}
         />
 

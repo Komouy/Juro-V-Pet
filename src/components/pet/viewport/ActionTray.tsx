@@ -218,9 +218,6 @@ export const ActionTray: React.FC<ActionTrayProps> = ({
                 <span className="pixel-text text-[9px] text-charcoal dark:text-white font-bold">
                   Sabun Busa
                 </span>
-                <span className="pixel-text text-[8px] text-sky-600 dark:text-sky-400">
-                  Tarik ke Juro
-                </span>
               </div>
             </button>
 
@@ -238,9 +235,6 @@ export const ActionTray: React.FC<ActionTrayProps> = ({
               <div className="flex flex-col items-center">
                 <span className="pixel-text text-[9px] text-charcoal dark:text-white font-bold">
                   Ember Air
-                </span>
-                <span className="pixel-text text-[8px] text-sky-600 dark:text-sky-400">
-                  {soapBadgePercent >= 40 ? "Bilas busa!" : "Siram air"}
                 </span>
               </div>
             </button>

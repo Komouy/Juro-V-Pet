@@ -36,9 +36,10 @@ export const Navbar: React.FC = () => {
   };
 
   const handleToggleSound = () => {
+    soundEffects.unlockAudio();
     if (!soundEnabled) {
       toggleSound();
-      setTimeout(() => soundEffects.playToggle(true), 10);
+      soundEffects.playToggle(true);
     } else {
       soundEffects.playToggle(false);
       toggleSound();

@@ -497,9 +497,10 @@ export const PetViewport: React.FC = () => {
       if (strokeDist > 26) {
         strokeDist = 0;
         const nowMs = Date.now();
-        if (nowMs - lastSoundAt > 200) {
+        if (nowMs - lastSoundAt > 220) {
           lastSoundAt = nowMs;
           soundEffects.playPet();
+          soundEffects.playPurr();
         }
         strokePet();
 

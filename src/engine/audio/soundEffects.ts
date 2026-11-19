@@ -1,8 +1,136 @@
 import { useUIStore } from "../../stores/uiStore";
 
-// Comprehensive Web Audio API Sound Generator for cozy, retro pixel UI/UX & jelly pet SFX
+export type BgmTrack = "meadow" | "lullaby" | "shop" | "mine" | "cozy";
+
+// Note frequency lookup table (Hz)
+const N = {
+  _: 0,
+  C2: 65.41, E2: 82.41, F2: 87.31, G2: 98.00, A2: 110.00, B2: 123.47,
+  C3: 130.81, D3: 146.83, E3: 164.81, F3: 174.61, G3: 196.00, A3: 220.00, B3: 246.94,
+  C4: 261.63, D4: 293.66, E4: 329.63, F4: 349.23, Fs4: 369.99, G4: 392.00, A4: 440.00, B4: 493.88,
+  C5: 523.25, D5: 587.33, E5: 659.25, F5: 698.46, Fs5: 739.99, G5: 783.99, A5: 880.00, B5: 987.77,
+  C6: 1046.50, D6: 1174.66, E6: 1318.51, G6: 1567.98,
+};
+
+interface TrackDef {
+  stepDur: number;
+  melody: number[];
+  bass: number[];
+  waveform: OscillatorType;
+  bassWaveform: OscillatorType;
+  melVol: number;
+  bassVol: number;
+}
+
+const BGM_TRACKS: Record<BgmTrack, TrackDef> = {
+  // 1. Daytime Juro Meadow: Joyful, pastoral, cozy chiptune
+  meadow: {
+    stepDur: 0.27,
+    melody: [
+      N.C5, N.E5, N.G5, N.A5, N.G5, N.E5, N.D5, N.C5,
+      N.E5, N.G5, N.C6, N.B5, N.A5, N.G5, N.E5, N.D5,
+      N.C5, N.D5, N.E5, N.G5, N.A5, N.G5, N.E5, N.D5,
+      N.C5, N.E5, N.D5, N.G4, N.C5, N._, N.C5, N._,
+    ],
+    bass: [
+      N.C3, N.C3, N.G3, N.G3, N.A3, N.A3, N.F3, N.F3,
+      N.C3, N.C3, N.E3, N.E3, N.F3, N.F3, N.G3, N.G3,
+      N.C3, N.C3, N.G3, N.G3, N.A3, N.A3, N.F3, N.F3,
+      N.C3, N.C3, N.F3, N.G3, N.C3, N._, N.C3, N._,
+    ],
+    waveform: "triangle",
+    bassWaveform: "sine",
+    melVol: 0.045,
+    bassVol: 0.065,
+  },
+
+  // 2. Nighttime / Bedtime Lullaby: Gentle, dreamy music box
+  lullaby: {
+    stepDur: 0.44,
+    melody: [
+      N.E5, N.G5, N.B5, N.C6, N.B5, N.G5, N.E5, N.D5,
+      N.E5, N.A5, N.C6, N.B5, N.A5, N.G5, N.E5, N.D5,
+      N.C5, N.E5, N.G5, N.A5, N.G5, N.E5, N.D5, N.B4,
+      N.C5, N.E5, N.D5, N.B4, N.A4, N._, N.A4, N._,
+    ],
+    bass: [
+      N.A2, N.E3, N.F2, N.C3, N.G2, N.D3, N.C3, N.G2,
+      N.A2, N.E3, N.F2, N.C3, N.G2, N.D3, N.A2, N.E2,
+    ],
+    waveform: "sine",
+    bassWaveform: "sine",
+    melVol: 0.038,
+    bassVol: 0.05,
+  },
+
+  // 3. Shop Market Theme: Bouncy, upbeat retro shopkeeper melody
+  shop: {
+    stepDur: 0.22,
+    melody: [
+      N.G4, N.B4, N.D5, N.G5, N.E5, N.C5, N.E5, N.G5,
+      N.Fs5, N.D5, N.Fs5, N.A5, N.G5, N.D5, N.B4, N.G4,
+      N.C5, N.E5, N.G5, N.A5, N.B5, N.G5, N.E5, N.D5,
+      N.C5, N.D5, N.E5, N.Fs5, N.G5, N._, N.G5, N._,
+    ],
+    bass: [
+      N.G2, N.D3, N.C3, N.G2, N.D3, N.A2, N.G2, N.D3,
+      N.C3, N.G3, N.E3, N.C3, N.D3, N.A2, N.G2, N.D3,
+    ],
+    waveform: "triangle",
+    bassWaveform: "triangle",
+    melVol: 0.05,
+    bassVol: 0.065,
+  },
+
+  // 4. Subterranean Mine Theme: Deep resonant cave ambiance & crystal chimes
+  mine: {
+    stepDur: 0.36,
+    melody: [
+      N.E5, N._, N.B5, N._, N.G5, N._, N.E6, N._,
+      N.D6, N._, N.B5, N._, N.G5, N._, N.A5, N._,
+      N.E5, N._, N.B5, N._, N.G5, N._, N.D6, N._,
+      N.C6, N._, N.B5, N._, N.A5, N._, N.E5, N._,
+    ],
+    bass: [
+      N.E2, N.E2, N.B2, N.B2, N.C3, N.C3, N.A2, N.B2,
+      N.E2, N.E2, N.B2, N.B2, N.A2, N.A2, N.B2, N.B2,
+    ],
+    waveform: "sine",
+    bassWaveform: "triangle",
+    melVol: 0.04,
+    bassVol: 0.07,
+  },
+
+  // 5. Cozy Theme (Collection, Evolution, Settings): Relaxed, warm lofi chiptune
+  cozy: {
+    stepDur: 0.30,
+    melody: [
+      N.F5, N.A5, N.C6, N.A5, N.G5, N.B5, N.D6, N.B5,
+      N.E5, N.G5, N.B5, N.G5, N.A5, N.C6, N.E6, N.C6,
+      N.F5, N.A5, N.C6, N.D6, N.C6, N.A5, N.G5, N.E5,
+      N.F5, N.G5, N.A5, N.B5, N.C6, N._, N.C6, N._,
+    ],
+    bass: [
+      N.F2, N.C3, N.G2, N.D3, N.E2, N.B2, N.A2, N.E3,
+      N.F2, N.C3, N.G2, N.D3, N.F2, N.G2, N.C3, N.C3,
+    ],
+    waveform: "triangle",
+    bassWaveform: "sine",
+    melVol: 0.042,
+    bassVol: 0.06,
+  },
+};
+
+// Comprehensive Web Audio API Sound & Music Generator for cozy, retro pixel UI/UX & jelly pet SFX
 class SoundSystem {
   private ctx: AudioContext | null = null;
+  private masterGain: GainNode | null = null;
+  private bgmGain: GainNode | null = null;
+  private currentTrack: BgmTrack = "meadow";
+  private isBgmPlaying: boolean = false;
+  private bgmIntervalId: ReturnType<typeof setInterval> | null = null;
+  private bgmStep: number = 0;
+  private bgmNextNoteTime: number = 0;
 
   private initCtx() {
     if (!this.ctx && typeof window !== "undefined") {
@@ -21,6 +149,142 @@ class SoundSystem {
 
   private isEnabled(): boolean {
     return Boolean(useUIStore.getState().soundEnabled);
+  }
+
+  public unlockAudio() {
+    if (typeof window === "undefined") return;
+    const ctx = this.initCtx();
+    if (ctx && ctx.state === "suspended") {
+      ctx.resume().catch(() => {});
+    }
+  }
+
+  private getMasterGain(): GainNode {
+    const ctx = this.initCtx()!;
+    if (!this.masterGain) {
+      this.masterGain = ctx.createGain();
+      const enabled = this.isEnabled();
+      this.masterGain.gain.setValueAtTime(enabled ? 1.0 : 0.0, ctx.currentTime);
+      this.masterGain.connect(ctx.destination);
+    }
+    return this.masterGain;
+  }
+
+  private getBgmGain(): GainNode {
+    const ctx = this.initCtx()!;
+    if (!this.bgmGain) {
+      this.bgmGain = ctx.createGain();
+      const enabled = this.isEnabled();
+      this.bgmGain.gain.setValueAtTime(enabled ? 0.35 : 0.0, ctx.currentTime);
+      this.bgmGain.connect(this.getMasterGain());
+    }
+    return this.bgmGain;
+  }
+
+  // === PROCEDURAL RETRO BGM SEQUENCER ===
+
+  public startBgm() {
+    if (!this.isEnabled()) return;
+    const ctx = this.initCtx();
+    if (!ctx) return;
+    if (this.isBgmPlaying && this.bgmIntervalId) return;
+
+    this.isBgmPlaying = true;
+    this.bgmStep = 0;
+    this.bgmNextNoteTime = ctx.currentTime + 0.08;
+
+    if (this.bgmIntervalId) clearInterval(this.bgmIntervalId);
+    this.bgmIntervalId = setInterval(() => {
+      this.scheduleBgm();
+    }, 50);
+  }
+
+  public stopBgm() {
+    this.isBgmPlaying = false;
+    if (this.bgmIntervalId) {
+      clearInterval(this.bgmIntervalId);
+      this.bgmIntervalId = null;
+    }
+  }
+
+  public setBgmTrack(track: BgmTrack) {
+    if (this.currentTrack === track && this.isBgmPlaying) return;
+    this.currentTrack = track;
+    this.bgmStep = 0;
+    if (this.ctx) {
+      this.bgmNextNoteTime = this.ctx.currentTime + 0.08;
+    }
+    if (this.isEnabled() && !this.isBgmPlaying) {
+      this.startBgm();
+    }
+  }
+
+  public syncSoundEnabled(enabled: boolean) {
+    if (this.ctx && this.masterGain) {
+      this.masterGain.gain.setValueAtTime(enabled ? 1.0 : 0.0, this.ctx.currentTime);
+    }
+    if (enabled) {
+      this.unlockAudio();
+      this.startBgm();
+    } else {
+      this.stopBgm();
+    }
+  }
+
+  private scheduleBgm() {
+    if (!this.ctx || this.ctx.state !== "running" || !this.isEnabled() || !this.isBgmPlaying) return;
+    const track = BGM_TRACKS[this.currentTrack];
+    if (!track) return;
+
+    const lookahead = 0.30;
+    while (this.bgmNextNoteTime < this.ctx.currentTime + lookahead) {
+      const stepIdx = this.bgmStep % track.melody.length;
+      const melFreq = track.melody[stepIdx];
+      const bassIdx = this.bgmStep % track.bass.length;
+      const bassFreq = track.bass[bassIdx];
+
+      const noteTime = this.bgmNextNoteTime;
+      const stepDur = track.stepDur;
+
+      if (melFreq > 0) {
+        this.playBgmNote(melFreq, noteTime, stepDur * 0.82, track.waveform, track.melVol);
+      }
+
+      if (bassFreq > 0) {
+        this.playBgmNote(bassFreq, noteTime, stepDur * 0.92, track.bassWaveform, track.bassVol);
+      }
+
+      this.bgmStep++;
+      this.bgmNextNoteTime += stepDur;
+    }
+  }
+
+  private playBgmNote(
+    freq: number,
+    time: number,
+    duration: number,
+    type: OscillatorType,
+    vol: number
+  ) {
+    if (!this.ctx) return;
+    try {
+      const osc = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+      osc.type = type;
+      osc.frequency.setValueAtTime(freq, time);
+
+      gain.gain.setValueAtTime(0.0001, time);
+      gain.gain.linearRampToValueAtTime(vol, time + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.0001, time + duration);
+
+      osc.connect(gain);
+      gain.connect(this.getBgmGain());
+
+      osc.start(time);
+      osc.stop(time + duration + 0.02);
+    } catch {
+      // Audio safety
+    }
   }
 
   // === 1. CORE PET & SLIME PHYSICS SOUNDS ===
@@ -1080,6 +1344,175 @@ class SoundSystem {
       // Audio safety
     }
   }
+
+  // === 5. NEW JELLY ANIMATION & DETAIL SFX ===
+
+  // Gentle adorable breath/snore when Juro is asleep on the sofa
+  playSnore() {
+    if (!this.isEnabled()) return;
+    const ctx = this.initCtx();
+    if (!ctx) return;
+    try {
+      const now = ctx.currentTime;
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      const filter = ctx.createBiquadFilter();
+
+      filter.type = "lowpass";
+      filter.frequency.setValueAtTime(450, now);
+
+      osc.type = "sine";
+      // Gentle inhale and exhale pitch wave
+      osc.frequency.setValueAtTime(190, now);
+      osc.frequency.linearRampToValueAtTime(250, now + 0.35);
+      osc.frequency.linearRampToValueAtTime(175, now + 0.85);
+
+      gain.gain.setValueAtTime(0.001, now);
+      gain.gain.linearRampToValueAtTime(0.12, now + 0.35);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.9);
+
+      osc.connect(filter);
+      filter.connect(gain);
+      gain.connect(ctx.destination);
+
+      osc.start(now);
+      osc.stop(now + 0.92);
+    } catch {
+      // Audio safety
+    }
+  }
+
+  // Foamy bubbly sound when scrubbing Juro with the soap sponge
+  playScrub() {
+    if (!this.isEnabled()) return;
+    const ctx = this.initCtx();
+    if (!ctx) return;
+    try {
+      const now = ctx.currentTime;
+      [0, 0.04, 0.08].forEach((delay, idx) => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = "triangle";
+        osc.frequency.setValueAtTime(820 + idx * 160 + Math.random() * 60, now + delay);
+        osc.frequency.exponentialRampToValueAtTime(320, now + delay + 0.04);
+
+        gain.gain.setValueAtTime(0.09, now + delay);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + delay + 0.045);
+
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+
+        osc.start(now + delay);
+        osc.stop(now + delay + 0.05);
+      });
+    } catch {
+      // Audio safety
+    }
+  }
+
+  // Warm loving purr vibration when gently stroking Juro
+  playPurr() {
+    if (!this.isEnabled()) return;
+    const ctx = this.initCtx();
+    if (!ctx) return;
+    try {
+      const now = ctx.currentTime;
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+
+      osc.type = "sine";
+      osc.frequency.setValueAtTime(65, now);
+      osc.frequency.linearRampToValueAtTime(85, now + 0.1);
+      osc.frequency.linearRampToValueAtTime(60, now + 0.22);
+
+      gain.gain.setValueAtTime(0.14, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.24);
+
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+
+      osc.start(now);
+      osc.stop(now + 0.25);
+    } catch {
+      // Audio safety
+    }
+  }
+
+  // Crunchy, cute jelly munch bite when eating food
+  playMunch() {
+    if (!this.isEnabled()) return;
+    const ctx = this.initCtx();
+    if (!ctx) return;
+    try {
+      const now = ctx.currentTime;
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+
+      osc.type = "triangle";
+      osc.frequency.setValueAtTime(540, now);
+      osc.frequency.exponentialRampToValueAtTime(260, now + 0.06);
+
+      gain.gain.setValueAtTime(0.18, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.07);
+
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+
+      osc.start(now);
+      osc.stop(now + 0.08);
+    } catch {
+      // Audio safety
+    }
+  }
+
+  // Subtle 8-bit typewriter click when typing in text inputs
+  playKeyTap() {
+    if (!this.isEnabled()) return;
+    const ctx = this.initCtx();
+    if (!ctx) return;
+    try {
+      const now = ctx.currentTime;
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+
+      osc.type = "triangle";
+      osc.frequency.setValueAtTime(600 + Math.random() * 120, now);
+      osc.frequency.exponentialRampToValueAtTime(200, now + 0.025);
+
+      gain.gain.setValueAtTime(0.06, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.03);
+
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+
+      osc.start(now);
+      osc.stop(now + 0.035);
+    } catch {
+      // Audio safety
+    }
+  }
 }
 
 export const soundEffects = new SoundSystem();
+
+// Global user-gesture interaction unlocker for all browsers (Chrome, Edge, Safari, Mobile)
+if (typeof window !== "undefined") {
+  const unlockEvents = ["pointerdown", "keydown", "touchstart", "click"];
+  const handleFirstInteraction = () => {
+    soundEffects.unlockAudio();
+    if (useUIStore.getState().soundEnabled) {
+      soundEffects.startBgm();
+    }
+    unlockEvents.forEach((ev) => window.removeEventListener(ev, handleFirstInteraction, true));
+  };
+  unlockEvents.forEach((ev) =>
+    window.addEventListener(ev, handleFirstInteraction, { capture: true, once: true })
+  );
+
+  // Sync BGM and master volume whenever soundEnabled is toggled anywhere in the app
+  useUIStore.subscribe((state, prev) => {
+    if (state.soundEnabled !== prev.soundEnabled) {
+      soundEffects.syncSoundEnabled(state.soundEnabled);
+    }
+  });
+}
