@@ -120,9 +120,21 @@ export const PetViewport: React.FC = () => {
 
   const [activeTray, setActiveTray] = useState<ActiveTray>("none");
   const [showStatDetails, setShowStatDetails] = useState(false);
-  const [showJuroMenu, setShowJuroMenu] = useState(false);
-  const [grabRequested, setGrabRequested] = useState<number | undefined>(undefined);
+  const [juroMenu, setJuroMenu] = useState<{
+    open: boolean;
+    x: number;
+    y: number;
+    isNearTop: boolean;
+  }>({
+    open: false,
+    x: 0,
+    y: 0,
+    isNearTop: false,
+  });
+
+  const [isGrabActive, setIsGrabActive] = useState(false);
   const [isDraggingPet, setIsDraggingPet] = useState(false);
+  const dragPointerNDC = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
 
   const juroMenuRef = useRef<HTMLDivElement>(null);
   const tailRef = useRef<HTMLDivElement>(null);
@@ -132,54 +144,98 @@ export const PetViewport: React.FC = () => {
   const [soapBadgePercent, setSoapBadgePercent] = useState(0);
   const [walkCommand, setWalkCommand] = useState<WalkCommand | null>(null);
 
-  const handleWalkPointSelect = useCallback((x: number, z: number) => {
-    setShowJuroMenu(false);
-    setActiveTray("none");
-    setShowStatDetails(false);
-    setWalkCommand({ x, z, nonce: Date.now() });
-  }, [setActiveTray, setShowStatDetails]);
+  const handleFinishGrab = useCallback(() => {
+    setIsGrabActive(false);
+    soundEffects.playBoing();
+    addLog("interaction", "Juro ditaruh kembali dengan aman di tanah.");
+  }, [addLog]);
+
+  const handleWalkPointSelect = useCallback(
+    (x: number, z: number) => {
+      if (isGrabActive) {
+        handleFinishGrab();
+        return;
+      }
+      setJuroMenu({ open: false, x: 0, y: 0, isNearTop: false });
+      setActiveTray("none");
+      setShowStatDetails(false);
+      setWalkCommand({ x, z, nonce: Date.now() });
+    },
+    [isGrabActive, handleFinishGrab, setActiveTray, setShowStatDetails]
+  );
 
   const handleOpenShopFromMap = useCallback(() => {
-    setShowJuroMenu(false);
+    if (isGrabActive) handleFinishGrab();
+    setJuroMenu({ open: false, x: 0, y: 0, isNearTop: false });
     soundEffects.playClick();
     navigate("/shop");
-  }, [navigate]);
+  }, [isGrabActive, handleFinishGrab, navigate]);
 
   const handleOpenMineFromMap = useCallback(() => {
-    setShowJuroMenu(false);
+    if (isGrabActive) handleFinishGrab();
+    setJuroMenu({ open: false, x: 0, y: 0, isNearTop: false });
     soundEffects.playClick();
     navigate("/mine");
-  }, [navigate]);
+  }, [isGrabActive, handleFinishGrab, navigate]);
 
-  const handlePetClick = useCallback(() => {
-    soundEffects.playSquish();
-    setShowStatDetails(false);
-    setActiveTray("none");
-    setShowJuroMenu((prev) => !prev);
-  }, []);
+  const handlePetClick = useCallback(
+    (screenPos?: { x: number; y: number }) => {
+      soundEffects.playSquish();
+      setShowStatDetails(false);
+      setActiveTray("none");
+
+      if (juroMenu.open) {
+        setJuroMenu({ open: false, x: 0, y: 0, isNearTop: false });
+        return;
+      }
+
+      const contRect = containerRef.current?.getBoundingClientRect();
+      const contW = contRect?.width || window.innerWidth;
+      const contH = contRect?.height || window.innerHeight;
+
+      const rawX = screenPos?.x ?? (juroScreenPosRef.current?.x ?? contW / 2);
+      const rawY = screenPos?.y ?? (juroScreenPosRef.current?.headY ?? contH / 2);
+
+      const halfMenuW = Math.min(180, (contW - 24) / 2);
+      const clampedX = Math.max(halfMenuW + 12, Math.min(contW - halfMenuW - 12, rawX));
+
+      const isNearTop = rawY < 140;
+      const targetY = isNearTop ? rawY + 45 : rawY - 14;
+      const clampedY = Math.max(20, Math.min(contH - 70, targetY));
+
+      setJuroMenu({
+        open: true,
+        x: clampedX,
+        y: clampedY,
+        isNearTop,
+      });
+    },
+    [juroMenu.open]
+  );
 
   // Dismiss open trays / stat popover / Juro menu on Escape key
   useEffect(() => {
-    if (activeTray === "none" && !showStatDetails && !showJuroMenu) return;
+    if (activeTray === "none" && !showStatDetails && !juroMenu.open && !isGrabActive) return;
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
+        if (isGrabActive) handleFinishGrab();
         setActiveTray("none");
         setShowStatDetails(false);
-        setShowJuroMenu(false);
+        setJuroMenu({ open: false, x: 0, y: 0, isNearTop: false });
       }
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [activeTray, showStatDetails, showJuroMenu]);
+  }, [activeTray, showStatDetails, juroMenu.open, isGrabActive, handleFinishGrab]);
 
   // Dismiss Juro menu when clicking outside
   useEffect(() => {
-    if (!showJuroMenu) return;
+    if (!juroMenu.open) return;
     const onWindowClick = (e: MouseEvent) => {
       if (juroMenuRef.current && juroMenuRef.current.contains(e.target as Node)) {
         return;
       }
-      setShowJuroMenu(false);
+      setJuroMenu({ open: false, x: 0, y: 0, isNearTop: false });
     };
     const timer = setTimeout(() => {
       window.addEventListener("click", onWindowClick);
@@ -188,22 +244,68 @@ export const PetViewport: React.FC = () => {
       clearTimeout(timer);
       window.removeEventListener("click", onWindowClick);
     };
-  }, [showJuroMenu]);
+  }, [juroMenu.open]);
 
   // Dismiss Juro menu when user rotates or zooms camera with OrbitControls
   useEffect(() => {
     const controls = controlsRef.current;
     if (!controls) return;
     const onOrbitStart = () => {
-      setShowJuroMenu(false);
+      setJuroMenu({ open: false, x: 0, y: 0, isNearTop: false });
     };
     controls.addEventListener("start", onOrbitStart);
     return () => controls.removeEventListener("start", onOrbitStart);
   }, []);
 
-  // Lightweight 60fps RAF loop to lock Juro menu directly above Juro in screen coordinates
+  // Continuous pointer tracking during Grab Mode (Pegang)
   useEffect(() => {
-    if (!showJuroMenu) return;
+    if (!isGrabActive) return;
+    let downTime = 0;
+    let movedDistance = 0;
+    let startX = 0;
+    let startY = 0;
+
+    const onPointerDown = (e: PointerEvent) => {
+      downTime = Date.now();
+      movedDistance = 0;
+      startX = e.clientX;
+      startY = e.clientY;
+    };
+
+    const onPointerMove = (e: PointerEvent) => {
+      if (downTime > 0) {
+        const dist = Math.hypot(e.clientX - startX, e.clientY - startY);
+        movedDistance = Math.max(movedDistance, dist);
+      }
+      if (containerRef.current) {
+        const rect = containerRef.current.getBoundingClientRect();
+        const nx = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+        const ny = -(((e.clientY - rect.top) / rect.height) * 2 - 1);
+        dragPointerNDC.current = { x: nx, y: ny };
+      }
+    };
+
+    const onPointerUp = () => {
+      // If user dragged on screen (> 18px moved), releasing finger drops Juro at that spot
+      if (downTime > 0 && movedDistance > 18) {
+        handleFinishGrab();
+      }
+      downTime = 0;
+    };
+
+    window.addEventListener("pointerdown", onPointerDown);
+    window.addEventListener("pointermove", onPointerMove);
+    window.addEventListener("pointerup", onPointerUp);
+    return () => {
+      window.removeEventListener("pointerdown", onPointerDown);
+      window.removeEventListener("pointermove", onPointerMove);
+      window.removeEventListener("pointerup", onPointerUp);
+    };
+  }, [isGrabActive, handleFinishGrab]);
+
+  // Lightweight 60fps RAF loop to keep Juro menu anchored directly above Juro in screen coordinates
+  useEffect(() => {
+    if (!juroMenu.open) return;
     let animId: number;
     const update = () => {
       if (juroMenuRef.current && juroScreenPosRef.current && containerRef.current) {
@@ -212,33 +314,22 @@ export const PetViewport: React.FC = () => {
         const contW = contRect.width || window.innerWidth;
         const contH = contRect.height || window.innerHeight;
 
-        const menuWidth = 360;
-        const halfW = menuWidth / 2;
-        const clampedX = Math.max(halfW + 8, Math.min(contW - halfW - 8, pos.x));
+        const halfMenuW = Math.min(180, (contW - 24) / 2);
+        const clampedX = Math.max(halfMenuW + 12, Math.min(contW - halfMenuW - 12, pos.x));
 
-        const isNearTop = pos.y < 135;
-        const targetY = isNearTop ? pos.y + pos.radiusPx + 16 : pos.y - pos.radiusPx - 16;
-        const clampedY = Math.max(16, Math.min(contH - 70, targetY));
+        const crownY = pos.headY ?? (pos.y - pos.radiusPx);
+        const isNearTop = crownY < 140;
+        const targetY = isNearTop ? crownY + 45 : crownY - 14;
+        const clampedY = Math.max(20, Math.min(contH - 70, targetY));
 
-        juroMenuRef.current.style.transform = `translate3d(${clampedX}px, ${clampedY}px, 0) translate(-50%, ${
-          isNearTop ? "0" : "-100%"
-        })`;
-
-        if (tailRef.current) {
-          if (isNearTop) {
-            tailRef.current.className =
-              "absolute -top-1.5 left-1/2 -translate-x-1/2 w-3 h-3 bg-warm-white dark:bg-neutral-900 border-l-2 border-t-2 border-charcoal dark:border-neutral-600 rotate-45";
-          } else {
-            tailRef.current.className =
-              "absolute -bottom-1.5 left-1/2 -translate-x-1/2 w-3 h-3 bg-warm-white dark:bg-neutral-900 border-r-2 border-b-2 border-charcoal dark:border-neutral-600 rotate-45";
-          }
-        }
+        juroMenuRef.current.style.left = `${clampedX}px`;
+        juroMenuRef.current.style.top = `${clampedY}px`;
       }
       animId = requestAnimationFrame(update);
     };
     update();
     return () => cancelAnimationFrame(animId);
-  }, [showJuroMenu]);
+  }, [juroMenu.open]);
 
   // Imperative drag tracking refs (zero allocations, zero layout thrash, zero re-renders)
   const dragMetaRef = useRef<{
@@ -578,7 +669,7 @@ export const PetViewport: React.FC = () => {
 
   const handleMenuAction = (action: "food" | "toy" | "sleep" | "bath" | "grab") => {
     soundEffects.playClick();
-    setShowJuroMenu(false);
+    setJuroMenu({ open: false, x: 0, y: 0, isNearTop: false });
     setShowStatDetails(false);
 
     switch (action) {
@@ -595,7 +686,8 @@ export const PetViewport: React.FC = () => {
         setActiveTray("bath");
         break;
       case "grab":
-        setGrabRequested(Date.now());
+        setIsGrabActive(true);
+        soundEffects.playSquish();
         break;
     }
   };
@@ -632,14 +724,14 @@ export const PetViewport: React.FC = () => {
       ? "Main"
       : "Aktif";
 
-  const orbitEnabled = !isDraggingPet && !isDraggingTool;
+  const orbitEnabled = !isGrabActive && !isDraggingPet && !isDraggingTool;
 
   return (
     <div
       ref={containerRef}
       style={{ background: activeTheme.skyGradient }}
       className={`relative flex-1 min-h-0 w-full overflow-hidden select-none touch-none transition-all duration-700 ${
-        isDraggingPet ? "cursor-grabbing" : "cursor-default"
+        isGrabActive || isDraggingPet ? "cursor-grabbing" : "cursor-default"
       }`}
     >
       {/* Top Overlay Bar: Compact Tap-to-Peek Stat Strip (Left) + Camera Zoom Dock (Right) */}
@@ -816,7 +908,8 @@ export const PetViewport: React.FC = () => {
             juroScreenPosRef={juroScreenPosRef}
             walkCommand={walkCommand}
             onPetClick={handlePetClick}
-            grabRequested={grabRequested}
+            isGrabActive={isGrabActive}
+            dragPointerNDC={dragPointerNDC}
           />
 
           {/* Wide Diorama Orbit Controls — automatically paused while grabbing Juro or dragging any item */}
@@ -1012,11 +1105,6 @@ export const PetViewport: React.FC = () => {
                 <span className="pixel-text text-[10px] uppercase text-charcoal dark:text-white font-bold tracking-wider">
                   Alat Mandi
                 </span>
-                {soapBadgePercent > 0 && (
-                  <span className="pixel-text text-[8px] px-1.5 py-0.5 bg-sky-100 dark:bg-sky-900/60 text-sky-700 dark:text-sky-300 border border-sky-400">
-                    Busa {soapBadgePercent}%
-                  </span>
-                )}
               </div>
               <button
                 onClick={() => setActiveTray("none")}
@@ -1032,11 +1120,7 @@ export const PetViewport: React.FC = () => {
               <button
                 type="button"
                 onPointerDown={(e) => handleStartItemDrag({ kind: "soap" }, e)}
-                className={`group min-w-0 p-2 bg-white dark:bg-neutral-800 border-2 shadow-[2px_2px_0px_#171717] hover:-translate-y-0.5 active:translate-x-[1px] active:translate-y-[1px] active:shadow-none transition-all cursor-grab active:cursor-grabbing flex flex-col items-center text-center gap-1.5 touch-none ${
-                  soapBadgePercent < 40
-                    ? "border-pink-400 dark:border-pink-500"
-                    : "border-charcoal dark:border-neutral-700 hover:border-juro-orange"
-                }`}
+                className={`group min-w-0 p-2 bg-white dark:bg-neutral-800 border-2 shadow-[2px_2px_0px_#171717] hover:-translate-y-0.5 active:translate-x-[1px] active:translate-y-[1px] active:shadow-none transition-all cursor-grab active:cursor-grabbing flex flex-col items-center text-center gap-1.5 touch-none`}
               >
                 <ItemIllustration id="soap-bar" size={38} />
                 <span className="pixel-text text-[9px] text-charcoal dark:text-white font-bold">
@@ -1073,14 +1157,27 @@ export const PetViewport: React.FC = () => {
       )}
 
       {/* Interactive Contextual Juro Menu (Pops up directly on Juro Tap/Click) */}
-      {showJuroMenu && (
+      {juroMenu.open && (
         <div
           ref={juroMenuRef}
-          className="animate-tray-enter absolute top-0 left-0 z-30 pointer-events-auto will-change-transform"
-          style={{ transform: "translate3d(-9999px, -9999px, 0)" }}
+          style={{
+            left: `${juroMenu.x}px`,
+            top: `${juroMenu.y}px`,
+          }}
+          className={`absolute z-30 pointer-events-auto -translate-x-1/2 ${
+            juroMenu.isNearTop ? "translate-y-2" : "-translate-y-full"
+          }`}
         >
-          <div className="relative inline-flex items-center gap-1 sm:gap-1.5 p-1 sm:p-1.5 bg-warm-white/95 dark:bg-neutral-900/95 backdrop-blur-xs border-2 border-charcoal dark:border-neutral-600 shadow-[3px_3px_0px_#171717] dark:shadow-[3px_3px_0px_#000000]">
-            <div ref={tailRef} aria-hidden="true" />
+          <div className="animate-tray-enter relative inline-flex items-center gap-1 sm:gap-1.5 p-1 sm:p-1.5 bg-warm-white/95 dark:bg-neutral-900/95 backdrop-blur-xs border-2 border-charcoal dark:border-neutral-600 shadow-[3px_3px_0px_#171717] dark:shadow-[3px_3px_0px_#000000]">
+            <div
+              ref={tailRef}
+              className={`absolute left-1/2 -translate-x-1/2 w-3 h-3 bg-warm-white dark:bg-neutral-900 rotate-45 ${
+                juroMenu.isNearTop
+                  ? "-top-1.5 border-l-2 border-t-2 border-charcoal dark:border-neutral-600"
+                  : "-bottom-1.5 border-r-2 border-b-2 border-charcoal dark:border-neutral-600"
+              }`}
+              aria-hidden="true"
+            />
 
             {/* 1. Makan */}
             <button
@@ -1151,10 +1248,19 @@ export const PetViewport: React.FC = () => {
       )}
 
       {/* Floating Grab Guide Pill when Juro is actively held */}
-      {isDraggingPet && (
-        <div className="animate-tray-enter absolute bottom-6 left-1/2 -translate-x-1/2 z-30 inline-flex items-center gap-2 px-3 py-1.5 bg-warm-white/95 dark:bg-neutral-900/95 border-2 border-charcoal dark:border-neutral-600 shadow-[3px_3px_0px_#171717] dark:shadow-[3px_3px_0px_#000000] pixel-text text-[9px] sm:text-[10px] uppercase font-bold text-charcoal dark:text-white pointer-events-none">
+      {isGrabActive && (
+        <div className="animate-tray-enter fixed sm:absolute bottom-6 inset-x-0 mx-auto w-fit z-30 flex items-center gap-2 px-3 py-1.5 bg-warm-white/95 dark:bg-neutral-900/95 border-2 border-charcoal dark:border-neutral-600 shadow-[3px_3px_0px_#171717] dark:shadow-[3px_3px_0px_#000000]">
           <Hand size={14} className="text-juro-orange animate-bounce shrink-0" />
-          <span>Memegang Juro · Seret & Lepaskan untuk Menurunkan</span>
+          <span className="pixel-text text-[9px] sm:text-[10px] uppercase font-bold text-charcoal dark:text-white">
+            Seret Juro ke Mana Saja
+          </span>
+          <button
+            type="button"
+            onClick={handleFinishGrab}
+            className="px-2 py-0.5 bg-juro-orange text-white border border-charcoal hover:bg-orange-600 active:translate-x-[1px] active:translate-y-[1px] pixel-text text-[8px] sm:text-[9px] uppercase font-bold cursor-pointer"
+          >
+            Taruh
+          </button>
         </div>
       )}
     </div>

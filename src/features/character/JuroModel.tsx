@@ -1,4 +1,4 @@
-import React, { useRef, useState, useMemo, useEffect, useCallback } from "react";
+import React, { useRef, useState, useMemo, useEffect } from "react";
 import { useFrame, useThree } from "@react-three/fiber";
 import * as THREE from "three";
 import { SpringOscillator3D } from "../../engine/physics/SpringOscillator";
@@ -28,6 +28,7 @@ const _bathDummy = new THREE.Object3D();
 const _camDir = new THREE.Vector3();
 const _targetVec = new THREE.Vector3();
 const _intersectVec = new THREE.Vector3();
+const _activePointerVec = new THREE.Vector2();
 
 function lerpAngle(current: number, target: number, alpha: number): number {
   let diff = ((target - current + Math.PI) % (Math.PI * 2)) - Math.PI;
@@ -223,6 +224,7 @@ export interface JuroScreenTarget {
   x: number;
   y: number;
   radiusPx: number;
+  headY?: number;
 }
 
 export interface BathLiveState {
@@ -237,14 +239,14 @@ export interface WalkCommand {
   nonce: number;
 }
 
-interface JuroModelProps {
+export interface JuroModelProps {
   onDraggingChange?: (dragging: boolean) => void;
   bathStateRef?: React.RefObject<BathLiveState>;
   juroScreenPosRef?: React.RefObject<JuroScreenTarget>;
   walkCommand?: WalkCommand | null;
-  onPetClick?: () => void;
-  grabRequested?: number;
-  onGrabEnd?: () => void;
+  onPetClick?: (screenPos: { x: number; y: number }) => void;
+  isGrabActive?: boolean;
+  dragPointerNDC?: React.RefObject<{ x: number; y: number }>;
 }
 
 export const JuroModel: React.FC<JuroModelProps> = React.memo(({
@@ -253,8 +255,8 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
   juroScreenPosRef,
   walkCommand,
   onPetClick,
-  grabRequested,
-  onGrabEnd,
+  isGrabActive = false,
+  dragPointerNDC,
 }) => {
   const groupRef = useRef<THREE.Group>(null);
   const leftEyeRef = useRef<THREE.Group>(null);
@@ -378,7 +380,6 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
   // Interaction state
   const [isDragging, setIsDragging] = useState(false);
   const dragPlane = useMemo(() => new THREE.Plane(new THREE.Vector3(0, 0, 1), 0), []);
-  const dragOffset = useRef(new THREE.Vector3());
   const lastPointerPos = useRef(new THREE.Vector3());
   const pointerSpeed = useRef(0);
 
@@ -431,7 +432,7 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
     []
   );
 
-  const { raycaster, pointer, camera, size } = useThree();
+  const { camera, size } = useThree();
 
   // 1. Sculpted Chubby Jelly Body Geometry with Smooth Vertex Colors
   const outerBodyGeometry = useMemo(() => {
@@ -535,78 +536,42 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
     return shape;
   }, []);
 
-  // Start dragging Juro across the 3D valley map (triggered by "Pegang" action)
-  const startDragging = useCallback(() => {
-    onDraggingChange?.(true);
-    setIsDragging(true);
-    jumpRef.current.active = false;
-    fsm.transitionTo("dragging", true);
-    setBehaviorState("dragging");
-    soundEffects.playSquish();
+  // Handle Grab Mode (Pegang) activation / release
+  useEffect(() => {
+    if (isGrabActive) {
+      onDraggingChange?.(true);
+      setIsDragging(true);
+      jumpRef.current.active = false;
+      fsm.transitionTo("dragging", true);
+      setBehaviorState("dragging");
+      soundEffects.playSquish();
 
-    camera.getWorldDirection(_camDir);
-    dragPlane.setFromNormalAndCoplanarPoint(_camDir, spring.position);
+      camera.getWorldDirection(_camDir);
+      dragPlane.setFromNormalAndCoplanarPoint(_camDir, spring.position);
 
-    if (raycaster.ray.intersectPlane(dragPlane, _intersectVec)) {
-      dragOffset.current.subVectors(spring.position, _intersectVec);
+      lastPointerPos.current.copy(spring.position);
+      pointerSpeed.current = 0;
+      dizzyRef.current.buildup = 0;
+      dizzyRef.current.dragAge = 0;
+
+      spring.applyImpulse(new THREE.Vector3(0, 0.55, 0));
     } else {
-      dragOffset.current.set(0, 0, 0);
+      if (isDragging) {
+        onDraggingChange?.(false);
+        setIsDragging(false);
+        const nextState = dizzyRef.current.timer > 0.2 ? "idle" : "happy";
+        fsm.transitionTo(nextState, true);
+        setBehaviorState(nextState);
+        const landX = THREE.MathUtils.clamp(spring.position.x, MAP_BOUNDS.minX, MAP_BOUNDS.maxX);
+        const landZ = THREE.MathUtils.clamp(spring.position.z, MAP_BOUNDS.minZ, MAP_BOUNDS.maxZ);
+        const landY = getTerrainHeightAt(landX, landZ) + BODY_BOTTOM_OFFSET;
+        spring.setTarget(new THREE.Vector3(landX, landY, landZ));
+        if (dizzyRef.current.timer <= 0.2) {
+          soundEffects.playBoing();
+        }
+      }
     }
-    // Match _targetVec coordinate space so frame-1 delta is 0 (no false velocity spike on grab!)
-    lastPointerPos.current.copy(spring.position);
-    pointerSpeed.current = 0;
-    dizzyRef.current.buildup = 0;
-    dizzyRef.current.dragAge = 0;
-
-    spring.applyImpulse(new THREE.Vector3(0, 0.55, 0));
-  }, [camera, dragPlane, fsm, onDraggingChange, raycaster, setBehaviorState, spring]);
-
-  // Stop dragging Juro and land safely on ground
-  const stopDragging = useCallback(() => {
-    if (!isDragging) return;
-    onDraggingChange?.(false);
-    setIsDragging(false);
-    onGrabEnd?.();
-    const nextState = dizzyRef.current.timer > 0.2 ? "idle" : "happy";
-    fsm.transitionTo(nextState, true);
-    setBehaviorState(nextState);
-    const landX = THREE.MathUtils.clamp(spring.position.x, MAP_BOUNDS.minX, MAP_BOUNDS.maxX);
-    const landZ = THREE.MathUtils.clamp(spring.position.z, MAP_BOUNDS.minZ, MAP_BOUNDS.maxZ);
-    const landY = getTerrainHeightAt(landX, landZ) + BODY_BOTTOM_OFFSET;
-    spring.setTarget(new THREE.Vector3(landX, landY, landZ));
-    if (dizzyRef.current.timer <= 0.2) {
-      soundEffects.playBoing();
-    }
-  }, [isDragging, onDraggingChange, onGrabEnd, fsm, setBehaviorState, spring]);
-
-  // Initiate drag when grabRequested prop triggers
-  useEffect(() => {
-    if (!grabRequested) return;
-    startDragging();
-  }, [grabRequested, startDragging]);
-
-  // Attach window release listeners while dragging with short grace period
-  useEffect(() => {
-    if (!isDragging) return;
-    let active = true;
-    const timer = setTimeout(() => {
-      if (!active) return;
-      const onRelease = () => {
-        stopDragging();
-      };
-      window.addEventListener("pointerup", onRelease);
-      window.addEventListener("pointerdown", onRelease);
-      return () => {
-        window.removeEventListener("pointerup", onRelease);
-        window.removeEventListener("pointerdown", onRelease);
-      };
-    }, 120);
-
-    return () => {
-      active = false;
-      clearTimeout(timer);
-    };
-  }, [isDragging, stopDragging]);
+  }, [isGrabActive, isDragging, camera, dragPlane, fsm, onDraggingChange, setBehaviorState, spring]);
 
   useFrame((state, delta) => {
     const t = state.clock.getElapsedTime();
@@ -631,24 +596,24 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
     let crawlScaleZ = 1;
 
     if (isDragging) {
-      if (raycaster.ray.intersectPlane(dragPlane, _intersectVec)) {
-        _targetVec.copy(_intersectVec).add(dragOffset.current);
-        const dragBottomY = _targetVec.y - BODY_BOTTOM_OFFSET;
+      if (dragPointerNDC?.current) {
+        _activePointerVec.set(dragPointerNDC.current.x, dragPointerNDC.current.y);
+      } else {
+        _activePointerVec.copy(state.pointer);
+      }
+      state.raycaster.setFromCamera(_activePointerVec, camera);
+      if (state.raycaster.ray.intersectPlane(dragPlane, _intersectVec)) {
         const resolvedDrag = resolveHorizontalCollisions(
-          _targetVec.x,
-          _targetVec.z,
-          dragBottomY,
+          _intersectVec.x,
+          _intersectVec.z,
+          _intersectVec.y,
           JURO_COLLISION_RADIUS,
           false
         );
         _targetVec.x = resolvedDrag.x;
         _targetVec.z = resolvedDrag.z;
         const groundAtDrag = getTerrainHeightAt(_targetVec.x, _targetVec.z);
-        _targetVec.y = THREE.MathUtils.clamp(
-          _targetVec.y,
-          groundAtDrag + BODY_BOTTOM_OFFSET,
-          groundAtDrag + 2.0
-        );
+        _targetVec.y = groundAtDrag + BODY_BOTTOM_OFFSET + 0.35;
 
         spring.setTarget(_targetVec);
 
@@ -1019,8 +984,16 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
         const cx = (_projCenter.x * 0.5 + 0.5) * size.width;
         const cy = (-_projCenter.y * 0.5 + 0.5) * size.height;
         const ex = (_projEdge.x * 0.5 + 0.5) * size.width;
+
+        // Project Juro's crown/head top
+        _projCenter
+          .set(spring.position.x, spring.position.y + 1.15 * JURO_BASE_SCALE, spring.position.z)
+          .project(camera);
+        const hy = (-_projCenter.y * 0.5 + 0.5) * size.height;
+
         juroScreenPosRef.current.x = cx;
         juroScreenPosRef.current.y = cy;
+        juroScreenPosRef.current.headY = hy;
         juroScreenPosRef.current.radiusPx = Math.max(52, Math.abs(ex - cx) * 1.55);
       }
 
@@ -1141,8 +1114,8 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
       rightEyeRef.current.visible = !isSleeping && !isDizzy;
 
       if (!isSleeping && !isDizzy) {
-        let lookX = pointer.x * 0.08;
-        let lookY = pointer.y * 0.06;
+        let lookX = state.pointer.x * 0.08;
+        let lookY = state.pointer.y * 0.06;
 
         if (isEating) {
           lookX = 0;
@@ -1351,12 +1324,19 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
         position={[0, -0.1, 0]}
         onClick={(e) => {
           e.stopPropagation();
-          if (isDragging) return;
+          if (isDragging || isGrabActive) return;
           if (fsm.currentState === "wander") {
             fsm.transitionTo("idle", true);
             setBehaviorState("idle");
           }
-          onPetClick?.();
+          // Project Juro's crown/head to screen coordinates immediately
+          _projCenter
+            .set(spring.position.x, spring.position.y + 1.15 * JURO_BASE_SCALE, spring.position.z)
+            .project(camera);
+          const screenX = (_projCenter.x * 0.5 + 0.5) * size.width;
+          const screenY = (-_projCenter.y * 0.5 + 0.5) * size.height;
+
+          onPetClick?.({ x: screenX, y: screenY });
         }}
       >
         {/* Main Sculpted Chubby Jelly Body */}
