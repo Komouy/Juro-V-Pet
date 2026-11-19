@@ -979,16 +979,14 @@ export const PetViewport: React.FC = () => {
     soundEffects.playWeatherChange(nextWeather === "rain");
     toggleWeather();
     if (nextWeather === "rain") {
-      showToast("Cuaca berganti: Hujan!", "info");
       addLog(
         "interaction",
         "Langit menurunkan rintik hujan yang menyejukkan. Juro memakai daun kecil sebagai payung!"
       );
     } else {
-      showToast("Cuaca berganti: Cerah!", "info");
       addLog("interaction", "Awan hujan berlalu, cuaca kembali cerah dan hangat.");
     }
-  }, [weather, toggleWeather, showToast, addLog]);
+  }, [weather, toggleWeather, addLog]);
 
   // Gentle ambient raindrop sound while pixel rain is falling
   useEffect(() => {
