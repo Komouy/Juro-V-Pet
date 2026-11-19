@@ -13,6 +13,7 @@ describe("Virtual Pet Core & Progression", () => {
       cleanliness: 50,
       affection: 50,
       recentlyLeveledUp: false,
+      pendingEvolutionAlert: null,
     });
   });
 
@@ -71,5 +72,47 @@ describe("Virtual Pet Core & Progression", () => {
     expect(state.cleanliness).toBe(85); // 50 + 35
     expect(state.affection).toBe(55); // 50 + 5
     expect(state.currentState).toBe("happy");
+  });
+
+  it("does not trigger evolution alert on standard level ups (e.g. Lv 2)", () => {
+    usePetStore.getState().addXP(150);
+    const state = usePetStore.getState();
+    expect(state.level).toBe(2);
+    expect(state.pendingEvolutionAlert).toBeNull();
+  });
+
+  it("triggers evolution alert for Stage 2 (Slime Memantul) upon reaching Level 5", () => {
+    usePetStore.setState({ level: 4, xp: 350, xpToNextLevel: 400 });
+    usePetStore.getState().addXP(60); // Crosses into Level 5
+
+    const state = usePetStore.getState();
+    expect(state.level).toBe(5);
+    expect(state.pendingEvolutionAlert).not.toBeNull();
+    expect(state.pendingEvolutionAlert?.stageNumber).toBe(2);
+    expect(state.pendingEvolutionAlert?.stageName).toBe("Slime Memantul");
+
+    usePetStore.getState().clearEvolutionAlert();
+    expect(usePetStore.getState().pendingEvolutionAlert).toBeNull();
+  });
+
+  it("triggers evolution alert for Stage 3 (Juro Mulia) upon reaching Level 10", () => {
+    usePetStore.setState({ level: 9, xp: 880, xpToNextLevel: 900 });
+    usePetStore.getState().addXP(50); // Crosses into Level 10
+
+    const state = usePetStore.getState();
+    expect(state.level).toBe(10);
+    expect(state.pendingEvolutionAlert).not.toBeNull();
+    expect(state.pendingEvolutionAlert?.stageNumber).toBe(3);
+    expect(state.pendingEvolutionAlert?.stageName).toBe("Juro Mulia");
+  });
+
+  it("computes physical growth scale accurately from Level 1 to 10+", () => {
+    const calcGrowth = (lvl: number) =>
+      Number((0.68 + (Math.min(10, Math.max(1, lvl)) - 1) * (0.52 / 9)).toFixed(3));
+
+    expect(calcGrowth(1)).toBe(0.68);
+    expect(calcGrowth(5)).toBeCloseTo(0.911, 2);
+    expect(calcGrowth(10)).toBe(1.2);
+    expect(calcGrowth(15)).toBe(1.2); // Capped at adult maximum
   });
 });

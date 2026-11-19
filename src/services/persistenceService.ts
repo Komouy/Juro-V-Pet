@@ -391,6 +391,7 @@ class PersistenceService {
       affection: 50,
       lastUpdated: Date.now(),
       recentlyLeveledUp: false,
+      pendingEvolutionAlert: null,
     });
     useGameStore.setState({
       coins: 50,

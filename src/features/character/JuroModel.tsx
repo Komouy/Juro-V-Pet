@@ -78,6 +78,7 @@ export interface JuroModelProps {
   isBlowingBubbles?: boolean;
   isRaining?: boolean;
   isDizzyRef?: React.RefObject<boolean>;
+  level?: number;
 }
 
 export const JuroModel: React.FC<JuroModelProps> = React.memo(({
@@ -93,6 +94,7 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
   isBlowingBubbles = false,
   isRaining = false,
   isDizzyRef,
+  level = 1,
 }) => {
   const groupRef = useRef<THREE.Group>(null);
   const leftEyeRef = useRef<THREE.Group>(null);
@@ -108,6 +110,8 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
   const sleepBubbleRef = useRef<THREE.Mesh>(null);
   const shadowRef = useRef<THREE.Mesh>(null);
   const leafUmbrellaRef = useRef<THREE.Group>(null);
+  const crownRef = useRef<THREE.Group>(null);
+  const currentPetScaleRef = useRef(JURO_BASE_SCALE);
   const zzzGroupRef = useRef<THREE.Group>(null);
   const zSpriteRefs = useRef<(THREE.Sprite | null)[]>([]);
 
@@ -1038,8 +1042,13 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
         scale.y -= breathing;
       }
 
-      // Scale entire character cleanly to pocket-sized JURO_BASE_SCALE
-      scale.multiplyScalar(JURO_BASE_SCALE);
+      // Dynamic physical pet growth based on level (0.68x baby -> 1.20x adult noble)
+      const growthFactor = 0.68 + (Math.min(10, Math.max(1, level)) - 1) * (0.52 / 9);
+      const currentPetScale = JURO_BASE_SCALE * growthFactor;
+      currentPetScaleRef.current = currentPetScale;
+
+      // Scale entire character cleanly to pocket-sized currentPetScale
+      scale.multiplyScalar(currentPetScale);
 
       // Hard terrain collision boundary: keep Juro's bottom resting cleanly on grass/hill/bridge/stump/mattress
       const isSleepingOnBed = currentState === "sleep";
@@ -1087,7 +1096,7 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
       if (juroScreenPosRef?.current) {
         _projCenter.copy(spring.position).project(camera);
         _projEdge
-          .set(spring.position.x + 1.18 * JURO_BASE_SCALE, spring.position.y, spring.position.z)
+          .set(spring.position.x + 1.18 * currentPetScale, spring.position.y, spring.position.z)
           .project(camera);
         const cx = (_projCenter.x * 0.5 + 0.5) * size.width;
         const cy = (-_projCenter.y * 0.5 + 0.5) * size.height;
@@ -1095,7 +1104,7 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
 
         // Project Juro's crown/head top
         _projCenter
-          .set(spring.position.x, spring.position.y + 1.15 * JURO_BASE_SCALE, spring.position.z)
+          .set(spring.position.x, spring.position.y + 1.15 * currentPetScale, spring.position.z)
           .project(camera);
         const hy = (-_projCenter.y * 0.5 + 0.5) * size.height;
 
@@ -1946,6 +1955,15 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
       }
     }
 
+    // 9.6 Mini Golden Crown (Stage 3 Evolution: Juro Mulia, Lv. 10+)
+    if (crownRef.current) {
+      crownRef.current.visible = level >= 10;
+      if (level >= 10) {
+        crownRef.current.position.y = 0.86 + Math.sin(t * 3.2) * 0.012;
+        crownRef.current.rotation.z = Math.sin(t * 2.4) * 0.03;
+      }
+    }
+
     // 10. 3D Soap Foam Bubbles Clinging to Juro (InstancedMesh)
     if (soapFoamInstRef.current) {
       soapFoamInstRef.current.visible = soapLevelNow > 0.01;
@@ -2031,7 +2049,11 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
           }
           // Project Juro's crown/head to screen coordinates immediately
           _projCenter
-            .set(spring.position.x, spring.position.y + 1.15 * JURO_BASE_SCALE, spring.position.z)
+            .set(
+              spring.position.x,
+              spring.position.y + 1.15 * currentPetScaleRef.current,
+              spring.position.z
+            )
             .project(camera);
           const screenX = (_projCenter.x * 0.5 + 0.5) * size.width;
           const screenY = (-_projCenter.y * 0.5 + 0.5) * size.height;
@@ -2606,6 +2628,43 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
               />
             </mesh>
           </group>
+        </group>
+
+        {/* === MINI NOBLE GOLDEN CROWN (Evolution Stage 3: Juro Mulia, Lv. 10+) === */}
+        <group
+          ref={crownRef}
+          visible={level >= 10}
+          position={[0, 0.86, 0.04]}
+          rotation={[-0.05, 0, 0]}
+        >
+          {/* Crown Base Circlet */}
+          <mesh position={[0, 0, 0]}>
+            <cylinderGeometry args={[0.22, 0.25, 0.08, 12]} />
+            <meshStandardMaterial color="#CA8A04" roughness={0.3} metalness={0.7} />
+          </mesh>
+          {/* Crown Golden Body */}
+          <mesh position={[0, 0.07, 0]}>
+            <cylinderGeometry args={[0.27, 0.22, 0.09, 12]} />
+            <meshStandardMaterial color="#FACC15" roughness={0.25} metalness={0.8} />
+          </mesh>
+          {/* 3 Crown Spikes (Front, Left, Right) */}
+          <mesh position={[0, 0.16, 0.22]} rotation={[0.15, 0, 0]}>
+            <coneGeometry args={[0.07, 0.14, 5]} />
+            <meshStandardMaterial color="#FDE047" roughness={0.2} metalness={0.85} />
+          </mesh>
+          <mesh position={[-0.18, 0.15, 0.08]} rotation={[0.1, 0, 0.2]}>
+            <coneGeometry args={[0.06, 0.12, 5]} />
+            <meshStandardMaterial color="#FDE047" roughness={0.2} metalness={0.85} />
+          </mesh>
+          <mesh position={[0.18, 0.15, 0.08]} rotation={[0.1, 0, -0.2]}>
+            <coneGeometry args={[0.06, 0.12, 5]} />
+            <meshStandardMaterial color="#FDE047" roughness={0.2} metalness={0.85} />
+          </mesh>
+          {/* Center Ruby Gem Accent */}
+          <mesh position={[0, 0.06, 0.24]}>
+            <sphereGeometry args={[0.038, 8, 8]} />
+            <meshStandardMaterial color="#EF4444" roughness={0.15} metalness={0.4} />
+          </mesh>
         </group>
 
         {/* === 3D SOAP FOAM BUBBLES CLINGING TO JURO (1 Draw Call) === */}

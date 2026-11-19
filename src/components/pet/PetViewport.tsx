@@ -71,6 +71,8 @@ export const PetViewport: React.FC = () => {
     currentState,
     recentlyLeveledUp,
     clearLevelUpAlert,
+    pendingEvolutionAlert,
+    clearEvolutionAlert,
     feedWithItem,
     playWithItem,
     sleep,
@@ -596,14 +598,17 @@ export const PetViewport: React.FC = () => {
     setIsDraggingPet(dragging);
   }, []);
 
-  // Auto-grant level-up coin bonus silently without interrupting Home viewport
+  // Auto-grant level-up coin bonus and show compact toast for standard levels
   useEffect(() => {
     if (recentlyLeveledUp) {
       clearLevelUpAlert();
       addCoins(25);
       addLog("interaction", `Juro mencapai Level ${level}! Bonus +25 koin otomatis ditambahkan.`);
+      if (!pendingEvolutionAlert) {
+        showToast(`Level Up! Juro mencapai Level ${level} (+25 Koin)`, "success");
+      }
     }
-  }, [recentlyLeveledUp, clearLevelUpAlert, addCoins, addLog, level]);
+  }, [recentlyLeveledUp, clearLevelUpAlert, addCoins, addLog, level, pendingEvolutionAlert, showToast]);
 
   // Real-time local clock tracking for automatic day/night nature atmosphere
   const [now, setNow] = useState(() => new Date());
@@ -1126,14 +1131,14 @@ export const PetViewport: React.FC = () => {
         <button
           type="button"
           onClick={handleToggleWeather}
-          aria-label={`Ganti cuaca (saat ini: ${weather === "rain" ? "Hujan Pixel" : "Cerah"})`}
+          aria-label={`Ganti cuaca (saat ini: ${weather === "rain" ? "Hujan" : "Cerah"})`}
           className="h-9 inline-flex items-center gap-1.5 sm:gap-2 px-2.5 bg-warm-white/95 dark:bg-neutral-900/90 backdrop-blur-xs border-2 border-charcoal dark:border-neutral-600 shadow-[2px_2px_0px_#171717] dark:shadow-[2px_2px_0px_#000000] hover:border-juro-orange transition-all active:translate-x-[1px] active:translate-y-[1px] cursor-pointer"
         >
           {weather === "rain" ? (
             <>
               <CloudRain size={14} className="text-sky-500 animate-bounce shrink-0" />
               <span className="pixel-text text-[9px] sm:text-[10px] font-bold text-sky-600 dark:text-sky-400 uppercase">
-                Hujan Pixel
+                Hujan
               </span>
             </>
           ) : activeTheme.isNight ? (
@@ -1221,6 +1226,7 @@ export const PetViewport: React.FC = () => {
             onBedArrival={handleBedArrival}
             isRaining={weather === "rain"}
             isDizzyRef={isDizzyRef}
+            level={level}
             isBlowingBubbles={
               dragVisual !== null &&
               dragVisual.moved &&
@@ -1378,6 +1384,75 @@ export const PetViewport: React.FC = () => {
           <Heart size={20} className="fill-rose-500 text-rose-600" strokeWidth={2} />
         </div>
       ))}
+
+      {/* Simple Retro Evolution Alert (Level 5 & Level 10 Milestones) */}
+      {pendingEvolutionAlert && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-charcoal/50 backdrop-blur-xs p-4">
+          <div className="animate-tray-enter w-full max-w-xs bg-warm-white dark:bg-neutral-900 border-2 border-charcoal dark:border-neutral-600 shadow-[4px_4px_0px_#171717] dark:shadow-[4px_4px_0px_#000000] p-4 text-center space-y-3">
+            {/* Crisp Pixel Art Stage Icon */}
+            <div className="w-12 h-12 mx-auto bg-neutral-100 dark:bg-neutral-800 border-2 border-charcoal dark:border-neutral-600 shadow-[2px_2px_0px_#171717] dark:shadow-[2px_2px_0px_#000000] flex items-center justify-center">
+              <svg width="32" height="32" viewBox="0 0 16 16" shapeRendering="crispEdges">
+                {pendingEvolutionAlert.stageNumber === 2 && (
+                  <>
+                    <rect x="4" y="4" width="8" height="8" fill="#F97316" />
+                    <rect x="3" y="6" width="10" height="5" fill="#F97316" />
+                    <rect x="5" y="3" width="6" height="1" fill="#F97316" />
+                    <rect x="5" y="5" width="2" height="2" fill="#FDBA74" />
+                    <rect x="5" y="8" width="2" height="2" fill="#171717" />
+                    <rect x="9" y="8" width="2" height="2" fill="#171717" />
+                    <rect x="5" y="8" width="1" height="1" fill="#FFFFFF" />
+                    <rect x="9" y="8" width="1" height="1" fill="#FFFFFF" />
+                  </>
+                )}
+                {pendingEvolutionAlert.stageNumber === 3 && (
+                  <>
+                    <rect x="5" y="1" width="1" height="2" fill="#FACC15" />
+                    <rect x="7" y="1" width="2" height="2" fill="#FACC15" />
+                    <rect x="10" y="1" width="1" height="2" fill="#FACC15" />
+                    <rect x="5" y="3" width="6" height="1" fill="#EAB308" />
+                    <rect x="3" y="5" width="10" height="8" fill="#F97316" />
+                    <rect x="2" y="7" width="12" height="5" fill="#F97316" />
+                    <rect x="4" y="6" width="3" height="2" fill="#FDBA74" />
+                    <rect x="5" y="9" width="2" height="2" fill="#171717" />
+                    <rect x="9" y="9" width="2" height="2" fill="#171717" />
+                    <rect x="5" y="9" width="1" height="1" fill="#FFFFFF" />
+                    <rect x="9" y="9" width="1" height="1" fill="#FFFFFF" />
+                  </>
+                )}
+              </svg>
+            </div>
+
+            <div className="space-y-1">
+              <h2 className="pixel-text text-xs uppercase font-bold text-charcoal dark:text-white tracking-wider">
+                Juro Berevolusi!
+              </h2>
+              <p className="pixel-text text-[10px] text-neutral-600 dark:text-neutral-300">
+                Wujud Baru:{" "}
+                <span className="text-juro-orange font-bold uppercase">
+                  {pendingEvolutionAlert.stageName}
+                </span>{" "}
+                (Level {pendingEvolutionAlert.level})
+              </p>
+              <p className="pixel-text text-[8px] text-neutral-500 dark:text-neutral-400">
+                {pendingEvolutionAlert.stageNumber === 3
+                  ? "Juro kini berukuran dewasa megah dengan mahkota emas!"
+                  : "Tubuh Juro membesar dan makin lincah membal!"}
+              </p>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => {
+                soundEffects.playClick();
+                clearEvolutionAlert();
+              }}
+              className="w-full py-2 bg-juro-orange text-white border-2 border-charcoal dark:border-neutral-700 shadow-[2px_2px_0px_#171717] hover:bg-orange-600 active:translate-x-[1px] active:translate-y-[1px] pixel-text text-[9px] uppercase font-bold cursor-pointer transition-colors"
+            >
+              Lanjutkan
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

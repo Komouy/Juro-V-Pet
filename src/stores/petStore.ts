@@ -53,6 +53,12 @@ export const DEFAULT_TOYS: ToyItem[] = [
   },
 ];
 
+export interface EvolutionAlertData {
+  stageNumber: 2 | 3;
+  stageName: string;
+  level: number;
+}
+
 interface PetState {
   name: string;
   level: number;
@@ -72,9 +78,11 @@ interface PetState {
   lastPetRewardAt: number;
   lastPosition?: { x: number; y: number; z: number };
 
-  // Level Up Alert State
+  // Level Up & Evolution Alert State
   recentlyLeveledUp: boolean;
   clearLevelUpAlert: () => void;
+  pendingEvolutionAlert: EvolutionAlertData | null;
+  clearEvolutionAlert: () => void;
 
   // Actions
   addXP: (amount: number) => boolean;
@@ -114,10 +122,12 @@ export const usePetStore = create<PetState>((set, get) => ({
   lastPetRewardAt: 0,
   lastPosition: undefined,
   recentlyLeveledUp: false,
+  pendingEvolutionAlert: null,
 
   setLastPosition: (pos) => set({ lastPosition: pos }),
 
   clearLevelUpAlert: () => set({ recentlyLeveledUp: false }),
+  clearEvolutionAlert: () => set({ pendingEvolutionAlert: null }),
 
   clearToyBeingPlayed: () => set({ currentToyBeingPlayed: null }),
 
@@ -152,12 +162,21 @@ export const usePetStore = create<PetState>((set, get) => ({
     let currentLevel = state.level;
     let targetXP = state.xpToNextLevel;
     let leveledUp = false;
+    let evolutionAlert: EvolutionAlertData | null = state.pendingEvolutionAlert;
 
     while (currentXP >= targetXP) {
       currentXP -= targetXP;
+      const prevLvl = currentLevel;
       currentLevel += 1;
       targetXP = currentLevel * 100;
       leveledUp = true;
+
+      // Detect major evolution milestones
+      if (prevLvl < 5 && currentLevel >= 5) {
+        evolutionAlert = { stageNumber: 2, stageName: "Slime Memantul", level: currentLevel };
+      } else if (prevLvl < 10 && currentLevel >= 10) {
+        evolutionAlert = { stageNumber: 3, stageName: "Juro Mulia", level: currentLevel };
+      }
     }
 
     set({
@@ -165,6 +184,7 @@ export const usePetStore = create<PetState>((set, get) => ({
       level: currentLevel,
       xpToNextLevel: targetXP,
       recentlyLeveledUp: leveledUp ? true : state.recentlyLeveledUp,
+      pendingEvolutionAlert: evolutionAlert,
     });
 
     if (leveledUp) {
