@@ -101,6 +101,7 @@ export function computePetEmotionalState(
     isInWater?: boolean;
     isRaining?: boolean;
     isNight?: boolean;
+    isNightSleepy?: boolean;
     level?: number;
   }
 ): PetEmotionalState {
@@ -182,7 +183,19 @@ export function computePetEmotionalState(
     };
   }
 
-  // 2. Needs-based states
+  // 2. Nocturnal circadian sleepy state: Jam 9 malam (21:00) sampai pagi (06:00)
+  if (context?.isNightSleepy) {
+    return {
+      primaryEmotion: "Sangat Mengantuk",
+      moodIntensity: "sedang",
+      resonanceScore: Math.min(resonanceScore, 65),
+      thoughtSummary: "Sudah jam 9 malam lewat... Kelopak mata Juro terasa sangat berat dan mengantuk, ingin segera meringkuk di kasur empuknya.",
+      expressionDetail: "Mata sayu terkantuk-kantuk dengan kelopak mata berat",
+      temperament: "Sayu & Manja",
+    };
+  }
+
+  // 3. Needs-based states
   if (hunger < 30) {
     return {
       primaryEmotion: "Lapar & Merengek Manja",

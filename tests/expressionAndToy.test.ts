@@ -82,4 +82,39 @@ describe("Dynamic Expressions & Toy Play System", () => {
     const hasBall = useGameStore.getState().ownedToys.includes("bounce-ball");
     expect(hasBall).toBe(true);
   });
+
+  it("ensures nocturnal sleepy expression persists from 9 PM (21:00) until morning (06:00)", async () => {
+    const { isBedtimeHour, isSleepyHour } = await import("../src/utils/timeOfDay");
+    const { computePetExpression } = await import("../src/services/geminiService");
+    const { computePetEmotionalState } = await import("../src/engine/ai/cognitiveCore");
+
+    const night9pm = new Date(2026, 10, 20, 21, 15, 0);
+    const midnight = new Date(2026, 10, 20, 0, 30, 0);
+    const morning5am = new Date(2026, 10, 20, 5, 45, 0);
+    const morning7am = new Date(2026, 10, 20, 7, 0, 0);
+
+    expect(isBedtimeHour(night9pm)).toBe(true);
+    expect(isSleepyHour(night9pm)).toBe(true);
+    expect(isBedtimeHour(midnight)).toBe(true);
+    expect(isBedtimeHour(morning5am)).toBe(true);
+    expect(isBedtimeHour(morning7am)).toBe(false);
+
+    // Expression & emotional awareness reflect sleepy state during 9 PM - morning
+    const expr = computePetExpression({
+      hunger: 90,
+      energy: 90,
+      cleanliness: 90,
+      happiness: 90,
+      affection: 90,
+      isNightSleepy: true,
+    });
+    expect(expr.toLowerCase()).toContain("mengantuk");
+
+    const emo = computePetEmotionalState(
+      { hunger: 90, energy: 90, happiness: 90, cleanliness: 90, affection: 90 },
+      { isNightSleepy: true }
+    );
+    expect(emo.primaryEmotion).toBe("Sangat Mengantuk");
+    expect(emo.thoughtSummary.toLowerCase()).toContain("jam 9 malam");
+  });
 });

@@ -37,6 +37,7 @@ export interface PetChatContext {
   isDragging?: boolean;
   isDizzy?: boolean;
   isNight?: boolean;
+  isNightSleepy?: boolean;
   isRaining?: boolean;
   isSittingOnBench?: boolean;
   isInWater?: boolean;
@@ -71,12 +72,16 @@ export function computePetExpression(context: {
   affection: number;
   isDizzy?: boolean;
   isSleeping?: boolean;
+  isNightSleepy?: boolean;
 }): string {
   if (context.isDizzy) {
     return "pusing dan linglung (mata berputar, ada bintang kelap-kelip)";
   }
   if (context.isSleeping) {
     return "tertidur lelap (mata terpejam tenang, mendengkur lembut Zzz)";
+  }
+  if (context.isNightSleepy) {
+    return "sangat mengantuk (mata sayu terkantuk-kantuk karena sudah jam 9 malam lewat, menguap lembut)";
   }
 
   const candidateNeeds: { type: string; val: number }[] = [

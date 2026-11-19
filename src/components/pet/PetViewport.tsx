@@ -303,6 +303,7 @@ export const PetViewport: React.FC = () => {
       const petState = usePetStore.getState();
       const currentHour = new Date().getHours();
       const isNight = currentHour >= 18 || currentHour < 6;
+      const isNightSleepy = isBedtimeHour();
       const isDizzy = isDizzyRef.current;
       const isSleeping = petState.currentState === "sleep";
       const isBathing =
@@ -338,6 +339,7 @@ export const PetViewport: React.FC = () => {
           isInWater: inWater,
           isRaining: weather === "rain",
           isNight,
+          isNightSleepy,
           level: petState.level,
         }
       );
@@ -350,6 +352,7 @@ export const PetViewport: React.FC = () => {
         affection: petState.affection,
         isDizzy,
         isSleeping,
+        isNightSleepy,
       });
 
       const currentActivity = computePetActivity({
@@ -388,6 +391,7 @@ export const PetViewport: React.FC = () => {
         isDragging,
         isDizzy,
         isNight,
+        isNightSleepy,
         isRaining: weather === "rain",
         isSittingOnBench,
         isInWater: inWater,
@@ -1182,7 +1186,7 @@ export const PetViewport: React.FC = () => {
     return () => clearInterval(interval);
   }, [weather]);
 
-  // Circadian rhythm controller: sleep at 19:00 - 06:00, wake at 06:00
+  // Circadian rhythm controller: sleep at 21:00 - 06:00, wake at 06:00
   const isNightSleep = isBedtimeHour(now);
   const prevHourRef = useRef<number>(now.getHours());
 
@@ -1193,7 +1197,7 @@ export const PetViewport: React.FC = () => {
 
     // Detect transition crossing into morning (06:00)
     const crossedToMorning =
-      (prevHour < 6 || prevHour >= 19) && currentHour >= 6 && currentHour < 10;
+      (prevHour < 6 || prevHour >= 21) && currentHour >= 6 && currentHour < 10;
 
     // 1. Daytime / Morning wake-up (ONLY when clock actually crosses into 06:00 morning)
     if (crossedToMorning) {
@@ -1209,13 +1213,13 @@ export const PetViewport: React.FC = () => {
       return;
     }
 
-    // Daytime check: during daytime (06:00 - 18:59), do NOT automatically wake or force sleep.
+    // Daytime check: during daytime (06:00 - 20:59), do NOT automatically wake or force sleep.
     // Allow daytime naps initiated by the player!
     if (!isNightSleep) {
       return;
     }
 
-    // 2. Nighttime bedtime (19:00 - 06:00)
+    // 2. Nighttime bedtime (21:00 - 06:00)
     if (currentState === "sleep") {
       isHeadingToBedRef.current = false;
       return;

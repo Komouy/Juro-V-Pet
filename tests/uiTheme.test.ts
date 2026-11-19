@@ -74,19 +74,21 @@ describe("UI Store & Theme Mode", () => {
       return d;
     };
 
-    // Bedtime: 19:00 - 05:59 (7-8 PM through 5-6 AM)
-    expect(isBedtimeHour(makeDate(19))).toBe(true);
-    expect(isBedtimeHour(makeDate(20))).toBe(true);
+    // Bedtime / Sleepy expression: 21:00 - 05:59 (jam 9 malam s/d 6 pagi)
+    expect(isBedtimeHour(makeDate(21))).toBe(true);
+    expect(isBedtimeHour(makeDate(22))).toBe(true);
     expect(isBedtimeHour(makeDate(23))).toBe(true);
     expect(isBedtimeHour(makeDate(0))).toBe(true);
     expect(isBedtimeHour(makeDate(5))).toBe(true);
 
-    // Daytime / Awake: 06:00 - 18:59
+    // Daytime / Awake: 06:00 - 20:59
     expect(isBedtimeHour(makeDate(6))).toBe(false);
     expect(isBedtimeHour(makeDate(9))).toBe(false);
     expect(isBedtimeHour(makeDate(12))).toBe(false);
     expect(isBedtimeHour(makeDate(16))).toBe(false);
     expect(isBedtimeHour(makeDate(18))).toBe(false);
+    expect(isBedtimeHour(makeDate(19))).toBe(false);
+    expect(isBedtimeHour(makeDate(20))).toBe(false);
 
     // Time phases
     expect(getTimePhaseFromDate(makeDate(6))).toBe("morning");

@@ -1677,6 +1677,11 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
       expression = candidateNeeds[0].type;
     }
 
+    // Jam 9 malam (21:00) sampai pagi (06:00): ekspresi Juro akan terus mengantuk ("tired")
+    if (isBedtimeHour()) {
+      expression = "tired";
+    }
+
     // Eyes: Awake vs Sleeping Curved Eyelids (︶ ︶)
     blinkState.current.timer += delta;
     if (blinkState.current.timer > blinkState.current.nextBlink) {

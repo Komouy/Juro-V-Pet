@@ -36,12 +36,20 @@ export function getTimePhaseFromDate(date: Date = new Date()): TimePhase {
 }
 
 /**
- * Deteksi jadwal tidur alami Juro:
- * Malam hari pukul 19:00 (7 malam) s/d sebelum 06:00 (6 pagi)
+ * Deteksi jadwal tidur alami & jam ekspresi mengantuk Juro:
+ * Mulai pukul 21:00 (9 malam) s/d sebelum 06:00 (6 pagi).
+ * Pada rentang waktu ini, ekspresi wajah Juro akan terus mengantuk.
  */
 export function isBedtimeHour(date: Date = new Date()): boolean {
   const hour = date.getHours();
-  return hour >= 19 || hour < 6;
+  return hour >= 21 || hour < 6;
+}
+
+/**
+ * Alias helper untuk memeriksa apakah saat ini jam mengantuk (21:00 - 06:00)
+ */
+export function isSleepyHour(date: Date = new Date()): boolean {
+  return isBedtimeHour(date);
 }
 
 export const TIME_THEMES: Record<TimePhase, TimeThemeConfig> = {
