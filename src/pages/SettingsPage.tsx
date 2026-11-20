@@ -18,6 +18,9 @@ import {
   Database,
   Settings,
   Bell,
+  Smartphone,
+  Share2,
+  Copy,
 } from "lucide-react";
 
 export const SettingsPage: React.FC = () => {
@@ -70,6 +73,42 @@ export const SettingsPage: React.FC = () => {
       soundEffects.playWarning();
       showToast("Izin notifikasi belum diizinkan", "warn");
     }
+  };
+
+  const APK_DOWNLOAD_URL =
+    "https://github.com/Komouy/Juro-V-Pet/releases/latest/download/Juro-Virtual-Pet.apk";
+  const RELEASES_PAGE_URL = "https://github.com/Komouy/Juro-V-Pet/releases";
+
+  const handleDownloadApk = () => {
+    soundEffects.playClick();
+    window.open(APK_DOWNLOAD_URL, "_blank");
+  };
+
+  const handleCopyApkLink = () => {
+    soundEffects.playPop();
+    navigator.clipboard.writeText(APK_DOWNLOAD_URL);
+    showToast("Link unduh APK disalin!", "success");
+  };
+
+  const handleShareApk = async () => {
+    soundEffects.playClick();
+    const shareData = {
+      title: "Juro Virtual Pet",
+      text: "Yuk rawat Juro bersama di HP Android kamu! Unduh APK resminya di sini:",
+      url: APK_DOWNLOAD_URL,
+    };
+
+    if (typeof navigator !== "undefined" && navigator.share) {
+      try {
+        await navigator.share(shareData);
+        return;
+      } catch {
+        // user cancelled share
+      }
+    }
+
+    const waText = encodeURIComponent(`${shareData.text} ${APK_DOWNLOAD_URL}`);
+    window.open(`https://api.whatsapp.com/send?text=${waText}`, "_blank");
   };
 
   const petNameInput = draftName ?? name;
@@ -221,6 +260,57 @@ export const SettingsPage: React.FC = () => {
             <p className="pixel-text text-[8.5px] text-neutral-500 dark:text-neutral-400 leading-relaxed">
               Kirimkan pemberitahuan saat Juro membutuhkan perhatian (lapar, mengantuk, atau kotor) serta saat pasangan perawat merawat Juro ketika aplikasi sedang diminimalkan.
             </p>
+          </div>
+        </Card>
+
+        {/* Android App (.apk) */}
+        <Card shadowOffset="sm" className="p-4 md:col-span-2 space-y-3.5">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <h2 className="pixel-text text-[11px] text-charcoal dark:text-white uppercase flex items-center gap-2">
+              <Smartphone size={13} strokeWidth={2.5} className="text-juro-orange" />
+              <span>Aplikasi Android (.apk)</span>
+            </h2>
+            <div className="flex flex-wrap items-center gap-2">
+              <Button
+                label="Unduh APK"
+                icon={Download}
+                size="sm"
+                variant="primary"
+                onClick={handleDownloadApk}
+              />
+              <Button
+                label="Salin Link"
+                icon={Copy}
+                size="sm"
+                variant="secondary"
+                onClick={handleCopyApkLink}
+              />
+              <Button
+                label="Bagikan"
+                icon={Share2}
+                size="sm"
+                variant="secondary"
+                onClick={handleShareApk}
+              />
+            </div>
+          </div>
+
+          <div className="pt-2 border-t border-charcoal/10 dark:border-neutral-700 space-y-2">
+            <p className="pixel-text text-[8.5px] text-neutral-600 dark:text-neutral-300 leading-relaxed">
+              Pasang Juro sebagai aplikasi di HP Android Anda dan pasangan. Dapatkan notifikasi langsung saat Juro lapar atau saat pasangan merawat Juro tanpa perlu membuka browser.
+            </p>
+            <div className="flex items-center gap-2 text-[8px] pixel-text text-neutral-400">
+              <span>File: Juro-Virtual-Pet.apk</span>
+              <span>•</span>
+              <a
+                href={RELEASES_PAGE_URL}
+                target="_blank"
+                rel="noreferrer"
+                className="underline hover:text-juro-orange"
+              >
+                Riwayat Rilis GitHub
+              </a>
+            </div>
           </div>
         </Card>
 
