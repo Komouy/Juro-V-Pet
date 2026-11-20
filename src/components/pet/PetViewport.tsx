@@ -1660,6 +1660,25 @@ export const PetViewport: React.FC = () => {
             triggerFeed(payload.food);
           } else if (payload.kind === "toy") {
             triggerPlay(payload.toy);
+          } else if (payload.kind === "soap") {
+            if (usePetStore.getState().currentState === "sleep") {
+              wakeUp();
+            }
+            bathStateRef.current.soapLevel = Math.min(1, bathStateRef.current.soapLevel + 0.35);
+            hadMeaningfulSoapRef.current = true;
+            soundEffects.playBubble();
+            triggerInteractionSpeech("bath_scrub");
+            showToast("Busa sabun digosokkan ke Juro! (Bilas dengan Ember Air)", "info");
+          } else if (payload.kind === "bucket") {
+            if (usePetStore.getState().currentState === "sleep") {
+              wakeUp();
+            }
+            if (bathStateRef.current.soapLevel > 0 || hadMeaningfulSoapRef.current) {
+              finishBathRinse();
+            } else {
+              soundEffects.playSplash();
+              showToast("Gosok sabun dulu sebelum dibilas ember air!", "warn");
+            }
           }
         }}
       />

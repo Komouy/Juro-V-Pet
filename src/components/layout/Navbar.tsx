@@ -129,6 +129,7 @@ export const Navbar: React.FC = () => {
             icon={RotateCcw}
             label="Reset sudut pandang kamera"
             size="sm"
+            className="hidden sm:inline-flex"
             onClick={handleResetCamera}
           />
 
@@ -143,6 +144,7 @@ export const Navbar: React.FC = () => {
             icon={theme === "light" ? Moon : Sun}
             label="Ganti mode tema"
             size="sm"
+            className="hidden sm:inline-flex"
             onClick={handleToggleTheme}
           />
 

@@ -47,9 +47,12 @@ export const ActionTray: React.FC<ActionTrayProps> = ({
         return (
           <div className="animate-tray-enter w-full bg-warm-white/95 dark:bg-neutral-900/95 backdrop-blur-xs border-2 border-charcoal dark:border-neutral-600 shadow-[4px_4px_0px_#171717] dark:shadow-[4px_4px_0px_#000000] p-2.5">
             <div className="flex items-center justify-between gap-3 pb-1.5 mb-2 border-b border-charcoal/15 dark:border-neutral-700">
-              <span className="pixel-text text-[10px] uppercase text-charcoal dark:text-white font-bold tracking-wider">
-                Stok Makanan
-              </span>
+              <div>
+                <span className="pixel-text text-[10px] uppercase text-charcoal dark:text-white font-bold tracking-wider block">
+                  Stok Makanan
+                </span>
+                <span className="text-[8px] pixel-text text-muted">Ketuk atau seret makanan ke Juro</span>
+              </div>
               <div className="flex items-center gap-2">
                 <Link
                   to="/shop?tab=food"
@@ -125,9 +128,12 @@ export const ActionTray: React.FC<ActionTrayProps> = ({
         return (
           <div className="animate-tray-enter w-full bg-warm-white/95 dark:bg-neutral-900/95 backdrop-blur-xs border-2 border-charcoal dark:border-neutral-600 shadow-[4px_4px_0px_#171717] dark:shadow-[4px_4px_0px_#000000] p-2.5">
             <div className="flex items-center justify-between gap-3 pb-1.5 mb-2 border-b border-charcoal/15 dark:border-neutral-700">
-              <span className="pixel-text text-[10px] uppercase text-charcoal dark:text-white font-bold tracking-wider">
-                Mainan Dimiliki
-              </span>
+              <div>
+                <span className="pixel-text text-[10px] uppercase text-charcoal dark:text-white font-bold tracking-wider block">
+                  Mainan Dimiliki
+                </span>
+                <span className="text-[8px] pixel-text text-muted">Ketuk atau seret mainan ke Juro</span>
+              </div>
               <div className="flex items-center gap-2">
                 {myToys.length < SHOP_TOYS.length && (
                   <Link
@@ -189,10 +195,11 @@ export const ActionTray: React.FC<ActionTrayProps> = ({
       {activeTray === "bath" && (
         <div className="animate-tray-enter w-full bg-warm-white/95 dark:bg-neutral-900/95 backdrop-blur-xs border-2 border-charcoal dark:border-neutral-600 shadow-[4px_4px_0px_#171717] dark:shadow-[4px_4px_0px_#000000] p-2.5">
           <div className="flex items-center justify-between gap-4 pb-1.5 mb-2 border-b border-charcoal/15 dark:border-neutral-700">
-            <div className="flex items-center gap-2">
-              <span className="pixel-text text-[10px] uppercase text-charcoal dark:text-white font-bold tracking-wider">
+            <div>
+              <span className="pixel-text text-[10px] uppercase text-charcoal dark:text-white font-bold tracking-wider block">
                 Alat Mandi
               </span>
+              <span className="text-[8px] pixel-text text-muted">Ketuk / seret sabun lalu bilas ember air</span>
             </div>
             <button
               onClick={() => {
@@ -211,6 +218,7 @@ export const ActionTray: React.FC<ActionTrayProps> = ({
             <button
               type="button"
               onPointerDown={(e) => onStartItemDrag({ kind: "soap" }, e)}
+              onClick={() => onDirectUse?.({ kind: "soap" })}
               className="group min-w-0 p-2 bg-white dark:bg-neutral-800 border-2 border-charcoal dark:border-neutral-700 hover:border-sky-400 shadow-[2px_2px_0px_#171717] dark:shadow-[2px_2px_0px_#000000] hover:-translate-y-0.5 active:translate-x-[1px] active:translate-y-[1px] active:shadow-none transition-all cursor-grab active:cursor-grabbing flex flex-col items-center text-center gap-1.5 touch-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400"
             >
               <ItemIllustration id="soap-bar" size={38} />
@@ -218,6 +226,7 @@ export const ActionTray: React.FC<ActionTrayProps> = ({
                 <span className="pixel-text text-[9px] text-charcoal dark:text-white font-bold">
                   Sabun Busa
                 </span>
+                <span className="text-[7.5px] pixel-text text-muted">1. Sabuni</span>
               </div>
             </button>
 
@@ -225,6 +234,7 @@ export const ActionTray: React.FC<ActionTrayProps> = ({
             <button
               type="button"
               onPointerDown={(e) => onStartItemDrag({ kind: "bucket" }, e)}
+              onClick={() => onDirectUse?.({ kind: "bucket" })}
               className={`group min-w-0 p-2 bg-white dark:bg-neutral-800 border-2 shadow-[2px_2px_0px_#171717] dark:shadow-[2px_2px_0px_#000000] hover:-translate-y-0.5 active:translate-x-[1px] active:translate-y-[1px] active:shadow-none transition-all cursor-grab active:cursor-grabbing flex flex-col items-center text-center gap-1.5 touch-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400 ${
                 soapBadgePercent >= 40
                   ? "border-sky-400 ring-2 ring-sky-400/40"
@@ -236,6 +246,7 @@ export const ActionTray: React.FC<ActionTrayProps> = ({
                 <span className="pixel-text text-[9px] text-charcoal dark:text-white font-bold">
                   Ember Air
                 </span>
+                <span className="text-[7.5px] pixel-text text-muted">2. Bilas Air</span>
               </div>
             </button>
           </div>

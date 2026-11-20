@@ -41,7 +41,7 @@ export function PixelSegmented<T extends string = string>({
     <div
       className={`bg-neutral-100 dark:bg-neutral-900/60 p-1 border-2 border-charcoal/30 dark:border-neutral-700 ${
         fullWidthOnMobile
-          ? "grid grid-cols-4 gap-1 w-full sm:inline-flex sm:w-fit sm:flex-nowrap"
+          ? "grid grid-flow-col auto-cols-fr gap-1 w-full sm:inline-flex sm:w-fit sm:flex-nowrap overflow-x-auto"
           : "inline-flex flex-nowrap items-center gap-1 w-fit max-w-full overflow-x-auto shrink-0"
       }`}
     >

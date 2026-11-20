@@ -209,7 +209,7 @@ export const ShopPage: React.FC = () => {
           options={[
             { value: "food", label: "Makanan" },
             { value: "toy", label: "Mainan" },
-            { value: "skins", label: "Warna Juro" },
+            { value: "skins", label: "Warna" },
             {
               value: "sell",
               label: "Kristal",
