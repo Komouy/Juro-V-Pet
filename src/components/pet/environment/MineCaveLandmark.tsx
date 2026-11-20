@@ -11,13 +11,16 @@ export interface MineCaveLandmarkProps {
   isLanternLit: boolean;
   isHovered: boolean;
   mineSignTex: THREE.CanvasTexture | null;
+  position?: [number, number, number];
+  rotation?: [number, number, number];
   onPointerDown: (e: ThreeEvent<PointerEvent>) => void;
   onClick: (e: ThreeEvent<MouseEvent>) => void;
   onHoverChange: (isHovered: boolean) => void;
 }
 
 /**
- * Interactive 3D Crystal Mine Cave ("TAMBANG") Straight North Across Bridge — Click to open /mine
+ * Interactive 3D Crystal Mine Cave ("TAMBANG") at West River Headwaters — Click to open /mine
+ * Faces directly towards the river and the diorama valley!
  */
 export const MineCaveLandmark: React.FC<MineCaveLandmarkProps> = ({
   theme,
@@ -26,14 +29,16 @@ export const MineCaveLandmark: React.FC<MineCaveLandmarkProps> = ({
   isLanternLit,
   isHovered,
   mineSignTex,
+  position = [-4.65, BASE_GROUND_Y, -4.35],
+  rotation = [0, 0.92, 0],
   onPointerDown,
   onClick,
   onHoverChange,
 }) => {
   return (
     <group
-      position={[-0.36, BASE_GROUND_Y, -4.55]}
-      rotation={[0, 0, 0]}
+      position={position}
+      rotation={rotation}
       scale={isHovered ? 1.045 : 1}
       onPointerDown={onPointerDown}
       onClick={onClick}

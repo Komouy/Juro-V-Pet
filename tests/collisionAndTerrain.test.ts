@@ -36,7 +36,7 @@ describe("Terrain & Object Collision Hull System", () => {
     const shop = MAP_OBSTACLES.find((o) => Math.hypot(o.x - 4.55, o.z - -2.55) < 0.1);
     expect(shop).toBeDefined();
 
-    const mine = MAP_OBSTACLES.find((o) => Math.hypot(o.x - -0.36, o.z - -4.55) < 0.1);
+    const mine = MAP_OBSTACLES.find((o) => Math.hypot(o.x - -4.65, o.z - -4.35) < 0.1);
     expect(mine).toBeDefined();
   });
 

@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import { BASE_GROUND_Y, MAP_PLATFORMS, isWaterAt } from "../../../engine/world/mapTerrain";
+import { BASE_GROUND_Y, MAP_PLATFORMS, isWaterAt, isNearWater } from "../../../engine/world/mapTerrain";
 
 // Crisp pixel-styled wooden signboard CanvasTexture for interactive 3D landmarks
 export function createSignTexture(
@@ -79,8 +79,7 @@ export function createOrganicPondShape(scaleX: number, scaleY: number): THREE.Sh
 // Smooth winding brook ribbon shape (sy maps to -worldZ when rotated -PI/2 on X)
 export function createStreamShape(halfWidthPad = 0): THREE.Shape {
   const centerPoints: [number, number, number][] = [
-    [-6.8, 5.8, 0.3],
-    [-4.3, 4.15, 0.36],
+    [-4.15, 3.95, 0.36],
     [-2.2, 3.0, 0.42],
     [-0.45, 2.35, 0.44],
     [0.95, 1.95, 0.46],
@@ -153,13 +152,13 @@ export function generateButterfliesData() {
 
 export function generateRoundTreesData() {
   const list: { pos: [number, number, number]; scale: number }[] = [
-    { pos: [-6.4, -0.82, -4.2], scale: 1.05 },
-    { pos: [-4.4, -0.82, -4.5], scale: 0.95 },
+    { pos: [-6.4, -0.82, -3.6], scale: 1.05 },
+    { pos: [-5.8, -0.82, -2.4], scale: 0.95 },
     { pos: [-2.8, -0.84, -4.8], scale: 0.82 },
     { pos: [1.55, -0.85, -4.7], scale: 0.8 },
     { pos: [3.2, -0.82, -4.2], scale: 0.95 },
     { pos: [5.9, -0.82, -4.2], scale: 1.05 },
-    { pos: [-5.9, -0.82, -2.0], scale: 1.05 },
+    { pos: [-5.9, -0.82, -1.6], scale: 1.05 },
     { pos: [-5.5, -0.82, 0.25], scale: 0.92 },
     { pos: [-4.8, -0.84, 2.2], scale: 0.85 },
     { pos: [-3.9, -0.44, -1.35], scale: 0.78 },
@@ -176,9 +175,9 @@ export function generateRoundTreesData() {
     const z = Math.sin(angle) * radius * 0.85;
     if (Math.abs(x) < 4.9 && z > -3.8 && z < 3.6) continue;
     if (Math.abs(x) < 4.2 && z > 2.4) continue;
-    if (isWaterAt(x, z)) continue;
+    if (isWaterAt(x, z) || isNearWater(x, z, 0.75)) continue;
     if (Math.hypot(x - 4.55, z - -2.55) < 1.9) continue;
-    if (Math.hypot(x - -0.36, z - -4.55) < 2.05) continue;
+    if (Math.hypot(x - -4.65, z - -4.35) < 2.1) continue;
     const scale = 0.42 + seeded(i * 19 + 3) * 0.46;
     list.push({ pos: [x, -0.86, z], scale });
   }
@@ -187,7 +186,7 @@ export function generateRoundTreesData() {
 
 export function generatePineTreesData() {
   const list: { pos: [number, number, number]; scale: number }[] = [
-    { pos: [-5.4, -0.84, -5.0], scale: 1.05 },
+    { pos: [-6.2, -0.84, -5.6], scale: 1.05 },
     { pos: [-3.6, -0.85, -5.3], scale: 0.9 },
     { pos: [-1.4, -0.86, -5.4], scale: 0.84 },
     { pos: [0.55, -0.86, -5.4], scale: 0.88 },
@@ -208,9 +207,9 @@ export function generatePineTreesData() {
     const z = Math.sin(angle) * radius * 0.88;
     if (Math.abs(x) < 5.0 && z > -4.0 && z < 3.6) continue;
     if (Math.abs(x) < 4.4 && z > 2.4) continue;
-    if (isWaterAt(x, z)) continue;
+    if (isWaterAt(x, z) || isNearWater(x, z, 0.75)) continue;
     if (Math.hypot(x - 4.55, z - -2.55) < 1.9) continue;
-    if (Math.hypot(x - -0.36, z - -4.55) < 2.05) continue;
+    if (Math.hypot(x - -4.65, z - -4.35) < 2.1) continue;
     const scale = 0.44 + seeded(i * 23 + 9) * 0.48;
     list.push({ pos: [x, -0.86, z], scale });
   }
@@ -243,9 +242,9 @@ export function generateBushesData() {
     const z = Math.sin(angle) * radius * 0.85;
     if (Math.abs(x) < 4.5 && z > -3.5 && z < 3.0) continue;
     if (Math.abs(x) < 3.5 && z > 2.4) continue;
-    if (isWaterAt(x, z)) continue;
+    if (isWaterAt(x, z) || isNearWater(x, z, 0.5)) continue;
     if (Math.hypot(x - 4.55, z - -2.55) < 1.65) continue;
-    if (Math.hypot(x - -0.36, z - -4.55) < 1.85) continue;
+    if (Math.hypot(x - -4.65, z - -4.35) < 1.95) continue;
     const s = 0.2 + seeded(i * 29 + 5) * 0.2;
     list.push({ pos: [x, -0.82, z], scale: [s * 1.15, s * 0.82, s] });
   }
@@ -333,9 +332,9 @@ export function generateOuterGrassBladesData() {
     const radius = 2.6 + seeded(ci * 31 + 2) * 9.8;
     const cx = Math.cos(angle) * radius * 1.15;
     const cz = Math.sin(angle) * radius * 0.85;
-    if (isWaterAt(cx, cz)) continue;
+    if (isWaterAt(cx, cz) || isNearWater(cx, cz, 0.35)) continue;
     if (Math.hypot(cx - 4.55, cz - -2.55) < 1.45) continue;
-    if (Math.hypot(cx - -0.36, cz - -4.55) < 1.65) continue;
+    if (Math.hypot(cx - -4.65, cz - -4.35) < 1.85) continue;
     let onPlatform = false;
     for (let p = 0; p < MAP_PLATFORMS.length; p++) {
       const pl = MAP_PLATFORMS[p];
@@ -411,7 +410,7 @@ export function generateSteppingStonesData() {
     { pos: [-0.55, -0.908, 1.02] as [number, number, number], scale: [0.22, 0.03, 0.16] as [number, number, number], rotY: -0.15 },
     { pos: [-0.36, -0.908, -1.16] as [number, number, number], scale: [0.24, 0.03, 0.17] as [number, number, number], rotY: 0.05 },
     { pos: [-0.36, -0.908, -1.56] as [number, number, number], scale: [0.26, 0.03, 0.18] as [number, number, number], rotY: -0.05 },
-    { pos: [-0.36, -0.908, -3.1] as [number, number, number], scale: [0.24, 0.03, 0.17] as [number, number, number], rotY: 0.05 },
+    { pos: [-2.9, -0.908, -2.35] as [number, number, number], scale: [0.24, 0.03, 0.17] as [number, number, number], rotY: 0.25 },
     { pos: [-1.15, -0.908, -0.35] as [number, number, number], scale: [0.22, 0.03, 0.16] as [number, number, number], rotY: 0.4 },
     { pos: [-1.58, -0.908, -0.48] as [number, number, number], scale: [0.24, 0.03, 0.17] as [number, number, number], rotY: 0.2 },
     { pos: [1.25, -0.908, 0.42] as [number, number, number], scale: [0.22, 0.03, 0.16] as [number, number, number], rotY: -0.3 },
@@ -530,11 +529,14 @@ export interface RiverRippleItem {
 
 export function generateRiverRipplesData(): RiverRippleItem[] {
   return [
-    // Winding brook ripples along the stream curve (avoiding dry rock ledge & wooden bridge)
-    { x: -5.2, z: -4.8, speed: 1.1, phase: 0.1, maxRadius: 0.32 },
-    { x: -4.4, z: -4.3, speed: 0.9, phase: 0.8, maxRadius: 0.36 },
-    { x: -3.7, z: -3.85, speed: 1.25, phase: 1.5, maxRadius: 0.34 },
-    { x: -3.0, z: -3.45, speed: 1.0, phase: 2.2, maxRadius: 0.38 },
+    // Winding brook ripples along the stream curve from mine headwaters down to pond
+    { x: -4.0, z: -3.9, speed: 1.1, phase: 0.1, maxRadius: 0.32 },
+    { x: -3.5, z: -3.65, speed: 0.9, phase: 0.8, maxRadius: 0.36 },
+    { x: -2.8, z: -3.3, speed: 1.15, phase: 1.2, maxRadius: 0.35 },
+    { x: -2.2, z: -3.0, speed: 1.25, phase: 1.5, maxRadius: 0.34 },
+    { x: -1.6, z: -2.75, speed: 1.0, phase: 2.2, maxRadius: 0.38 },
+    { x: -1.0, z: -2.55, speed: 1.1, phase: 2.9, maxRadius: 0.36 },
+    { x: -0.4, z: -2.32, speed: 1.05, phase: 3.6, maxRadius: 0.35 },
     { x: 0.25, z: -2.2, speed: 1.05, phase: 5.0, maxRadius: 0.34 },
     { x: 0.6, z: -2.05, speed: 0.92, phase: 5.7, maxRadius: 0.35 },
     { x: 1.15, z: -1.85, speed: 1.12, phase: 0.2, maxRadius: 0.33 },

@@ -40,10 +40,10 @@ export const MAP_OBSTACLES: SolidObstacle[] = [
   { x: 4.55, z: -2.55, radius: 1.12, topY: 1.5 },
   { x: 4.35, z: -2.08, radius: 0.68, topY: 1.1 },
 
-  // Crystal Mine Cave Portal & Side Rock Mounds
-  { x: -0.36, z: -4.55, radius: 1.05, topY: 1.6 },
-  { x: -1.14, z: -4.4, radius: 0.75, topY: 1.2 },
-  { x: 0.42, z: -4.4, radius: 0.75, topY: 1.2 },
+  // Crystal Mine Cave Portal & Side Rock Mounds at West River Headwaters
+  { x: -4.65, z: -4.35, radius: 1.15, topY: 1.6 },
+  { x: -5.35, z: -4.15, radius: 0.85, topY: 1.3 },
+  { x: -4.15, z: -4.85, radius: 0.85, topY: 1.3 },
 
   // Wooden Park Bench atop East Knoll (3 overlapping circles along bench length)
   { x: 3.46, z: 0.77, radius: 0.24, topY: BASE_GROUND_Y + 0.82, tag: "bench" },
@@ -197,6 +197,14 @@ export function getBridgeElevation(_x: number, _z: number): number | null {
   return null;
 }
 
+const BROOK_SEGMENTS = [
+  [-4.15, -3.95, 0.42],
+  [-2.2, -3.0, 0.46],
+  [-0.45, -2.35, 0.48],
+  [0.95, -1.95, 0.50],
+  [2.25, -1.25, 0.60],
+];
+
 // Check if (x, z) is inside the lily pond or winding brook (Juro can swim/glide over water!)
 export function isWaterAt(x: number, z: number): boolean {
   // Stumps and platforms are elevated dry land above water
@@ -212,11 +220,44 @@ export function isWaterAt(x: number, z: number): boolean {
   const pdz = (z - -1.05) / 0.8;
   if (pdx * pdx + pdz * pdz < 1.0) return true;
 
-  // Approximate brook centerline curve
-  if (x >= -5.5 && x <= 2.2) {
-    const t = (x + 5.5) / 7.7;
-    const streamZ = -4.9 + t * 3.7 + Math.sin(t * Math.PI) * 0.35;
-    if (Math.abs(z - streamZ) < 0.48) return true;
+  // Brook stream from mine headwaters (-4.15, -3.95) down to pond (2.25, -1.25)
+  for (let i = 0; i < BROOK_SEGMENTS.length - 1; i++) {
+    const p1 = BROOK_SEGMENTS[i];
+    const p2 = BROOK_SEGMENTS[i + 1];
+    const dx = p2[0] - p1[0];
+    const dz = p2[1] - p1[1];
+    const segLenSq = dx * dx + dz * dz;
+    const t = Math.max(0, Math.min(1, ((x - p1[0]) * dx + (z - p1[1]) * dz) / segLenSq));
+    const projX = p1[0] + t * dx;
+    const projZ = p1[1] + t * dz;
+    const halfWidth = p1[2] + t * (p2[2] - p1[2]);
+    if (Math.hypot(x - projX, z - projZ) < halfWidth) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+// Check if (x, z) is in or near water within a safety buffer margin (used by vegetation generators)
+export function isNearWater(x: number, z: number, buffer = 0.6): boolean {
+  const pdx = (x - 2.45) / (1.15 + buffer);
+  const pdz = (z - -1.05) / (0.8 + buffer);
+  if (pdx * pdx + pdz * pdz < 1.0) return true;
+
+  for (let i = 0; i < BROOK_SEGMENTS.length - 1; i++) {
+    const p1 = BROOK_SEGMENTS[i];
+    const p2 = BROOK_SEGMENTS[i + 1];
+    const dx = p2[0] - p1[0];
+    const dz = p2[1] - p1[1];
+    const segLenSq = dx * dx + dz * dz;
+    const t = Math.max(0, Math.min(1, ((x - p1[0]) * dx + (z - p1[1]) * dz) / segLenSq));
+    const projX = p1[0] + t * dx;
+    const projZ = p1[1] + t * dz;
+    const halfWidth = p1[2] + t * (p2[2] - p1[2]) + buffer;
+    if (Math.hypot(x - projX, z - projZ) < halfWidth) {
+      return true;
+    }
   }
 
   return false;
@@ -385,8 +426,8 @@ export function pickScenicWaypoint(bias?: "water" | "bed" | "food" | "bench" | "
     // 80% chance to target the clear water stream/brook for a refreshing splash or wash
     if (Math.random() < 0.8) {
       const brookX = -2.5 + Math.random() * 3.5;
-      const t = (brookX + 5.5) / 7.7;
-      const brookZ = -4.9 + t * 3.7 + Math.sin(t * Math.PI) * 0.35;
+      const t = (brookX + 4.15) / 6.4;
+      const brookZ = -3.95 + t * 2.7 + Math.sin(t * Math.PI) * 0.35;
       if (!isInsideObstacle(brookX, brookZ, 0.3)) {
         return { x: brookX, z: brookZ };
       }
