@@ -166,6 +166,14 @@ export function generateRoundTreesData() {
     { pos: [5.6, -0.82, 0.85], scale: 0.95 },
     { pos: [4.9, -0.84, 2.35], scale: 0.82 },
     { pos: [4.2, -0.48, 1.35], scale: 0.76 },
+    // Western & South-Western Horizon Tree Belt (Framing West Knoll & Horizon Hills)
+    { pos: [-6.8, -0.82, -0.6], scale: 0.98 },
+    { pos: [-6.4, -0.82, 0.95], scale: 1.02 },
+    { pos: [-5.7, -0.82, 1.85], scale: 0.92 },
+    { pos: [-5.4, -0.82, 3.2], scale: 0.88 },
+    { pos: [-4.2, -0.84, 3.8], scale: 0.85 },
+    { pos: [-2.6, -0.84, 4.8], scale: 0.92 },
+    { pos: [-7.5, -0.82, 1.2], scale: 1.05 },
   ];
 
   for (let i = 0; i < 65; i++) {
@@ -198,6 +206,13 @@ export function generatePineTreesData() {
     { pos: [6.6, -0.84, -0.2], scale: 1.0 },
     { pos: [6.0, -0.84, 1.95], scale: 0.88 },
     { pos: [-7.2, -0.84, -3.1], scale: 0.96 },
+    // Western & South-Western Horizon Pine Belt
+    { pos: [-7.1, -0.84, 0.1], scale: 1.05 },
+    { pos: [-6.6, -0.84, -1.8], scale: 0.98 },
+    { pos: [-6.8, -0.84, 2.4], scale: 0.96 },
+    { pos: [-5.9, -0.84, 3.7], scale: 0.92 },
+    { pos: [-3.5, -0.84, 4.4], scale: 0.88 },
+    { pos: [-7.6, -0.84, -1.2], scale: 1.02 },
   ];
 
   for (let i = 0; i < 60; i++) {
@@ -233,6 +248,11 @@ export function generateBushesData() {
     { pos: [-1.48, -0.78, -4.05], scale: [0.32, 0.24, 0.3] },
     { pos: [5.5, -0.78, -2.65], scale: [0.34, 0.26, 0.32] },
     { pos: [-5.6, -0.78, -3.4], scale: [0.38, 0.28, 0.34] },
+    // Western & South-Western Horizon Foothill Bushes
+    { pos: [-5.6, -0.78, -0.3], scale: [0.36, 0.26, 0.32] },
+    { pos: [-5.3, -0.78, 1.3], scale: [0.34, 0.25, 0.3] },
+    { pos: [-4.6, -0.78, 2.9], scale: [0.32, 0.24, 0.28] },
+    { pos: [-3.2, -0.78, 4.1], scale: [0.34, 0.25, 0.3] },
   ];
 
   for (let i = 0; i < 48; i++) {

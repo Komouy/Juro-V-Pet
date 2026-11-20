@@ -511,6 +511,7 @@ export const OutdoorEnvironment: React.FC<OutdoorEnvironmentProps> = React.memo(
         <PixelRain isRaining={weather === "rain"} />
 
         {/* 3. Layered Distant Mountains & Rolling Green Horizon Hills */}
+        {/* North Distant Mountains & Horizon Hills */}
         <mesh position={[-3.8, -1.4, -10.5]} scale={[3.8, 2.4, 0.7]}>
           <coneGeometry args={[1.6, 2.2, 5]} />
           <meshBasicMaterial color={theme.hillFarColor} transparent opacity={0.55} />
@@ -530,6 +531,53 @@ export const OutdoorEnvironment: React.FC<OutdoorEnvironmentProps> = React.memo(
         <mesh position={[5.6, -1.85, -6.6]} scale={[5.4, 1.38, 0.8]}>
           <sphereGeometry args={[1.5, 24, 12]} />
           <meshBasicMaterial color={theme.hillNearColor} />
+        </mesh>
+
+        {/* West & South-West Rolling Horizon Hills (Enclosing West Knoll & Empty Horizon) */}
+        <mesh position={[-7.4, -1.85, -1.6]} scale={[5.6, 1.42, 0.9]}>
+          <sphereGeometry args={[1.5, 24, 12]} />
+          <meshBasicMaterial color={theme.hillNearColor} />
+        </mesh>
+        <mesh position={[-7.2, -1.85, 1.6]} scale={[5.4, 1.38, 0.9]}>
+          <sphereGeometry args={[1.5, 24, 12]} />
+          <meshBasicMaterial color={theme.hillNearColor} />
+        </mesh>
+        <mesh position={[-5.8, -1.85, 4.8]} scale={[5.8, 1.34, 0.9]}>
+          <sphereGeometry args={[1.5, 24, 12]} />
+          <meshBasicMaterial color={theme.hillNearColor} />
+        </mesh>
+        {/* West Horizon Far Subtle Layering */}
+        <mesh position={[-9.6, -1.75, 0.0]} scale={[7.4, 1.6, 1.0]}>
+          <sphereGeometry args={[1.5, 24, 12]} />
+          <meshBasicMaterial color={theme.hillFarColor} />
+        </mesh>
+        <mesh position={[-8.8, -1.75, 3.6]} scale={[6.8, 1.55, 1.0]}>
+          <sphereGeometry args={[1.5, 24, 12]} />
+          <meshBasicMaterial color={theme.hillFarColor} />
+        </mesh>
+
+        {/* South Horizon Framing */}
+        <mesh position={[-1.2, -1.88, 6.8]} scale={[8.0, 1.32, 0.9]}>
+          <sphereGeometry args={[1.5, 24, 12]} />
+          <meshBasicMaterial color={theme.hillNearColor} />
+        </mesh>
+        <mesh position={[5.2, -1.86, 5.8]} scale={[6.4, 1.34, 0.9]}>
+          <sphereGeometry args={[1.5, 24, 12]} />
+          <meshBasicMaterial color={theme.hillNearColor} />
+        </mesh>
+
+        {/* East Horizon Framing */}
+        <mesh position={[7.5, -1.85, -1.2]} scale={[5.6, 1.4, 0.9]}>
+          <sphereGeometry args={[1.5, 24, 12]} />
+          <meshBasicMaterial color={theme.hillNearColor} />
+        </mesh>
+        <mesh position={[7.2, -1.85, 2.2]} scale={[5.2, 1.36, 0.9]}>
+          <sphereGeometry args={[1.5, 24, 12]} />
+          <meshBasicMaterial color={theme.hillNearColor} />
+        </mesh>
+        <mesh position={[9.5, -1.75, 0.5]} scale={[7.0, 1.58, 1.0]}>
+          <sphereGeometry args={[1.5, 24, 12]} />
+          <meshBasicMaterial color={theme.hillFarColor} />
         </mesh>
 
         {/* 4. Instanced Forest Belt: 14 Round Trees + 12 Pine Trees + 16 Shrubs */}
