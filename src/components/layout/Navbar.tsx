@@ -111,7 +111,7 @@ export const Navbar: React.FC = () => {
               openHubModal();
             }}
             className="flex items-center gap-1 sm:gap-1.5 px-2 sm:px-2.5 py-1 border-2 border-charcoal dark:border-neutral-600 bg-amber-50 dark:bg-neutral-800 text-charcoal dark:text-neutral-100 shadow-[2px_2px_0px_#171717] dark:shadow-[2px_2px_0px_#000000] hover:bg-amber-100 dark:hover:bg-neutral-700 active:translate-x-[1px] active:translate-y-[1px] cursor-pointer transition-colors"
-            title="Buku Asuh & Kemitraan 2 Perawat"
+            title="Buku Asuh & 2P"
             aria-label="Buka Hub Perawat Juro"
           >
             <Users size={13} className="text-juro-orange" />

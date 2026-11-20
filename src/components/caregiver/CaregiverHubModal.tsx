@@ -7,7 +7,6 @@ import {
   Check,
   X,
   LogOut,
-  Sparkles,
   HeartHandshake,
   Utensils,
   Bath,
@@ -42,7 +41,7 @@ function getActionIcon(type: CareActionType) {
     case "skin":
       return <ShoppingBag size={13} className="text-amber-500" />;
     default:
-      return <Sparkles size={13} className="text-amber-500" />;
+      return <HeartHandshake size={13} className="text-emerald-500" />;
   }
 }
 
@@ -162,7 +161,7 @@ export const CaregiverHubModal: React.FC<CaregiverHubModalProps> = ({ isOpen, on
               }`}
           >
             <HeartHandshake size={13} />
-            Kemitraan 2 Perawat
+            Profil & 2P
           </button>
           <button
             type="button"
