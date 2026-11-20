@@ -10,7 +10,7 @@ export type CaregiverRole = "primary" | "partner" | "custom";
  */
 export interface CaregiverProfile {
   id: string; // ID unik perawat (misal: "cg_dhavi_179516")
-  name: string; // Nama panggilan (misal: "Dhavi", "Naufall", "Papi", "Mami")
+  name: string; // Nama panggilan (misal: "Dhavi", "Partner", "Papi", "Mami")
   roleTitle: string; // Judul peran (misal: "Perawat 1", "Perawat 2", "Papi Juro", "Mami Juro")
   avatarColor?: string; // Warna aksen badge profil perawat
   joinedAt: number;

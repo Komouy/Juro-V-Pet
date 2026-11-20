@@ -29,6 +29,14 @@ export const RootLayout: React.FC = () => {
     }
   }, [location.pathname]);
 
+  // Otomatis sambungkan kembali listener Firebase jika sudah memiliki kamar aktif
+  useEffect(() => {
+    const caregiver = useCaregiverStore.getState();
+    if (caregiver.activeRoomCode && caregiver.myProfile) {
+      caregiver.initRealtimeSubscription();
+    }
+  }, []);
+
   return (
     <div
       className={`${

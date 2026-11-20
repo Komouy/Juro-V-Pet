@@ -34,23 +34,23 @@ export function getActiveFirebaseConfig(): FirebaseCustomConfig | null {
     }
   }
 
-  // 2. Cek dari environment variables (.env / .env.local)
-  const envApiKey = import.meta.env.VITE_FIREBASE_API_KEY;
-  const envProjectId = import.meta.env.VITE_FIREBASE_PROJECT_ID;
+  // 2. Cek dari environment variables (.env / .env.local) dengan default fallback ke project Firebase
+  const envApiKey = import.meta.env.VITE_FIREBASE_API_KEY || "AIzaSyAgYfQa5WEI88S5-vt1mI1xD-KVETNr5dg";
+  const envProjectId = import.meta.env.VITE_FIREBASE_PROJECT_ID || "jurovpet-a4b7d";
   const envDbUrl = (
     import.meta.env.VITE_FIREBASE_DATABASE_URL ||
-    (envProjectId ? `https://${envProjectId}-default-rtdb.firebaseio.com` : "")
+    "https://jurovpet-a4b7d-default-rtdb.asia-southeast1.firebasedatabase.app"
   ).replace(/\/+$/, "");
 
   if (envApiKey && envProjectId && envDbUrl) {
     return {
       apiKey: envApiKey,
-      authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || `${envProjectId}.firebaseapp.com`,
+      authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || "jurovpet-a4b7d.firebaseapp.com",
       databaseURL: envDbUrl,
       projectId: envProjectId,
-      storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || `${envProjectId}.firebasestorage.app`,
-      messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || "",
-      appId: import.meta.env.VITE_FIREBASE_APP_ID || "",
+      storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || "jurovpet-a4b7d.firebasestorage.app",
+      messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || "292948659239",
+      appId: import.meta.env.VITE_FIREBASE_APP_ID || "1:292948659239:web:2917e703e9971f538d5202",
     };
   }
 

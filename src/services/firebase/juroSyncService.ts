@@ -27,6 +27,7 @@ export function generatePairingCode(): string {
 export interface SyncCallbacks {
   onJuroStateSync: (juroState: SharedJuroState) => void;
   onActivityLogAdded?: (log: CaregiverActionLog) => void;
+  onInitialLogsLoaded?: (logs: CaregiverActionLog[]) => void;
   onPartnerStatusChange?: (partner: CaregiverProfile | null) => void;
   onError?: (error: Error) => void;
 }
@@ -210,18 +211,22 @@ export class JuroRealtimeSyncService {
           : data.caregivers.caregiver1 ?? null;
       callbacks.onPartnerStatusChange?.(partner);
 
-      // 3. Deteksi log aksi baru
+      // 3. Deteksi log aksi baru dan pulihkan seluruh riwayat saat baru terhubung
       if (data.activityLogs) {
-        const logsArray = Object.values(data.activityLogs).sort(
-          (a, b) => a.timestamp - b.timestamp
+        const logsDesc = Object.values(data.activityLogs).sort(
+          (a, b) => b.timestamp - a.timestamp
         );
-        if (logsArray.length > lastKnownLogsCount) {
-          const newestLog = logsArray[logsArray.length - 1];
-          // Jika aksi dilakukan oleh perawat pasangan, picu callback notifikasi/feed
+        if (lastKnownLogsCount === 0) {
+          // Pertama kali terhubung / setelah refresh browser: muat seluruh log
+          callbacks.onInitialLogsLoaded?.(logsDesc.slice(0, 80));
+          lastKnownLogsCount = logsDesc.length;
+        } else if (logsDesc.length > lastKnownLogsCount) {
+          const newestLog = logsDesc[0];
+          // Jika aksi dilakukan oleh perawat pasangan, picu callback notifikasi
           if (newestLog && newestLog.caregiverId !== myCaregiverId) {
             callbacks.onActivityLogAdded?.(newestLog);
           }
-          lastKnownLogsCount = logsArray.length;
+          lastKnownLogsCount = logsDesc.length;
         }
       }
     };

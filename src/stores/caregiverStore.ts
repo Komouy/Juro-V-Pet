@@ -389,6 +389,10 @@ export const useCaregiverStore = create<CaregiverState>((set, get) => {
           }
         },
 
+        onInitialLogsLoaded: (logs) => {
+          set({ activityLogs: logs });
+        },
+
         onActivityLogAdded: (newLog) => {
           set((state) => {
             const alreadyExists = state.activityLogs.some((l) => l.id === newLog.id);

@@ -49,18 +49,18 @@ describe("Caregiver Co-Parenting & Firebase Realtime Foundation", () => {
 
   it("records care actions with author details and timestamps", async () => {
     const store = useCaregiverStore.getState();
-    store.setProfile("Naufall", "Perawat 2");
+    store.setProfile("Sahabat", "Perawat 2");
 
     await store.recordAction(
       "feed",
-      "Naufall memberi Juro Pudding Stroberi (+25 Kenyang)",
+      "Sahabat memberi Juro Pudding Stroberi (+25 Kenyang)",
       { hunger: 25 },
       "Pudding Stroberi"
     );
 
     const logs = useCaregiverStore.getState().activityLogs;
     expect(logs.length).toBeGreaterThanOrEqual(1);
-    expect(logs[0].caregiverName).toBe("Naufall");
+    expect(logs[0].caregiverName).toBe("Sahabat");
     expect(logs[0].actionType).toBe("feed");
     expect(logs[0].statChanges?.hunger).toBe(25);
     expect(logs[0].itemUsedName).toBe("Pudding Stroberi");
@@ -138,7 +138,7 @@ describe("Caregiver Co-Parenting & Firebase Realtime Foundation", () => {
     useCaregiverStore.setState({
       partnerProfile: {
         id: "partner_456",
-        name: "Naufall",
+        name: "Sahabat",
         roleTitle: "Perawat 2",
         joinedAt: Date.now(),
       },
@@ -156,10 +156,10 @@ describe("Caregiver Co-Parenting & Firebase Realtime Foundation", () => {
           id: "log_2",
           timestamp: Date.now() - 1000,
           caregiverId: "partner_456",
-          caregiverName: "Naufall",
+          caregiverName: "Sahabat",
           caregiverRoleTitle: "Perawat 2",
           actionType: "play",
-          description: "Naufall ajak main bola",
+          description: "Sahabat ajak main bola",
         },
       ],
     });
@@ -167,7 +167,7 @@ describe("Caregiver Co-Parenting & Firebase Realtime Foundation", () => {
     const rel = useCaregiverStore.getState().getCaregiverRelationship();
     expect(rel.caregiverCount).toBe(2);
     expect(rel.myCaregiverName).toBe("Dhavi");
-    expect(rel.partnerCaregiverName).toBe("Naufall");
+    expect(rel.partnerCaregiverName).toBe("Sahabat");
     expect(rel.developmentTrait).toBe("Harmoni Dua Sahabat");
 
     // Inject into Gemini system prompt
@@ -184,7 +184,7 @@ describe("Caregiver Co-Parenting & Firebase Realtime Foundation", () => {
 
     expect(prompt).toContain("KESADARAN & MEMORI 2 PERAWAT ASUH JURO");
     expect(prompt).toContain("Dhavi");
-    expect(prompt).toContain("Naufall");
+    expect(prompt).toContain("Sahabat");
     expect(prompt).toContain("Harmoni Dua Sahabat");
   });
 });
