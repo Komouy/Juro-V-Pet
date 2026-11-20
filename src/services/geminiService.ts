@@ -423,6 +423,10 @@ export function getContextualFallbackReply(
     return "Bloop... Malam sudah larut, lentera dan kunang-kunang indah sekali ya!";
   }
 
+  if (!context) {
+    return JURO_FALLBACK_REPLIES[Math.floor(Math.random() * JURO_FALLBACK_REPLIES.length)];
+  }
+
   const defaultOptions = [
     `Bloop! Juro senang berada di ${loc.locationName} bersama kamu, sambil membayangkan puding lezat! Nyam nyam~`,
     "Slimey! Perut jeli Juro berbunyi lembut... bloop bloop!",

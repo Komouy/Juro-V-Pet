@@ -12,7 +12,7 @@ import {
 } from "../../features/character/JuroModel";
 import { OutdoorEnvironment } from "./OutdoorEnvironment";
 import { ItemIllustration } from "../items/ItemIllustration";
-import { Heart, CloudRain, Sun, Moon, Armchair, Footprints, X } from "lucide-react";
+import { Heart, CloudRain, Sun, Moon } from "lucide-react";
 import { usePetStore } from "../../stores/petStore";
 import { useGameStore } from "../../stores/gameStore";
 import { useUIStore } from "../../stores/uiStore";
@@ -159,14 +159,9 @@ export const PetViewport: React.FC = () => {
   const isDizzyRef = useRef<boolean>(false);
 
   // Bench sitting interaction state & refs
-  const [benchMenu, setBenchMenu] = useState<{
-    open: boolean;
-    x: number;
-    y: number;
-  } | null>(null);
+  const [isBenchMenuOpen, setIsBenchMenuOpen] = useState(false);
   const [isSittingOnBench, setIsSittingOnBench] = useState(false);
   const isHeadingToBenchRef = useRef<boolean>(false);
-  const benchMenuRef = useRef<HTMLDivElement>(null);
 
   const juroMenuRef = useRef<HTMLDivElement>(null);
   const tailRef = useRef<HTMLDivElement>(null);
@@ -185,8 +180,8 @@ export const PetViewport: React.FC = () => {
         setIsSittingOnBench(false);
       }
       isHeadingToBenchRef.current = false;
-      if (benchMenu?.open) {
-        setBenchMenu(null);
+      if (isBenchMenuOpen) {
+        setIsBenchMenuOpen(false);
       }
       soundEffects.playGuideTap();
       setJuroMenu({ open: false, x: 0, y: 0, isNearTop: false });
@@ -194,14 +189,14 @@ export const PetViewport: React.FC = () => {
       setShowStatDetails(false);
       setWalkCommand({ x, z, nonce: Date.now() });
     },
-    [isPettingActive, isSittingOnBench, benchMenu?.open, setActiveTray, setShowStatDetails]
+    [isPettingActive, isSittingOnBench, isBenchMenuOpen, setActiveTray, setShowStatDetails]
   );
 
   const handleOpenShopFromMap = useCallback(() => {
     if (isPettingActive) setIsPettingActive(false);
     if (isSittingOnBench) setIsSittingOnBench(false);
     isHeadingToBenchRef.current = false;
-    setBenchMenu(null);
+    setIsBenchMenuOpen(false);
     setJuroMenu({ open: false, x: 0, y: 0, isNearTop: false });
     soundEffects.playClick();
     navigate("/shop");
@@ -211,7 +206,7 @@ export const PetViewport: React.FC = () => {
     if (isPettingActive) setIsPettingActive(false);
     if (isSittingOnBench) setIsSittingOnBench(false);
     isHeadingToBenchRef.current = false;
-    setBenchMenu(null);
+    setIsBenchMenuOpen(false);
     setJuroMenu({ open: false, x: 0, y: 0, isNearTop: false });
     soundEffects.playClick();
     navigate("/mine");
@@ -287,7 +282,7 @@ export const PetViewport: React.FC = () => {
       activeTray === "none" &&
       !showStatDetails &&
       !juroMenu.open &&
-      !benchMenu?.open &&
+      !isBenchMenuOpen &&
       !isPettingActive &&
       !speechBubble.visible
     )
@@ -298,13 +293,13 @@ export const PetViewport: React.FC = () => {
         setActiveTray("none");
         setShowStatDetails(false);
         setJuroMenu({ open: false, x: 0, y: 0, isNearTop: false });
-        setBenchMenu(null);
+        setIsBenchMenuOpen(false);
         setSpeechBubble((s) => ({ ...s, visible: false }));
       }
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [activeTray, showStatDetails, juroMenu.open, benchMenu?.open, isPettingActive, speechBubble.visible]);
+  }, [activeTray, showStatDetails, juroMenu.open, isBenchMenuOpen, isPettingActive, speechBubble.visible]);
 
   // Dynamically assemble pet context: activities, emotions, sensations & environmental state
   const getLiveChatContext = useCallback(
@@ -529,7 +524,7 @@ export const PetViewport: React.FC = () => {
     ) => {
       // Dismiss any open contextual menu so the speech bubble is completely unobscured
       setJuroMenu({ open: false, x: 0, y: 0, isNearTop: false });
-      setBenchMenu(null);
+      setIsBenchMenuOpen(false);
 
       // Don't interrupt if user is actively in chat or if busy
       if (speechBubble.isLoading) return;
@@ -641,12 +636,13 @@ export const PetViewport: React.FC = () => {
 
   // Dismiss bench menu when tapping/clicking outside (supporting both mouse and touch)
   useEffect(() => {
-    if (!benchMenu?.open) return;
+    if (!isBenchMenuOpen) return;
     const onWindowPointer = (e: Event) => {
-      if (benchMenuRef.current && benchMenuRef.current.contains(e.target as Node)) {
+      const target = e.target as HTMLElement | null;
+      if (target?.closest?.('[data-bench-menu="true"]')) {
         return;
       }
-      setBenchMenu(null);
+      setIsBenchMenuOpen(false);
     };
     const timer = setTimeout(() => {
       window.addEventListener("pointerdown", onWindowPointer);
@@ -655,7 +651,7 @@ export const PetViewport: React.FC = () => {
       clearTimeout(timer);
       window.removeEventListener("pointerdown", onWindowPointer);
     };
-  }, [benchMenu?.open]);
+  }, [isBenchMenuOpen]);
 
   // Dismiss speech bubble when tapping/clicking outside (matching behavior of other menus)
   useEffect(() => {
@@ -680,15 +676,13 @@ export const PetViewport: React.FC = () => {
     };
   }, [speechBubble.visible]);
 
-
-
   // Dismiss Juro menu and bench menu when user rotates or zooms camera with OrbitControls
   useEffect(() => {
     const controls = controlsRef.current;
     if (!controls) return;
     const onOrbitStart = () => {
       setJuroMenu({ open: false, x: 0, y: 0, isNearTop: false });
-      setBenchMenu(null);
+      setIsBenchMenuOpen(false);
     };
     controls.addEventListener("start", onOrbitStart);
     return () => controls.removeEventListener("start", onOrbitStart);
@@ -839,7 +833,7 @@ export const PetViewport: React.FC = () => {
     if (dragging) {
       setIsSittingOnBench(false);
       isHeadingToBenchRef.current = false;
-      setBenchMenu(null);
+      setIsBenchMenuOpen(false);
     }
     setIsDraggingPet(dragging);
   }, []);
@@ -1208,45 +1202,25 @@ export const PetViewport: React.FC = () => {
     addLog("interaction", "Juro duduk dengan santai di kursi taman sambil menikmati pemandangan.");
   }, [addLog]);
 
-  const handleBenchClick = useCallback(
-    (screenPos?: { x: number; y: number }) => {
-      if (isPettingActive) setIsPettingActive(false);
-      setShowStatDetails(false);
-      setActiveTray("none");
-      setJuroMenu({ open: false, x: 0, y: 0, isNearTop: false });
+  const handleBenchClick = useCallback(() => {
+    if (isPettingActive) setIsPettingActive(false);
+    setShowStatDetails(false);
+    setActiveTray("none");
+    setJuroMenu({ open: false, x: 0, y: 0, isNearTop: false });
 
-      if (benchMenu?.open) {
-        soundEffects.playDismiss();
-        setBenchMenu(null);
-        return;
-      }
+    if (isBenchMenuOpen) {
+      soundEffects.playDismiss();
+      setIsBenchMenuOpen(false);
+      return;
+    }
 
-      soundEffects.playPop();
-
-      const contRect = containerRef.current?.getBoundingClientRect();
-      const contW = contRect?.width || window.innerWidth;
-      const contH = contRect?.height || window.innerHeight;
-
-      const rawX = screenPos?.x ?? contW * 0.78;
-      const rawY = screenPos?.y ?? contH * 0.45;
-
-      const menuW = 160;
-      const menuH = 68;
-      const clampedX = Math.max(menuW / 2 + 12, Math.min(contW - menuW / 2 - 12, rawX));
-      const clampedY = Math.max(menuH + 12, Math.min(contH - 20, rawY - 20));
-
-      setBenchMenu({
-        open: true,
-        x: clampedX,
-        y: clampedY,
-      });
-    },
-    [benchMenu?.open, isPettingActive]
-  );
+    soundEffects.playPop();
+    setIsBenchMenuOpen(true);
+  }, [isBenchMenuOpen, isPettingActive]);
 
   const handleSitOnBench = useCallback(() => {
     soundEffects.playClick();
-    setBenchMenu(null);
+    setIsBenchMenuOpen(false);
     isHeadingToBenchRef.current = true;
     setIsSittingOnBench(false);
     setWalkCommand({ x: JURO_BENCH_POS.x, z: JURO_BENCH_POS.z, nonce: Date.now() });
@@ -1255,9 +1229,10 @@ export const PetViewport: React.FC = () => {
 
   const handleStandFromBench = useCallback(() => {
     soundEffects.playClick();
-    setBenchMenu(null);
+    setIsBenchMenuOpen(false);
     setIsSittingOnBench(false);
     isHeadingToBenchRef.current = false;
+    soundEffects.playPlop();
     // Walk to clear ground slightly in front of the bench
     setWalkCommand({ x: 3.15, z: 1.25, nonce: Date.now() });
     addLog("interaction", "Juro berdiri dari kursi taman dan kembali menjelajah.");
@@ -1267,7 +1242,7 @@ export const PetViewport: React.FC = () => {
     soundEffects.playClick();
     if (isSittingOnBench) setIsSittingOnBench(false);
     isHeadingToBenchRef.current = false;
-    setBenchMenu(null);
+    setIsBenchMenuOpen(false);
     if (currentState === "sleep") {
       wakeUp();
       soundEffects.playWakeUp();
@@ -1285,7 +1260,7 @@ export const PetViewport: React.FC = () => {
   const handleToggleSleep = useCallback(() => {
     if (isSittingOnBench) setIsSittingOnBench(false);
     isHeadingToBenchRef.current = false;
-    setBenchMenu(null);
+    setIsBenchMenuOpen(false);
     if (currentState === "sleep") {
       wakeUp();
       soundEffects.playWakeUp();
@@ -1387,7 +1362,7 @@ export const PetViewport: React.FC = () => {
   const handleMenuAction = (action: "food" | "toy" | "sleep" | "bath" | "pet") => {
     if (isSittingOnBench) setIsSittingOnBench(false);
     isHeadingToBenchRef.current = false;
-    setBenchMenu(null);
+    setIsBenchMenuOpen(false);
     setJuroMenu({ open: false, x: 0, y: 0, isNearTop: false });
     setShowStatDetails(false);
 
@@ -1536,10 +1511,15 @@ export const PetViewport: React.FC = () => {
             theme={activeTheme}
             weather={weather}
             onWalkPointSelect={handleWalkPointSelect}
+            walkCommand={walkCommand}
             onOpenShop={handleOpenShopFromMap}
             onOpenMine={handleOpenMineFromMap}
             onBedClick={handleBedClick}
+            isBenchMenuOpen={isBenchMenuOpen}
             onBenchClick={handleBenchClick}
+            onSitOnBench={handleSitOnBench}
+            onStandFromBench={handleStandFromBench}
+            onCloseBenchMenu={() => setIsBenchMenuOpen(false)}
             isSittingOnBench={isSittingOnBench}
           />
 
@@ -1662,65 +1642,6 @@ export const PetViewport: React.FC = () => {
         petName={name}
       />
 
-      {/* Contextual Park Bench Menu ("Duduk" / "Berdiri") */}
-      {benchMenu?.open && (
-        <div
-          ref={benchMenuRef}
-          style={{
-            left: `${benchMenu.x}px`,
-            top: `${benchMenu.y}px`,
-          }}
-          className="absolute z-30 pointer-events-auto -translate-x-1/2 -translate-y-full"
-        >
-          <div className="animate-tray-enter relative flex flex-col gap-1.5 p-2 bg-warm-white/95 dark:bg-neutral-900/95 backdrop-blur-xs border-2 border-charcoal dark:border-neutral-600 shadow-[3px_3px_0px_#171717] dark:shadow-[3px_3px_0px_#000000] min-w-[148px]">
-            {/* Tail arrow */}
-            <div
-              style={{ left: "50%" }}
-              className="absolute -translate-x-1/2 w-3 h-3 bg-warm-white dark:bg-neutral-900 rotate-45 pointer-events-none -bottom-1.5 border-r-2 border-b-2 border-charcoal dark:border-neutral-600"
-              aria-hidden="true"
-            />
-
-            {/* Header */}
-            <div className="flex items-center justify-between gap-2 border-b border-neutral-300 dark:border-neutral-700 pb-1">
-              <div className="flex items-center gap-1.5">
-                <Armchair size={13} className="text-amber-600 dark:text-amber-400 shrink-0" />
-                <span className="pixel-text text-[9px] uppercase font-bold text-charcoal dark:text-white">
-                  Kursi Taman
-                </span>
-              </div>
-              <button
-                type="button"
-                onClick={() => setBenchMenu(null)}
-                className="text-neutral-400 hover:text-charcoal dark:hover:text-white cursor-pointer"
-                aria-label="Tutup menu kursi"
-              >
-                <X size={12} />
-              </button>
-            </div>
-
-            {/* Action Button: Duduk or Berdiri */}
-            {isSittingOnBench ? (
-              <button
-                type="button"
-                onClick={handleStandFromBench}
-                className="w-full flex items-center justify-center gap-1.5 py-1.5 px-3 bg-amber-500 hover:bg-amber-600 text-white border-2 border-charcoal shadow-[2px_2px_0px_#171717] pixel-text text-[9px] uppercase font-bold cursor-pointer active:translate-x-[1px] active:translate-y-[1px] transition-all"
-              >
-                <Footprints size={12} />
-                Berdiri
-              </button>
-            ) : (
-              <button
-                type="button"
-                onClick={handleSitOnBench}
-                className="w-full flex items-center justify-center gap-1.5 py-1.5 px-3 bg-emerald-600 hover:bg-emerald-700 text-white border-2 border-charcoal shadow-[2px_2px_0px_#171717] pixel-text text-[9px] uppercase font-bold cursor-pointer active:translate-x-[1px] active:translate-y-[1px] transition-all"
-              >
-                <Armchair size={12} />
-                Duduk
-              </button>
-            )}
-          </div>
-        </div>
-      )}
 
       {/* Floating Iridescent Soap Bubbles from dragging Bubble Wand */}
       {dragBubbles.map((b) => (

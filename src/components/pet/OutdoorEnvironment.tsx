@@ -9,7 +9,9 @@ import { ShopBuildingLandmark } from "./environment/ShopBuildingLandmark";
 import { MineCaveLandmark } from "./environment/MineCaveLandmark";
 import { PixelRain } from "./environment/PixelRain";
 import { NightFireflies } from "./environment/NightFireflies";
+import { WalkTargetMarker } from "./environment/WalkTargetMarker";
 import type { WeatherMode } from "../../types/ui";
+import type { WalkCommand } from "../../features/character/JuroModel";
 import {
   createSignTexture,
   createOrganicPondShape,
@@ -33,10 +35,15 @@ interface OutdoorEnvironmentProps {
   theme: TimeThemeConfig;
   weather?: WeatherMode;
   onWalkPointSelect?: (x: number, z: number) => void;
+  walkCommand?: WalkCommand | null;
   onOpenShop?: () => void;
   onOpenMine?: () => void;
   onBedClick?: () => void;
-  onBenchClick?: (screenPos?: { x: number; y: number }) => void;
+  isBenchMenuOpen?: boolean;
+  onBenchClick?: () => void;
+  onSitOnBench?: () => void;
+  onStandFromBench?: () => void;
+  onCloseBenchMenu?: () => void;
   isSittingOnBench?: boolean;
 }
 
@@ -49,10 +56,15 @@ export const OutdoorEnvironment: React.FC<OutdoorEnvironmentProps> = React.memo(
     theme,
     weather = "clear",
     onWalkPointSelect,
+    walkCommand,
     onOpenShop,
     onOpenMine,
     onBedClick,
+    isBenchMenuOpen = false,
     onBenchClick,
+    onSitOnBench,
+    onStandFromBench,
+    onCloseBenchMenu,
     isSittingOnBench = false,
   }) => {
     const [hoveredLandmark, setHoveredLandmark] = useState<"none" | "shop" | "mine" | "bed" | "bench">("none");
@@ -648,6 +660,10 @@ export const OutdoorEnvironment: React.FC<OutdoorEnvironmentProps> = React.memo(
           onHoverChange={(hovered) => setHoveredLandmark(hovered ? "bench" : "none")}
           isHovered={hoveredLandmark === "bench"}
           isSitting={isSittingOnBench}
+          isMenuOpen={isBenchMenuOpen}
+          onSit={onSitOnBench}
+          onStand={onStandFromBench}
+          onCloseMenu={onCloseBenchMenu}
         />
 
         {/* Interactive 3D Juro Shop Building ("TOKO") on Back-Right Hillside — Click to open /shop! */}
@@ -675,6 +691,15 @@ export const OutdoorEnvironment: React.FC<OutdoorEnvironmentProps> = React.memo(
           onClick={handleMineClick}
           onHoverChange={(hovered) => setHoveredLandmark(hovered ? "mine" : "none")}
         />
+
+        {/* Animated Ground Walk Destination Marker Ring */}
+        {walkCommand && (
+          <WalkTargetMarker
+            key={walkCommand.nonce}
+            x={walkCommand.x}
+            z={walkCommand.z}
+          />
+        )}
 
         {/* 10. Winding Brook & Cozy Lily Pond */}
         <group>
