@@ -21,11 +21,21 @@ import {
   Smartphone,
   Share2,
   Copy,
+  MessageSquare,
+  LayoutGrid,
 } from "lucide-react";
 
 export const SettingsPage: React.FC = () => {
   const { name } = usePetStore();
-  const { theme, soundEnabled, toggleTheme, toggleSound, showToast } = useUIStore();
+  const {
+    theme,
+    soundEnabled,
+    actionMenuStyle,
+    toggleTheme,
+    toggleSound,
+    setActionMenuStyle,
+    showToast,
+  } = useUIStore();
   const [draftName, setDraftName] = useState<string | null>(null);
   const [savedSuccess, setSavedSuccess] = useState(false);
   const [confirmingReset, setConfirmingReset] = useState(false);
@@ -232,6 +242,76 @@ export const SettingsPage: React.FC = () => {
               checked={soundEnabled}
               onChange={toggleSound}
             />
+          </div>
+        </Card>
+
+        {/* Interaction Style / Gaya Menu & Interaksi */}
+        <Card shadowOffset="sm" className="p-4 md:col-span-2 space-y-3.5">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <h2 className="pixel-text text-[11px] text-charcoal dark:text-white uppercase flex items-center gap-2">
+              <Settings size={16} strokeWidth={2.5} className="text-juro-orange" />
+              <span>Gaya Menu & Interaksi Juro</span>
+            </h2>
+          </div>
+
+          <p className="pixel-text text-[8.5px] text-neutral-600 dark:text-neutral-400 leading-relaxed">
+            Pilih letak dan cara memanggil menu perawatan serta dialog AI Juro sesuai kenyamanan Anda:
+          </p>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+            {/* Option 1: Floating (Classic) */}
+            <button
+              type="button"
+              onClick={() => {
+                setActionMenuStyle("floating");
+                soundEffects.playPop();
+              }}
+              className={`p-3 text-left border-2 transition-all cursor-pointer relative ${
+                actionMenuStyle === "floating"
+                  ? "bg-amber-50 dark:bg-amber-950/30 border-juro-orange shadow-[3px_3px_0px_#F97316]"
+                  : "bg-white dark:bg-neutral-800 border-charcoal dark:border-neutral-700 shadow-[2px_2px_0px_#171717] dark:shadow-[2px_2px_0px_#000000] hover:border-juro-orange/60"
+              }`}
+            >
+              <div className="flex items-center justify-between gap-2 mb-1.5">
+                <span className="pixel-text text-[9.5px] uppercase font-bold text-charcoal dark:text-white flex items-center gap-1.5">
+                  <MessageSquare size={13} className="text-juro-orange" />
+                  <span>Melayang di Juro</span>
+                </span>
+                {actionMenuStyle === "floating" && (
+                  <Check size={14} className="text-juro-orange stroke-[3]" />
+                )}
+              </div>
+              <p className="pixel-text text-[8px] text-neutral-600 dark:text-neutral-400 leading-relaxed">
+                Klik tubuh jeli Juro untuk membuka balon menu aksi & kolom obrolan tepat di atas kepalanya seperti versi awal.
+              </p>
+            </button>
+
+            {/* Option 2: Bottom Dock */}
+            <button
+              type="button"
+              onClick={() => {
+                setActionMenuStyle("dock");
+                soundEffects.playPop();
+              }}
+              className={`p-3 text-left border-2 transition-all cursor-pointer relative ${
+                actionMenuStyle === "dock"
+                  ? "bg-amber-50 dark:bg-amber-950/30 border-juro-orange shadow-[3px_3px_0px_#F97316]"
+                  : "bg-white dark:bg-neutral-800 border-charcoal dark:border-neutral-700 shadow-[2px_2px_0px_#171717] dark:shadow-[2px_2px_0px_#000000] hover:border-juro-orange/60"
+              }`}
+            >
+              <div className="flex items-center justify-between gap-2 mb-1.5">
+                <span className="pixel-text text-[9.5px] uppercase font-bold text-charcoal dark:text-white flex items-center gap-1.5">
+                  <LayoutGrid size={13} className="text-juro-orange" />
+                  <span>Bilah Bawah</span>
+                </span>
+                {actionMenuStyle === "dock" && (
+                  <Check size={14} className="text-juro-orange stroke-[3]" />
+                )}
+              </div>
+              <p className="pixel-text text-[8px] text-neutral-600 dark:text-neutral-400 leading-relaxed">
+                Menu aksi dan tombol obrolan selalu siap di bilah bawah layar; klik langsung pada Juro untuk mengelus atau membangunkannya.
+              </p>
+            </button>
           </div>
         </Card>
 

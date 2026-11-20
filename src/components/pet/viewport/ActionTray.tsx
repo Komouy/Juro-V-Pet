@@ -19,6 +19,7 @@ export interface ActionTrayProps {
   ownedToys: string[];
   soapBadgePercent: number;
   dragVisualMoved?: boolean;
+  isDockMode?: boolean;
   onStartItemDrag: (payload: DragPayload, e: React.PointerEvent) => void;
   onDirectUse?: (payload: DragPayload) => void;
 }
@@ -30,6 +31,7 @@ export const ActionTray: React.FC<ActionTrayProps> = ({
   ownedToys,
   soapBadgePercent,
   dragVisualMoved = false,
+  isDockMode = false,
   onStartItemDrag,
   onDirectUse,
 }) => {
@@ -37,7 +39,9 @@ export const ActionTray: React.FC<ActionTrayProps> = ({
 
   return (
     <div
-      className={`absolute bottom-16 sm:bottom-20 left-1/2 -translate-x-1/2 z-20 flex flex-col items-center gap-2 w-max max-w-[calc(100%-1.5rem)] transition-opacity duration-150 ${
+      className={`absolute ${
+        isDockMode ? "bottom-16 sm:bottom-20" : "bottom-4 sm:bottom-6"
+      } left-1/2 -translate-x-1/2 z-20 flex flex-col items-center gap-2 w-max max-w-[calc(100%-1.5rem)] transition-opacity duration-150 ${
         dragVisualMoved ? "opacity-30 pointer-events-none" : "opacity-100"
       }`}
     >

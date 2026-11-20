@@ -60,6 +60,18 @@ describe("UI Store & Theme Mode", () => {
     expect(useUIStore.getState().toast).toBeNull();
   });
 
+  it("handles actionMenuStyle defaulting to floating and toggling to dock", () => {
+    expect(useUIStore.getState().actionMenuStyle).toBe("floating");
+
+    useUIStore.getState().setActionMenuStyle("dock");
+    expect(useUIStore.getState().actionMenuStyle).toBe("dock");
+    expect(window.localStorage.getItem("juro_action_menu_style")).toBe("dock");
+
+    useUIStore.getState().setActionMenuStyle("floating");
+    expect(useUIStore.getState().actionMenuStyle).toBe("floating");
+    expect(window.localStorage.getItem("juro_action_menu_style")).toBe("floating");
+  });
+
   it("increments cameraResetNonce when triggerCameraReset is called", () => {
     expect(useUIStore.getState().cameraResetNonce).toBe(0);
     useUIStore.getState().triggerCameraReset();
