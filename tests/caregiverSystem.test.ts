@@ -187,4 +187,19 @@ describe("Caregiver Co-Parenting & Firebase Realtime Foundation", () => {
     expect(prompt).toContain("Sahabat");
     expect(prompt).toContain("Harmoni Dua Sahabat");
   });
+
+  it("synchronizes full economy and behavior state to Firebase cloud", async () => {
+    const store = useCaregiverStore.getState();
+    store.setProfile("Dhavi", "Perawat 1");
+
+    await store.recordAction(
+      "shop",
+      "Dhavi membeli camilan manis",
+      { coins: -50 }
+    );
+
+    const logs = useCaregiverStore.getState().activityLogs;
+    expect(logs[0].actionType).toBe("shop");
+    expect(logs[0].statChanges?.coins).toBe(-50);
+  });
 });

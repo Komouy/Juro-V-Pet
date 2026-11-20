@@ -17,6 +17,7 @@ import { PixelSegmented } from "../components/ui/PixelSegmented";
 import { ItemIllustration } from "../components/items/ItemIllustration";
 import { useGameStore } from "../stores/gameStore";
 import { useUIStore } from "../stores/uiStore";
+import { useCaregiverStore } from "../stores/caregiverStore";
 import {
   CRYSTAL_CATALOG,
   PICKAXE_TIERS,
@@ -92,6 +93,11 @@ export const ShopPage: React.FC = () => {
       triggerWalletPulse();
       addLog("interaction", `Membeli ${qty}× ${name} di Toko (-${unitPrice * qty} koin).`);
       showToast(`+${qty} ${name}`, "success");
+      useCaregiverStore.getState().recordAction(
+        "shop",
+        `Membeli ${qty}× ${name} di Toko (-${unitPrice * qty} koin).`,
+        { coins: -(unitPrice * qty) }
+      );
     } else {
       soundEffects.playError();
       showToast("Koin belum cukup", "warn");
@@ -105,6 +111,11 @@ export const ShopPage: React.FC = () => {
       triggerWalletPulse();
       addLog("interaction", `Membeli mainan permanen ${name} (-${price} koin).`);
       showToast(`${name} dimiliki`, "success");
+      useCaregiverStore.getState().recordAction(
+        "shop",
+        `Membeli mainan permanen ${name} (-${price} koin).`,
+        { coins: -price }
+      );
     } else {
       soundEffects.playError();
       showToast("Koin belum cukup", "warn");
@@ -116,6 +127,11 @@ export const ShopPage: React.FC = () => {
       soundEffects.playEquip();
       addLog("interaction", `Mengganti tampilan warna Juro ke ${name}.`);
       showToast(`Warna: ${name}`, "info");
+      useCaregiverStore.getState().recordAction(
+        "skin",
+        `Mengganti tampilan warna Juro ke ${name}.`,
+        {}
+      );
     }
   };
 
@@ -125,6 +141,11 @@ export const ShopPage: React.FC = () => {
       triggerWalletPulse();
       addLog("interaction", `Membuka warna ${name} (-${costLabel})!`);
       showToast(`Terbuka: ${name}`, "success");
+      useCaregiverStore.getState().recordAction(
+        "skin",
+        `Membuka warna ${name} (-${costLabel})!`,
+        {}
+      );
     } else {
       soundEffects.playError();
       showToast("Kristal belum cukup", "warn");
@@ -138,6 +159,11 @@ export const ShopPage: React.FC = () => {
       triggerWalletPulse();
       addLog("interaction", `Menjual ${qty}× ${name} (+${earned} koin).`);
       showToast(`+${earned} Koin`, "success");
+      useCaregiverStore.getState().recordAction(
+        "shop",
+        `Menjual ${qty}× ${name} (+${earned} koin).`,
+        { coins: earned }
+      );
     }
   };
 
@@ -148,6 +174,11 @@ export const ShopPage: React.FC = () => {
       triggerWalletPulse();
       addLog("interaction", `Menjual seluruh kristal (+${earned} koin).`);
       showToast(`Terjual semua (+${earned} Koin)`, "success");
+      useCaregiverStore.getState().recordAction(
+        "shop",
+        `Menjual seluruh kristal (+${earned} koin).`,
+        { coins: earned }
+      );
     }
   };
 
@@ -158,6 +189,11 @@ export const ShopPage: React.FC = () => {
       triggerWalletPulse();
       addLog("interaction", `Upgrade beliung ke ${tierName} (-${price} koin).`);
       showToast(`Upgrade: ${tierName}`, "success");
+      useCaregiverStore.getState().recordAction(
+        "shop",
+        `Upgrade beliung ke ${tierName} (-${price} koin).`,
+        { coins: -price }
+      );
     } else {
       soundEffects.playError();
       showToast("Koin belum cukup", "warn");

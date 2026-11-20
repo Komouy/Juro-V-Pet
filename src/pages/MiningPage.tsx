@@ -19,6 +19,7 @@ import { Badge } from "../components/ui/Badge";
 import { ItemIllustration } from "../components/items/ItemIllustration";
 import { useGameStore } from "../stores/gameStore";
 import { useUIStore } from "../stores/uiStore";
+import { useCaregiverStore } from "../stores/caregiverStore";
 import {
   CRYSTAL_CATALOG,
   getCrystalById,
@@ -320,6 +321,16 @@ export const MiningPage: React.FC = () => {
           : `+${result.qty} ${crystal.name}`,
         "success"
       );
+
+      if (crystal.id === "emerald" || crystal.id === "amethyst" || result.gotBonus) {
+        useCaregiverStore.getState().recordAction(
+          "interaction",
+          `Menemukan ${result.qty}× ${crystal.name} di Tambang Lantai ${mineFloor}!`,
+          {}
+        );
+      } else {
+        useCaregiverStore.getState().syncCurrentState();
+      }
       return;
     }
 

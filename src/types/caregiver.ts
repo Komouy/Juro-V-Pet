@@ -68,8 +68,10 @@ export interface SharedJuroState {
   affection: number;
   currentState: string;
   activeSkin: string;
+  unlockedSkins?: string[];
   coins: number;
   crystals?: Record<CrystalId, number>;
+  pickaxeLevel?: number;
   foodInventory?: Record<string, number>;
   ownedToys?: string[];
   lastUpdated: number;

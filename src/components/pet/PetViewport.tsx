@@ -853,6 +853,11 @@ export const PetViewport: React.FC = () => {
       clearLevelUpAlert();
       addCoins(25);
       addLog("interaction", `Juro mencapai Level ${level}! Bonus +25 koin otomatis ditambahkan.`);
+      useCaregiverStore.getState().recordAction(
+        "interaction",
+        `Juro mencapai Level ${level}! (+25 Koin Bonus)`,
+        { coins: 25 }
+      );
       if (!pendingEvolutionAlert) {
         showToast(`Level Up! Juro mencapai Level ${level} (+25 Koin)`, "success");
       }

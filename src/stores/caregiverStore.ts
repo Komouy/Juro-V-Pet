@@ -9,6 +9,7 @@ import type {
 import { juroSyncService } from "../services/firebase/juroSyncService";
 import { usePetStore } from "./petStore";
 import { useGameStore } from "./gameStore";
+import { useUIStore } from "./uiStore";
 import { soundEffects } from "../engine/audio/soundEffects";
 import { addPetMemory } from "../services/petMemoryService";
 
@@ -55,6 +56,7 @@ interface CaregiverState {
     itemUsedName?: string
   ) => Promise<void>;
   getCaregiverRelationship: () => CaregiverRelationshipInfo;
+  syncCurrentState: () => Promise<boolean>;
   initRealtimeSubscription: () => void;
 }
 
@@ -114,8 +116,10 @@ export const useCaregiverStore = create<CaregiverState>((set, get) => {
         affection: pet.affection,
         currentState: pet.currentState,
         activeSkin: game.activeSkin,
+        unlockedSkins: game.unlockedSkins,
         coins: game.coins,
         crystals: game.crystals,
+        pickaxeLevel: game.pickaxeLevel,
         foodInventory: game.foodInventory,
         ownedToys: game.ownedToys,
         lastUpdated: Date.now(),
@@ -172,15 +176,19 @@ export const useCaregiverStore = create<CaregiverState>((set, get) => {
             happiness: room.juro.happiness,
             cleanliness: room.juro.cleanliness,
             affection: room.juro.affection,
+            currentState: (room.juro.currentState as any) || "idle",
+            lastUpdated: room.juro.lastUpdated || Date.now(),
           });
 
-          useGameStore.setState({
-            activeSkin: room.juro.activeSkin || "skin_default",
-            coins: room.juro.coins ?? 100,
-            crystals: room.juro.crystals,
-            foodInventory: room.juro.foodInventory,
-            ownedToys: room.juro.ownedToys,
-          });
+          useGameStore.setState((prev) => ({
+            activeSkin: room.juro.activeSkin || prev.activeSkin,
+            unlockedSkins: room.juro.unlockedSkins || prev.unlockedSkins,
+            coins: room.juro.coins ?? prev.coins,
+            crystals: room.juro.crystals || prev.crystals,
+            foodInventory: room.juro.foodInventory || prev.foodInventory,
+            ownedToys: room.juro.ownedToys || prev.ownedToys,
+            pickaxeLevel: room.juro.pickaxeLevel ?? prev.pickaxeLevel,
+          }));
         }
 
         const logs = room.activityLogs ? Object.values(room.activityLogs) : [];
@@ -261,13 +269,43 @@ export const useCaregiverStore = create<CaregiverState>((set, get) => {
             affection: pet.affection,
             level: pet.level,
             xp: pet.xp,
+            xpToNextLevel: pet.xpToNextLevel,
+            currentState: pet.currentState,
             coins: game.coins,
+            crystals: game.crystals,
             foodInventory: game.foodInventory,
             ownedToys: game.ownedToys,
             activeSkin: game.activeSkin,
+            unlockedSkins: game.unlockedSkins,
+            pickaxeLevel: game.pickaxeLevel,
           }
         );
       }
+    },
+
+    syncCurrentState: async () => {
+      const { activeRoomCode, myProfile } = get();
+      if (!activeRoomCode || !myProfile) return false;
+      const pet = usePetStore.getState();
+      const game = useGameStore.getState();
+      return await juroSyncService.syncJuroState(activeRoomCode, myProfile.id, {
+        hunger: pet.hunger,
+        energy: pet.energy,
+        cleanliness: pet.cleanliness,
+        happiness: pet.happiness,
+        affection: pet.affection,
+        level: pet.level,
+        xp: pet.xp,
+        xpToNextLevel: pet.xpToNextLevel,
+        currentState: pet.currentState,
+        coins: game.coins,
+        crystals: game.crystals,
+        foodInventory: game.foodInventory,
+        ownedToys: game.ownedToys,
+        activeSkin: game.activeSkin,
+        unlockedSkins: game.unlockedSkins,
+        pickaxeLevel: game.pickaxeLevel,
+      });
     },
 
     getCaregiverRelationship: (): CaregiverRelationshipInfo => {
@@ -355,10 +393,28 @@ export const useCaregiverStore = create<CaregiverState>((set, get) => {
       const { activeRoomCode, myProfile } = get();
       if (!activeRoomCode || !myProfile) return;
 
+      let hasSyncedInitialState = false;
+
       juroSyncService.subscribeToRoom(activeRoomCode, myProfile.id, {
         onJuroStateSync: (incoming) => {
-          // Hanya sync jika update berasal dari perawat lain
-          if (incoming.updatedByCaregiverId && incoming.updatedByCaregiverId !== myProfile.id) {
+          // Snapshot pertama dari cloud selalu disinkronkan ke lokal agar tidak tertinggal data lama.
+          // Snapshot berikutnya hanya disinkronkan jika diubah oleh perawat pasangan.
+          const shouldSync =
+            !hasSyncedInitialState ||
+            (incoming.updatedByCaregiverId && incoming.updatedByCaregiverId !== myProfile.id);
+
+          hasSyncedInitialState = true;
+
+          if (shouldSync) {
+            const currentPet = usePetStore.getState();
+
+            // Sinkronisasi status tidur / bangun Juro secara visual
+            if (incoming.currentState === "sleep" && currentPet.currentState !== "sleep") {
+              currentPet.sleep();
+            } else if (incoming.currentState !== "sleep" && currentPet.currentState === "sleep") {
+              currentPet.wakeUp();
+            }
+
             usePetStore.setState({
               hunger: incoming.hunger,
               energy: incoming.energy,
@@ -367,14 +423,19 @@ export const useCaregiverStore = create<CaregiverState>((set, get) => {
               affection: incoming.affection,
               level: incoming.level,
               xp: incoming.xp,
+              xpToNextLevel: incoming.xpToNextLevel,
+              lastUpdated: incoming.lastUpdated || Date.now(),
             });
 
-            useGameStore.setState({
-              coins: incoming.coins,
-              activeSkin: incoming.activeSkin,
-              foodInventory: incoming.foodInventory,
-              ownedToys: incoming.ownedToys,
-            });
+            useGameStore.setState((prev) => ({
+              coins: incoming.coins ?? prev.coins,
+              activeSkin: incoming.activeSkin || prev.activeSkin,
+              unlockedSkins: incoming.unlockedSkins || prev.unlockedSkins,
+              crystals: incoming.crystals || prev.crystals,
+              foodInventory: incoming.foodInventory || prev.foodInventory,
+              ownedToys: incoming.ownedToys || prev.ownedToys,
+              pickaxeLevel: incoming.pickaxeLevel ?? prev.pickaxeLevel,
+            }));
           }
         },
 
@@ -404,6 +465,15 @@ export const useCaregiverStore = create<CaregiverState>((set, get) => {
 
           // Mainkan suara riak gembira saat ada aksi dari pasangan
           soundEffects.playPop();
+
+          // Munculkan toast notifikasi langsung di layar
+          const myId = get().myProfile?.id;
+          if (newLog.caregiverId !== myId) {
+            useUIStore.getState().showToast(
+              `${newLog.caregiverName}: ${newLog.description}`,
+              "info"
+            );
+          }
         },
 
         onError: (err) => {

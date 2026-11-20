@@ -293,6 +293,38 @@ export class JuroRealtimeSyncService {
   }
 
   /**
+   * Menyinkronkan perubahan status Juro secara langsung ke Firebase tanpa menambah log baru
+   */
+  public async syncJuroState(
+    roomCode: string,
+    caregiverId: string,
+    updatedJuro: Partial<SharedJuroState>
+  ): Promise<boolean> {
+    const db = getFirebaseDatabaseInstance();
+    if (!db) return false;
+
+    const cleanCode = roomCode.trim().toUpperCase();
+
+    try {
+      const updates: Record<string, unknown> = {
+        [`rooms/${cleanCode}/lastUpdatedAt`]: Date.now(),
+      };
+
+      for (const [key, val] of Object.entries(updatedJuro)) {
+        updates[`rooms/${cleanCode}/juro/${key}`] = val;
+      }
+      updates[`rooms/${cleanCode}/juro/updatedByCaregiverId`] = caregiverId;
+      updates[`rooms/${cleanCode}/juro/lastUpdated`] = Date.now();
+
+      await update(ref(db), updates);
+      return true;
+    } catch (err) {
+      console.error("Gagal menyinkronkan status Juro ke Firebase:", err);
+      return false;
+    }
+  }
+
+  /**
    * Melepas listener realtime yang sedang aktif
    */
   public unsubscribe(): void {
