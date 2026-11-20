@@ -11,6 +11,7 @@ import {
   Menu,
   X,
   ChevronRight,
+  Coins,
 } from "lucide-react";
 import { soundEffects } from "../../engine/audio/soundEffects";
 import { useUIStore } from "../../stores/uiStore";
@@ -29,6 +30,7 @@ export const Navbar: React.FC = () => {
   const navigate = useNavigate();
   const { theme, soundEnabled, toggleTheme, toggleSound, triggerCameraReset } = useUIStore();
   const { myProfile, partnerProfile, openHubModal } = useCaregiverStore();
+  const coins = useGameStore((s) => s.coins);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -135,8 +137,22 @@ export const Navbar: React.FC = () => {
           })}
         </div>
 
-        {/* Action Controls: Caregiver Badge + ListButton Menu */}
-        <div className="flex items-center gap-2 relative" ref={menuRef}>
+        {/* Action Controls: Wallet Pill + Caregiver Badge + ListButton Menu */}
+        <div className="flex items-center gap-1.5 sm:gap-2 relative" ref={menuRef}>
+          {/* Retro Coin Wallet Pill */}
+          <Link
+            to="/shop"
+            onClick={() => soundEffects.playClick()}
+            className="flex items-center gap-1.5 px-2 sm:px-2.5 py-1.5 border-2 border-charcoal dark:border-neutral-600 bg-warm-white dark:bg-neutral-800 text-charcoal dark:text-neutral-100 shadow-[2px_2px_0px_#171717] dark:shadow-[2px_2px_0px_#000000] hover:border-amber-500 active:translate-x-[1px] active:translate-y-[1px] cursor-pointer transition-colors"
+            title="Buka Toko & Dompet"
+            aria-label={`Saldo: ${coins} Koin`}
+          >
+            <Coins size={13} className="text-amber-500 shrink-0" />
+            <span className="pixel-text text-[9px] sm:text-[9.5px] font-bold text-amber-600 dark:text-amber-400">
+              {coins}
+            </span>
+          </Link>
+
           {/* Caregiver Hub Button */}
           <button
             type="button"
@@ -144,12 +160,12 @@ export const Navbar: React.FC = () => {
               soundEffects.playClick();
               openHubModal();
             }}
-            className="flex items-center gap-1.5 px-2.5 py-1.5 border-2 border-charcoal dark:border-neutral-600 bg-amber-50 dark:bg-neutral-800 text-charcoal dark:text-neutral-100 shadow-[2px_2px_0px_#171717] dark:shadow-[2px_2px_0px_#000000] hover:bg-amber-100 dark:hover:bg-neutral-700 active:translate-x-[1px] active:translate-y-[1px] cursor-pointer transition-colors"
+            className="flex items-center gap-1.5 px-2 sm:px-2.5 py-1.5 border-2 border-charcoal dark:border-neutral-600 bg-amber-50 dark:bg-neutral-800 text-charcoal dark:text-neutral-100 shadow-[2px_2px_0px_#171717] dark:shadow-[2px_2px_0px_#000000] hover:bg-amber-100 dark:hover:bg-neutral-700 active:translate-x-[1px] active:translate-y-[1px] cursor-pointer transition-colors"
             title="Buku Asuh & 2P"
             aria-label="Buka Hub Perawat Juro"
           >
             <Users size={13} className="text-juro-orange shrink-0" />
-            <span className="pixel-text text-[9px] uppercase font-bold tracking-tight max-w-[72px] sm:max-w-none truncate">
+            <span className="pixel-text text-[9px] uppercase font-bold tracking-tight max-w-[64px] sm:max-w-none truncate">
               {myProfile?.name || "Perawat"}
             </span>
             {partnerProfile && (
@@ -181,9 +197,39 @@ export const Navbar: React.FC = () => {
           {/* ListButton Dropdown Menu Card */}
           {isMenuOpen && (
             <div className="absolute right-0 top-full mt-2 w-56 sm:w-64 bg-warm-white dark:bg-neutral-900 border-2 border-charcoal dark:border-neutral-600 shadow-[4px_4px_0px_#171717] dark:shadow-[4px_4px_0px_#000000] p-1.5 z-50 flex flex-col gap-1 animate-scale-up select-none">
-              <div className="px-2 py-1 border-b border-charcoal/20 dark:border-neutral-700 flex items-center justify-between mb-0.5">
+              {/* Mobile-Only Page Navigation Links */}
+              <div className="md:hidden flex flex-col gap-1 pb-1 mb-1 border-b border-charcoal/20 dark:border-neutral-700">
+                <span className="pixel-text text-[8px] uppercase font-bold text-neutral-400 px-1">
+                  Halaman
+                </span>
+                {NAV_LINKS.map(({ path, label }) => {
+                  const isActive = location.pathname === path;
+                  return (
+                    <Link
+                      key={path}
+                      to={path}
+                      onClick={() => {
+                        soundEffects.playTab();
+                        setIsMenuOpen(false);
+                      }}
+                      className={`w-full flex items-center justify-between px-2.5 py-1.5 text-left border border-charcoal/20 hover:border-charcoal transition-colors cursor-pointer ${
+                        isActive
+                          ? "bg-juro-orange text-white font-bold"
+                          : "bg-white dark:bg-neutral-800 text-charcoal dark:text-white hover:bg-amber-50 dark:hover:bg-neutral-700"
+                      }`}
+                    >
+                      <span className="pixel-text text-[9.5px] uppercase font-bold">
+                        {label}
+                      </span>
+                      <ChevronRight size={13} className={isActive ? "text-white" : "text-neutral-400"} />
+                    </Link>
+                  );
+                })}
+              </div>
+
+              <div className="px-2 py-0.5 flex items-center justify-between mb-0.5">
                 <span className="pixel-text text-[8px] uppercase font-bold text-neutral-400">
-                  Menu & Opsi
+                  Opsi Cepat
                 </span>
               </div>
 

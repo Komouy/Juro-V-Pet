@@ -7,23 +7,51 @@ export interface JuroChatModalProps {
   onSendMessage: (message: string) => void;
   isLoading: boolean;
   petName: string;
+  hunger?: number;
+  energy?: number;
+  cleanliness?: number;
+  happiness?: number;
+  isSleeping?: boolean;
 }
 
-const QUICK_PROMPTS = [
-  "Halo Juro!",
-  "Lagi mikirin apa?",
-  "Kamu suka makan apa?",
-  "Semangat ya!",
-];
+function getDynamicQuickPrompts(props: JuroChatModalProps): string[] {
+  const prompts: string[] = [];
 
-export const JuroChatModal: React.FC<JuroChatModalProps> = ({
-  isOpen,
-  onClose,
-  onSendMessage,
-  isLoading,
-  petName,
-}) => {
+  if ((props.hunger ?? 100) < 45) {
+    prompts.push("Kamu laper ya Juro?");
+  }
+  if ((props.cleanliness ?? 100) < 45) {
+    prompts.push("Ayo kita mandi busa!");
+  }
+  if (props.isSleeping || (props.energy ?? 100) < 40) {
+    prompts.push("Mau tidur nyenyak ya?");
+  }
+  if ((props.happiness ?? 100) < 45) {
+    prompts.push("Juro jangan sedih ya!");
+  }
+
+  const defaults = [
+    `Halo ${props.petName}!`,
+    "Lagi mikirin apa?",
+    `Aku sayang ${props.petName}!`,
+    "Kamu suka camilan apa?",
+    "Semangat terus ya!",
+  ];
+
+  for (const d of defaults) {
+    if (prompts.length >= 4) break;
+    if (!prompts.includes(d)) {
+      prompts.push(d);
+    }
+  }
+
+  return prompts.slice(0, 4);
+}
+
+export const JuroChatModal: React.FC<JuroChatModalProps> = (props) => {
+  const { isOpen, onClose, onSendMessage, isLoading, petName } = props;
   const [input, setInput] = useState("");
+  const quickPrompts = getDynamicQuickPrompts(props);
 
   if (!isOpen) return null;
 
@@ -62,9 +90,9 @@ export const JuroChatModal: React.FC<JuroChatModalProps> = ({
         </button>
       </div>
 
-      {/* Quick Prompts */}
+      {/* Dynamic Contextual Quick Prompts */}
       <div className="flex flex-wrap gap-1.5 mb-2.5">
-        {QUICK_PROMPTS.map((prompt) => (
+        {quickPrompts.map((prompt) => (
           <button
             key={prompt}
             type="button"

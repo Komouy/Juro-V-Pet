@@ -375,7 +375,7 @@ export const MiningPage: React.FC = () => {
   const getTileStyle = (tile: MineTile) => {
     if (tile.dug) {
       if (tile.reward.kind === "ladder") {
-        return "bg-amber-950/90 border-amber-400 hover:bg-amber-900 cursor-pointer shadow-inner";
+        return "bg-amber-950/90 border-amber-400 hover:bg-amber-900 cursor-pointer shadow-inner ring-2 ring-amber-400/80 animate-pulse";
       }
       if (tile.reward.kind === "crystal") {
         return "bg-neutral-900/90 border-neutral-700 shadow-inner";
@@ -583,7 +583,10 @@ export const MiningPage: React.FC = () => {
                         {/* Revealed Ladder */}
                         {tile.dug && tile.reward.kind === "ladder" && (
                           <div className="flex flex-col items-center justify-center animate-bounce">
-                            <ItemIllustration id="mine-ladder" size={34} />
+                            <ItemIllustration id="mine-ladder" size={32} />
+                            <span className="pixel-text text-[7px] uppercase font-bold text-amber-300 bg-charcoal/90 px-1 py-0.5 border border-amber-400 -mt-1 shadow-xs">
+                              Turun
+                            </span>
                           </div>
                         )}
 

@@ -1600,6 +1600,11 @@ export const PetViewport: React.FC = () => {
         onSendMessage={handleSendMessage}
         isLoading={speechBubble.isLoading}
         petName={name}
+        hunger={hunger}
+        energy={energy}
+        cleanliness={cleanliness}
+        happiness={happiness}
+        isSleeping={currentState === "sleep"}
       />
 
       {/* Juro's Floating Retro Speech Bubble */}
