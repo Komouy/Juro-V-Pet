@@ -153,15 +153,6 @@ export const MAP_PLATFORMS: ElevatedPlatform[] = [
     label: "Bukit Santai Timur",
   },
   {
-    id: "nw-ledge",
-    kind: "rock-ledge",
-    x: -1.75,
-    z: -2.85,
-    radius: 0.85,
-    height: 0.34,
-    label: "Batu Datar Utara",
-  },
-  {
     id: "stump-se",
     kind: "stump",
     x: 1.55,

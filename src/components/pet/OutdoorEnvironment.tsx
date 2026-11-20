@@ -9,6 +9,7 @@ import { ShopBuildingLandmark } from "./environment/ShopBuildingLandmark";
 import { MineCaveLandmark } from "./environment/MineCaveLandmark";
 import { PixelRain } from "./environment/PixelRain";
 import { NightFireflies } from "./environment/NightFireflies";
+import { RiverFishes } from "./environment/RiverFishes";
 import { WalkTargetMarker } from "./environment/WalkTargetMarker";
 import type { WeatherMode } from "../../types/ui";
 import type { WalkCommand } from "../../features/character/JuroModel";
@@ -612,21 +613,6 @@ export const OutdoorEnvironment: React.FC<OutdoorEnvironmentProps> = React.memo(
               );
             }
 
-            if (p.kind === "rock-ledge") {
-              return (
-                <group key={p.id} position={[p.x, BASE_GROUND_Y, p.z]}>
-                  <mesh position={[0, p.height * 0.48, 0]}>
-                    <cylinderGeometry args={[p.radius * 0.94, p.radius * 1.1, p.height * 0.96, 9]} />
-                    <meshLambertMaterial color={theme.isNight ? "#475569" : "#9CA3AF"} />
-                  </mesh>
-                  <mesh position={[0, p.height - 0.02, 0]}>
-                    <cylinderGeometry args={[p.radius * 0.9, p.radius * 0.94, 0.045, 9]} />
-                    <meshLambertMaterial color={theme.groundRimColor} />
-                  </mesh>
-                </group>
-              );
-            }
-
             // Tree stump Juro can hop right on top of!
             return (
               <group key={p.id} position={[p.x, BASE_GROUND_Y, p.z]}>
@@ -761,6 +747,9 @@ export const OutdoorEnvironment: React.FC<OutdoorEnvironmentProps> = React.memo(
             <circleGeometry args={[0.145, 14, 0, Math.PI * 1.84]} />
             <meshLambertMaterial color={theme.isNight ? "#166534" : "#16A34A"} />
           </mesh>
+
+          {/* Animated Koi & River Fishes swimming smoothly through the brook and pond */}
+          <RiverFishes isNight={theme.isNight} />
         </group>
 
         {/* 11. Two Cozy Glowing Meadow Lantern Posts (North Brook & East Path) */}

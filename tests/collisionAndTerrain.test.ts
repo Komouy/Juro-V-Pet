@@ -140,9 +140,16 @@ describe("Terrain & Object Collision Hull System", () => {
     expect(isWaterAt(resolved.x, resolved.z)).toBe(true);
   });
 
-  it("verifies footbridge is removed and Juro traverses the stream naturally", () => {
+  it("verifies footbridge and nw river rock ledge are removed and stream flows freely", () => {
     // Footbridge elevation is null (removed as requested)
     expect(getBridgeElevation(-0.36, -2.32)).toBeNull();
+
+    // Verify nw-ledge large river boulder is removed from MAP_PLATFORMS
+    const nwLedge = MAP_PLATFORMS.find((p) => p.id === "nw-ledge");
+    expect(nwLedge).toBeUndefined();
+
+    // Former rock position in river is now clear water
+    expect(isWaterAt(-1.75, -2.85)).toBe(true);
 
     const streamCrossing = resolveHorizontalCollisions(
       -0.36,
