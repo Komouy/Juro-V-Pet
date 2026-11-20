@@ -37,22 +37,19 @@ export const ActionTray: React.FC<ActionTrayProps> = ({
 
   return (
     <div
-      className={`absolute bottom-3 left-1/2 -translate-x-1/2 z-20 flex flex-col items-center gap-2 w-max max-w-[calc(100%-1.5rem)] transition-opacity duration-150 ${
+      className={`absolute bottom-16 sm:bottom-20 left-1/2 -translate-x-1/2 z-20 flex flex-col items-center gap-2 w-max max-w-[calc(100%-1.5rem)] transition-opacity duration-150 ${
         dragVisualMoved ? "opacity-30 pointer-events-none" : "opacity-100"
       }`}
     >
-      {/* Pop-Up Food Pantry Strip (Real Consumable Stock — Drag onto Juro or Tap) */}
+      {/* Pop-Up Food Pantry Strip (Real Consumable Stock — Tap or Drag) */}
       {activeTray === "food" && (() => {
         const availableFoods = SHOP_FOODS.filter((f) => (foodInventory[f.id] ?? 0) > 0);
         return (
           <div className="animate-tray-enter w-full bg-warm-white/95 dark:bg-neutral-900/95 backdrop-blur-xs border-2 border-charcoal dark:border-neutral-600 shadow-[4px_4px_0px_#171717] dark:shadow-[4px_4px_0px_#000000] p-2.5">
             <div className="flex items-center justify-between gap-3 pb-1.5 mb-2 border-b border-charcoal/15 dark:border-neutral-700">
-              <div>
-                <span className="pixel-text text-[10px] uppercase text-charcoal dark:text-white font-bold tracking-wider block">
-                  Stok Makanan
-                </span>
-                <span className="text-[8px] pixel-text text-muted">Ketuk atau seret makanan ke Juro</span>
-              </div>
+              <span className="pixel-text text-[10px] uppercase text-charcoal dark:text-white font-bold tracking-wider">
+                Stok Makanan
+              </span>
               <div className="flex items-center gap-2">
                 <Link
                   to="/shop?tab=food"
@@ -122,18 +119,15 @@ export const ActionTray: React.FC<ActionTrayProps> = ({
         );
       })()}
 
-      {/* Pop-Up Toy Shelf Strip (Permanent Owned Toys — Drag onto Juro or Tap) */}
+      {/* Pop-Up Toy Shelf Strip (Permanent Owned Toys — Tap or Drag) */}
       {activeTray === "toy" && (() => {
         const myToys = SHOP_TOYS.filter((t) => ownedToys.includes(t.id));
         return (
           <div className="animate-tray-enter w-full bg-warm-white/95 dark:bg-neutral-900/95 backdrop-blur-xs border-2 border-charcoal dark:border-neutral-600 shadow-[4px_4px_0px_#171717] dark:shadow-[4px_4px_0px_#000000] p-2.5">
             <div className="flex items-center justify-between gap-3 pb-1.5 mb-2 border-b border-charcoal/15 dark:border-neutral-700">
-              <div>
-                <span className="pixel-text text-[10px] uppercase text-charcoal dark:text-white font-bold tracking-wider block">
-                  Mainan Dimiliki
-                </span>
-                <span className="text-[8px] pixel-text text-muted">Ketuk atau seret mainan ke Juro</span>
-              </div>
+              <span className="pixel-text text-[10px] uppercase text-charcoal dark:text-white font-bold tracking-wider">
+                Koleksi Mainan
+              </span>
               <div className="flex items-center gap-2">
                 {myToys.length < SHOP_TOYS.length && (
                   <Link
@@ -191,16 +185,13 @@ export const ActionTray: React.FC<ActionTrayProps> = ({
         );
       })()}
 
-      {/* Pop-Up Interactive Bath Kit Strip: 1. Sabun Busa + 2. Ember Air */}
+      {/* Pop-Up Interactive Bath Kit Strip: Sabun Busa & Ember Air */}
       {activeTray === "bath" && (
         <div className="animate-tray-enter w-full bg-warm-white/95 dark:bg-neutral-900/95 backdrop-blur-xs border-2 border-charcoal dark:border-neutral-600 shadow-[4px_4px_0px_#171717] dark:shadow-[4px_4px_0px_#000000] p-2.5">
           <div className="flex items-center justify-between gap-4 pb-1.5 mb-2 border-b border-charcoal/15 dark:border-neutral-700">
-            <div>
-              <span className="pixel-text text-[10px] uppercase text-charcoal dark:text-white font-bold tracking-wider block">
-                Alat Mandi
-              </span>
-              <span className="text-[8px] pixel-text text-muted">Ketuk / seret sabun lalu bilas ember air</span>
-            </div>
+            <span className="pixel-text text-[10px] uppercase text-charcoal dark:text-white font-bold tracking-wider">
+              Peralatan Mandi
+            </span>
             <button
               onClick={() => {
                 soundEffects.playDismiss();
@@ -226,7 +217,7 @@ export const ActionTray: React.FC<ActionTrayProps> = ({
                 <span className="pixel-text text-[9px] text-charcoal dark:text-white font-bold">
                   Sabun Busa
                 </span>
-                <span className="text-[7.5px] pixel-text text-muted">1. Sabuni</span>
+                <span className="text-[7.5px] pixel-text text-muted">1. Gosokkan Sabun</span>
               </div>
             </button>
 
@@ -246,7 +237,7 @@ export const ActionTray: React.FC<ActionTrayProps> = ({
                 <span className="pixel-text text-[9px] text-charcoal dark:text-white font-bold">
                   Ember Air
                 </span>
-                <span className="text-[7.5px] pixel-text text-muted">2. Bilas Air</span>
+                <span className="text-[7.5px] pixel-text text-muted">2. Siram Bersih</span>
               </div>
             </button>
           </div>

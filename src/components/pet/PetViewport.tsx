@@ -32,7 +32,8 @@ import type { FoodItem, ToyItem } from "../../types/pet";
 import { ResponsiveCamera } from "./viewport/ResponsiveCamera";
 import { StatBars } from "./viewport/StatBars";
 import { ActionTray, type DragPayload } from "./viewport/ActionTray";
-import { JuroContextMenu } from "./viewport/JuroContextMenu";
+import { ActionDock } from "./viewport/ActionDock";
+import { JuroChatModal } from "./viewport/JuroChatModal";
 import { JuroSpeechBubble } from "./viewport/JuroSpeechBubble";
 import {
   chatWithJuro,
@@ -95,17 +96,7 @@ export const PetViewport: React.FC = () => {
 
   const [activeTray, setActiveTray] = useState<ActiveTray>("none");
   const [showStatDetails, setShowStatDetails] = useState(false);
-  const [juroMenu, setJuroMenu] = useState<{
-    open: boolean;
-    x: number;
-    y: number;
-    isNearTop: boolean;
-  }>({
-    open: false,
-    x: 0,
-    y: 0,
-    isNearTop: false,
-  });
+  const [isChatOpen, setIsChatOpen] = useState(false);
 
   const [speechBubble, setSpeechBubble] = useState<{
     text: string;
@@ -166,9 +157,6 @@ export const PetViewport: React.FC = () => {
   const [isSittingOnBench, setIsSittingOnBench] = useState(false);
   const isHeadingToBenchRef = useRef<boolean>(false);
 
-  const juroMenuRef = useRef<HTMLDivElement>(null);
-  const tailRef = useRef<HTMLDivElement>(null);
-
   // Coarse UI states (only change on discrete state flips — NEVER on pointermove pixels!)
   const [dragVisual, setDragVisual] = useState<DragVisualState | null>(null);
   const [soapBadgePercent, setSoapBadgePercent] = useState(0);
@@ -187,7 +175,7 @@ export const PetViewport: React.FC = () => {
         setIsBenchMenuOpen(false);
       }
       soundEffects.playGuideTap();
-      setJuroMenu({ open: false, x: 0, y: 0, isNearTop: false });
+      setIsChatOpen(false);
       setActiveTray("none");
       setShowStatDetails(false);
       setWalkCommand({ x, z, nonce: Date.now() });
@@ -200,7 +188,7 @@ export const PetViewport: React.FC = () => {
     if (isSittingOnBench) setIsSittingOnBench(false);
     isHeadingToBenchRef.current = false;
     setIsBenchMenuOpen(false);
-    setJuroMenu({ open: false, x: 0, y: 0, isNearTop: false });
+    setIsChatOpen(false);
     soundEffects.playClick();
     navigate("/shop");
   }, [isPettingActive, isSittingOnBench, navigate]);
@@ -210,84 +198,20 @@ export const PetViewport: React.FC = () => {
     if (isSittingOnBench) setIsSittingOnBench(false);
     isHeadingToBenchRef.current = false;
     setIsBenchMenuOpen(false);
-    setJuroMenu({ open: false, x: 0, y: 0, isNearTop: false });
+    setIsChatOpen(false);
     soundEffects.playClick();
     navigate("/mine");
   }, [isPettingActive, isSittingOnBench, navigate]);
 
-  const handlePetClick = useCallback(
-    (screenPos?: { x: number; y: number }) => {
-      // Dismiss active speech bubble so it never collides or stacks with the menu
-      if (speechBubble.visible) {
-        if (speechTimerRef.current) {
-          clearTimeout(speechTimerRef.current);
-          speechTimerRef.current = null;
-        }
-        setSpeechBubble((s) => ({ ...s, visible: false }));
-      }
-
-      setShowStatDetails(false);
-      setActiveTray("none");
-
-      if (juroMenu.open) {
-        soundEffects.playDismiss();
-        setJuroMenu({ open: false, x: 0, y: 0, isNearTop: false });
-        return;
-      }
-
-      soundEffects.playPop();
-
-      const contRect = containerRef.current?.getBoundingClientRect();
-      const contW = contRect?.width || window.innerWidth;
-      const contH = contRect?.height || window.innerHeight;
-
-      const rawX = screenPos?.x ?? (juroScreenPosRef.current?.x ?? contW / 2);
-      const rawY = screenPos?.y ?? (juroScreenPosRef.current?.headY ?? contH / 2);
-
-      const menuEl = juroMenuRef.current;
-      const menuW = menuEl?.offsetWidth || Math.min(280, contW - 24);
-      const menuH = menuEl?.offsetHeight || 52;
-      const halfMenuW = menuW / 2;
-      const pad = 12;
-      const clampedX = Math.max(halfMenuW + pad, Math.min(contW - halfMenuW - pad, rawX));
-
-      const isNearTop = rawY < menuH + 30;
-      let targetY: number;
-      let clampedY: number;
-      if (isNearTop) {
-        targetY = rawY + 45;
-        clampedY = Math.max(10, Math.min(contH - menuH - 20, targetY));
-      } else {
-        targetY = rawY - 14;
-        clampedY = Math.max(menuH + 10, Math.min(contH - 20, targetY));
-      }
-
-      setJuroMenu({
-        open: true,
-        x: clampedX,
-        y: clampedY,
-        isNearTop,
-      });
-
-      if (tailRef.current) {
-        const menuLeft = clampedX - halfMenuW;
-        const tailOffset = rawX - menuLeft;
-        const clampedTailOffset = Math.max(20, Math.min(menuW - 20, tailOffset));
-        tailRef.current.style.left = `${clampedTailOffset}px`;
-      }
-    },
-    [juroMenu.open, speechBubble.visible]
-  );
-
-  // Dismiss open trays / stat popover / Juro menu / bench menu / Petting Mode / Speech Bubble on Escape key
+  // Dismiss open trays / stat popover / bench menu / Petting Mode / Speech Bubble / Chat on Escape key
   useEffect(() => {
     if (
       activeTray === "none" &&
       !showStatDetails &&
-      !juroMenu.open &&
       !isBenchMenuOpen &&
       !isPettingActive &&
-      !speechBubble.visible
+      !speechBubble.visible &&
+      !isChatOpen
     )
       return;
     const onKeyDown = (e: KeyboardEvent) => {
@@ -295,14 +219,14 @@ export const PetViewport: React.FC = () => {
         if (isPettingActive) setIsPettingActive(false);
         setActiveTray("none");
         setShowStatDetails(false);
-        setJuroMenu({ open: false, x: 0, y: 0, isNearTop: false });
         setIsBenchMenuOpen(false);
+        setIsChatOpen(false);
         setSpeechBubble((s) => ({ ...s, visible: false }));
       }
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [activeTray, showStatDetails, juroMenu.open, isBenchMenuOpen, isPettingActive, speechBubble.visible]);
+  }, [activeTray, showStatDetails, isBenchMenuOpen, isPettingActive, speechBubble.visible, isChatOpen]);
 
   // Dynamically assemble pet context: activities, emotions, sensations & environmental state
   const getLiveChatContext = useCallback(
@@ -431,8 +355,7 @@ export const PetViewport: React.FC = () => {
   // AI Pet Chat message handler (triggers Gemini API or fallback & shows speech bubble)
   const handleSendMessage = useCallback(
     async (userMessage: string) => {
-      // Close context menu immediately so it doesn't obstruct the view or speech bubble
-      setJuroMenu({ open: false, x: 0, y: 0, isNearTop: false });
+      setIsChatOpen(false);
 
       if (speechTimerRef.current) {
         clearTimeout(speechTimerRef.current);
@@ -482,7 +405,7 @@ export const PetViewport: React.FC = () => {
   // Autonomous spontaneous chatter (Juro randomly blurts out cute thoughts based on his activity)
   const triggerSpontaneousChatter = useCallback(async () => {
     if (
-      juroMenu.open ||
+      isChatOpen ||
       speechBubble.visible ||
       speechBubble.isLoading ||
       isDraggingPet ||
@@ -513,7 +436,7 @@ export const PetViewport: React.FC = () => {
       isChatBusyRef.current = false;
     }
   }, [
-    juroMenu.open,
+    isChatOpen,
     speechBubble.visible,
     speechBubble.isLoading,
     isDraggingPet,
@@ -526,8 +449,6 @@ export const PetViewport: React.FC = () => {
       interaction: "feed" | "play" | "bath_scrub" | "bath_rinse" | "pet",
       detail?: { food?: FoodItem; toy?: ToyItem }
     ) => {
-      // Dismiss any open contextual menu so the speech bubble is completely unobscured
-      setJuroMenu({ open: false, x: 0, y: 0, isNearTop: false });
       setIsBenchMenuOpen(false);
 
       // Don't interrupt if user is actively in chat or if busy
@@ -595,6 +516,64 @@ export const PetViewport: React.FC = () => {
     [speechBubble.isLoading, getLiveChatContext]
   );
 
+  const handleDirectPet = useCallback(() => {
+    setActiveTray("none");
+    setIsChatOpen(false);
+    setShowStatDetails(false);
+
+    if (currentState === "sleep") {
+      wakeUp();
+      soundEffects.playWakeUp();
+      addLog("interaction", "Juro dibangunkan dengan elusan lembut.");
+      useCaregiverStore.getState().recordAction("wake", "Membangunkan Juro dengan elusan lembut.", {});
+      wakeCooldownUntilRef.current = Date.now() + 180_000;
+      isHeadingToBedRef.current = false;
+      return;
+    }
+
+    soundEffects.playPet();
+    soundEffects.playPurr();
+    strokePet();
+    setIsPettingActive(true);
+
+    petStrokeCountRef.current += 1;
+    if (petStrokeCountRef.current >= 3) {
+      petStrokeCountRef.current = 0;
+      useCaregiverStore.getState().recordAction(
+        "pet",
+        "Mengelus lembut tubuh jeli Juro dengan hangat.",
+        { affection: 6, happiness: 4 }
+      );
+      triggerInteractionSpeech("pet");
+    }
+
+    const juroPos = juroScreenPosRef.current;
+    if (juroPos) {
+      const heartId = Date.now() + Math.random();
+      const spawnX = juroPos.x + (Math.random() - 0.5) * 44;
+      const spawnY = (juroPos.headY ?? (juroPos.y - juroPos.radiusPx)) - 14;
+      setHearts((prev) => [
+        ...prev.slice(-5),
+        { id: heartId, x: spawnX, y: spawnY, dx: (Math.random() - 0.5) * 28 },
+      ]);
+      setTimeout(() => {
+        setHearts((prev) => prev.filter((h) => h.id !== heartId));
+      }, 850);
+    }
+  }, [currentState, wakeUp, strokePet, triggerInteractionSpeech, addLog]);
+
+  const handlePetClick = useCallback(() => {
+    // Dismiss active speech bubble if already visible
+    if (speechBubble.visible) {
+      if (speechTimerRef.current) {
+        clearTimeout(speechTimerRef.current);
+        speechTimerRef.current = null;
+      }
+      setSpeechBubble((s) => ({ ...s, visible: false }));
+    }
+    handleDirectPet();
+  }, [speechBubble.visible, handleDirectPet]);
+
   // Autonomous Spontaneous Chatter Loop (every 24 - 50 seconds randomly)
   useEffect(() => {
     let isCancelled = false;
@@ -619,24 +598,6 @@ export const PetViewport: React.FC = () => {
       }
     };
   }, [triggerSpontaneousChatter]);
-
-  // Dismiss Juro menu when tapping/clicking outside (supporting both mouse and touch)
-  useEffect(() => {
-    if (!juroMenu.open) return;
-    const onWindowPointer = (e: Event) => {
-      if (juroMenuRef.current && juroMenuRef.current.contains(e.target as Node)) {
-        return;
-      }
-      setJuroMenu({ open: false, x: 0, y: 0, isNearTop: false });
-    };
-    const timer = setTimeout(() => {
-      window.addEventListener("pointerdown", onWindowPointer);
-    }, 80);
-    return () => {
-      clearTimeout(timer);
-      window.removeEventListener("pointerdown", onWindowPointer);
-    };
-  }, [juroMenu.open]);
 
   // Dismiss bench menu when tapping/clicking outside (supporting both mouse and touch)
   useEffect(() => {
@@ -680,12 +641,11 @@ export const PetViewport: React.FC = () => {
     };
   }, [speechBubble.visible]);
 
-  // Dismiss Juro menu and bench menu when user rotates or zooms camera with OrbitControls
+  // Dismiss bench menu when user rotates or zooms camera with OrbitControls
   useEffect(() => {
     const controls = controlsRef.current;
     if (!controls) return;
     const onOrbitStart = () => {
-      setJuroMenu({ open: false, x: 0, y: 0, isNearTop: false });
       setIsBenchMenuOpen(false);
     };
     controls.addEventListener("start", onOrbitStart);
@@ -773,52 +733,6 @@ export const PetViewport: React.FC = () => {
       window.removeEventListener("pointerup", onPointerUp);
     };
   }, [isPettingActive, strokePet, triggerInteractionSpeech]);
-
-  // Lightweight 60fps RAF loop to keep Juro menu anchored directly above Juro in screen coordinates
-  useEffect(() => {
-    if (!juroMenu.open) return;
-    let animId: number;
-    const update = () => {
-      if (juroMenuRef.current && juroScreenPosRef.current && containerRef.current) {
-        const contRect = containerRef.current.getBoundingClientRect();
-        const pos = juroScreenPosRef.current;
-        const contW = contRect.width || window.innerWidth;
-        const contH = contRect.height || window.innerHeight;
-
-        const menuEl = juroMenuRef.current;
-        const menuW = menuEl.offsetWidth || Math.min(280, contW - 24);
-        const menuH = menuEl.offsetHeight || 52;
-        const halfMenuW = menuW / 2;
-        const pad = 12;
-        const clampedX = Math.max(halfMenuW + pad, Math.min(contW - halfMenuW - pad, pos.x));
-
-        const crownY = pos.headY ?? (pos.y - pos.radiusPx);
-        const isNearTop = crownY < menuH + 30;
-        let targetY: number;
-        let clampedY: number;
-        if (isNearTop) {
-          targetY = crownY + 45;
-          clampedY = Math.max(10, Math.min(contH - menuH - 20, targetY));
-        } else {
-          targetY = crownY - 14;
-          clampedY = Math.max(menuH + 10, Math.min(contH - 20, targetY));
-        }
-
-        juroMenuRef.current.style.left = `${clampedX}px`;
-        juroMenuRef.current.style.top = `${clampedY}px`;
-
-        if (tailRef.current) {
-          const menuLeft = clampedX - halfMenuW;
-          const tailOffset = pos.x - menuLeft;
-          const clampedTailOffset = Math.max(20, Math.min(menuW - 20, tailOffset));
-          tailRef.current.style.left = `${clampedTailOffset}px`;
-        }
-      }
-      animId = requestAnimationFrame(update);
-    };
-    update();
-    return () => cancelAnimationFrame(animId);
-  }, [juroMenu.open]);
 
   // Imperative drag tracking refs (zero allocations, zero layout thrash, zero re-renders)
   const dragMetaRef = useRef<{
@@ -1242,7 +1156,7 @@ export const PetViewport: React.FC = () => {
     if (isPettingActive) setIsPettingActive(false);
     setShowStatDetails(false);
     setActiveTray("none");
-    setJuroMenu({ open: false, x: 0, y: 0, isNearTop: false });
+    setIsChatOpen(false);
 
     if (isBenchMenuOpen) {
       soundEffects.playDismiss();
@@ -1414,37 +1328,6 @@ export const PetViewport: React.FC = () => {
       );
     }
   }, [isNightSleep, currentState, isPettingActive, now, wakeUp, addLog]);
-
-  const handleMenuAction = (action: "food" | "toy" | "sleep" | "bath" | "pet") => {
-    if (isSittingOnBench) setIsSittingOnBench(false);
-    isHeadingToBenchRef.current = false;
-    setIsBenchMenuOpen(false);
-    setJuroMenu({ open: false, x: 0, y: 0, isNearTop: false });
-    setShowStatDetails(false);
-
-    switch (action) {
-      case "food":
-        soundEffects.playPop();
-        setActiveTray("food");
-        break;
-      case "toy":
-        soundEffects.playPop();
-        setActiveTray("toy");
-        break;
-      case "sleep":
-        handleToggleSleep();
-        break;
-      case "bath":
-        soundEffects.playPop();
-        setActiveTray("bath");
-        break;
-      case "pet":
-        soundEffects.playHappy();
-        setIsPettingActive(true);
-        addLog("play", "Mengelus tubuh Juro dengan penuh kasih sayang!");
-        break;
-    }
-  };
 
   const getDraggedIllustrationId = (payload: DragPayload): string => {
     switch (payload.kind) {
@@ -1688,19 +1571,35 @@ export const PetViewport: React.FC = () => {
         }}
       />
 
-      {/* Interactive Contextual Juro Menu (Pops up directly on Juro Tap/Click) */}
-      <JuroContextMenu
-        open={juroMenu.open && !speechBubble.visible}
-        x={juroMenu.x}
-        y={juroMenu.y}
-        isNearTop={juroMenu.isNearTop}
+      {/* Permanent Tactile Action Dock (Bottom Center — Always visible, instant 1-tap feedback) */}
+      <ActionDock
+        activeTray={activeTray}
+        onSelectTray={(tray) => {
+          setIsChatOpen(false);
+          setActiveTray((prev) => (prev === tray ? "none" : tray));
+        }}
+        onToggleSleep={handleToggleSleep}
+        onPet={handleDirectPet}
+        onToggleChat={() => {
+          setActiveTray("none");
+          setIsChatOpen((prev) => !prev);
+        }}
+        isChatOpen={isChatOpen}
         currentState={currentState}
+        hunger={hunger}
+        energy={energy}
+        happiness={happiness}
+        cleanliness={cleanliness}
         totalFoodStock={totalFoodStock}
-        onAction={handleMenuAction}
+      />
+
+      {/* AI Gemini Dialogue Modal (Anchored cleanly above Action Dock) */}
+      <JuroChatModal
+        isOpen={isChatOpen}
+        onClose={() => setIsChatOpen(false)}
         onSendMessage={handleSendMessage}
-        isChatLoading={speechBubble.isLoading}
-        menuRef={juroMenuRef}
-        tailRef={tailRef}
+        isLoading={speechBubble.isLoading}
+        petName={name}
       />
 
       {/* Juro's Floating Retro Speech Bubble */}

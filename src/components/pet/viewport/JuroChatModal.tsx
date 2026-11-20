@@ -1,0 +1,106 @@
+import React, { useState } from "react";
+import { MessageSquare, Send, X } from "lucide-react";
+import { soundEffects } from "../../../engine/audio/soundEffects";
+export interface JuroChatModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  onSendMessage: (message: string) => void;
+  isLoading: boolean;
+  petName: string;
+}
+
+const QUICK_PROMPTS = [
+  "Halo Juro!",
+  "Lagi mikirin apa?",
+  "Kamu suka makan apa?",
+  "Semangat ya!",
+];
+
+export const JuroChatModal: React.FC<JuroChatModalProps> = ({
+  isOpen,
+  onClose,
+  onSendMessage,
+  isLoading,
+  petName,
+}) => {
+  const [input, setInput] = useState("");
+
+  if (!isOpen) return null;
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const trimmed = input.trim();
+    if (!trimmed || isLoading) return;
+    onSendMessage(trimmed);
+    setInput("");
+  };
+
+  const handleQuickPrompt = (prompt: string) => {
+    soundEffects.playClick();
+    onSendMessage(prompt);
+  };
+
+  return (
+    <div className="animate-tray-enter absolute bottom-16 sm:bottom-20 left-1/2 -translate-x-1/2 z-30 w-80 sm:w-96 max-w-[calc(100vw-1.5rem)] bg-warm-white/95 dark:bg-neutral-900/95 backdrop-blur-xs border-2 border-charcoal dark:border-neutral-600 shadow-[4px_4px_0px_#171717] dark:shadow-[4px_4px_0px_#000000] p-3 select-none">
+      <div className="flex items-center justify-between border-b border-charcoal/15 dark:border-neutral-700 pb-2 mb-2.5">
+        <div className="flex items-center gap-1.5">
+          <MessageSquare size={13} className="text-juro-orange" />
+          <span className="pixel-text text-[10px] uppercase font-bold text-charcoal dark:text-white">
+            Ngobrol Bersama {petName}
+          </span>
+        </div>
+        <button
+          type="button"
+          onClick={() => {
+            soundEffects.playDismiss();
+            onClose();
+          }}
+          className="p-0.5 text-neutral-400 hover:text-charcoal dark:hover:text-white cursor-pointer"
+          aria-label="Tutup obrolan"
+        >
+          <X size={15} />
+        </button>
+      </div>
+
+      {/* Quick Prompts */}
+      <div className="flex flex-wrap gap-1.5 mb-2.5">
+        {QUICK_PROMPTS.map((prompt) => (
+          <button
+            key={prompt}
+            type="button"
+            disabled={isLoading}
+            onClick={() => handleQuickPrompt(prompt)}
+            className="px-2 py-1 bg-white dark:bg-neutral-800 border border-charcoal/40 dark:border-neutral-700 pixel-text text-[8px] text-charcoal dark:text-neutral-200 hover:border-juro-orange hover:text-juro-orange active:scale-95 transition-all cursor-pointer"
+          >
+            {prompt}
+          </button>
+        ))}
+      </div>
+
+      {/* Input Form */}
+      <form onSubmit={handleSubmit} className="flex items-center gap-1.5">
+        <input
+          type="text"
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          placeholder={`Kirim pesan untuk ${petName}...`}
+          maxLength={100}
+          disabled={isLoading}
+          className="flex-1 min-w-0 px-2.5 py-1.5 bg-white dark:bg-neutral-800 border-2 border-charcoal dark:border-neutral-600 pixel-text text-[9.5px] text-charcoal dark:text-white placeholder:text-neutral-400 focus:outline-none focus:border-juro-orange"
+        />
+        <button
+          type="submit"
+          disabled={!input.trim() || isLoading}
+          className={`px-3 py-1.5 border-2 border-charcoal dark:border-neutral-600 pixel-text text-[9.5px] uppercase font-bold flex items-center gap-1 transition-all ${
+            input.trim() && !isLoading
+              ? "bg-juro-orange text-white hover:bg-orange-600 cursor-pointer shadow-[2px_2px_0px_#171717] active:translate-x-[1px] active:translate-y-[1px] active:shadow-none"
+              : "bg-neutral-200 dark:bg-neutral-700 text-neutral-400 cursor-not-allowed opacity-60"
+          }`}
+        >
+          <Send size={11} strokeWidth={2.5} />
+          <span>{isLoading ? "..." : "Kirim"}</span>
+        </button>
+      </form>
+    </div>
+  );
+};
