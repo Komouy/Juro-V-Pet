@@ -219,6 +219,15 @@ export const PetViewport: React.FC = () => {
 
   const handlePetClick = useCallback(
     (screenPos?: { x: number; y: number }) => {
+      // Dismiss active speech bubble so it never collides or stacks with the menu
+      if (speechBubble.visible) {
+        if (speechTimerRef.current) {
+          clearTimeout(speechTimerRef.current);
+          speechTimerRef.current = null;
+        }
+        setSpeechBubble((s) => ({ ...s, visible: false }));
+      }
+
       setShowStatDetails(false);
       setActiveTray("none");
 
@@ -269,7 +278,7 @@ export const PetViewport: React.FC = () => {
         tailRef.current.style.left = `${clampedTailOffset}px`;
       }
     },
-    [juroMenu.open]
+    [juroMenu.open, speechBubble.visible]
   );
 
   // Dismiss open trays / stat popover / Juro menu / bench menu / Petting Mode / Speech Bubble on Escape key
@@ -518,6 +527,10 @@ export const PetViewport: React.FC = () => {
       interaction: "feed" | "play" | "bath_scrub" | "bath_rinse" | "pet",
       detail?: { food?: FoodItem; toy?: ToyItem }
     ) => {
+      // Dismiss any open contextual menu so the speech bubble is completely unobscured
+      setJuroMenu({ open: false, x: 0, y: 0, isNearTop: false });
+      setBenchMenu(null);
+
       // Don't interrupt if user is actively in chat or if busy
       if (speechBubble.isLoading) return;
 
@@ -643,6 +656,31 @@ export const PetViewport: React.FC = () => {
       window.removeEventListener("pointerdown", onWindowPointer);
     };
   }, [benchMenu?.open]);
+
+  // Dismiss speech bubble when tapping/clicking outside (matching behavior of other menus)
+  useEffect(() => {
+    if (!speechBubble.visible) return;
+    const onWindowPointer = (e: Event) => {
+      const target = e.target as HTMLElement | null;
+      if (target?.closest?.('[data-speech-bubble="true"]')) {
+        return;
+      }
+      if (speechTimerRef.current) {
+        clearTimeout(speechTimerRef.current);
+        speechTimerRef.current = null;
+      }
+      setSpeechBubble((s) => ({ ...s, visible: false }));
+    };
+    const timer = setTimeout(() => {
+      window.addEventListener("pointerdown", onWindowPointer);
+    }, 120);
+    return () => {
+      clearTimeout(timer);
+      window.removeEventListener("pointerdown", onWindowPointer);
+    };
+  }, [speechBubble.visible]);
+
+
 
   // Dismiss Juro menu and bench menu when user rotates or zooms camera with OrbitControls
   useEffect(() => {
@@ -1592,7 +1630,7 @@ export const PetViewport: React.FC = () => {
 
       {/* Interactive Contextual Juro Menu (Pops up directly on Juro Tap/Click) */}
       <JuroContextMenu
-        open={juroMenu.open}
+        open={juroMenu.open && !speechBubble.visible}
         x={juroMenu.x}
         y={juroMenu.y}
         isNearTop={juroMenu.isNearTop}

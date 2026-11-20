@@ -1,6 +1,6 @@
 import React from "react";
 import { Link, useLocation } from "react-router-dom";
-import { Home, Store, Pickaxe, Archive, TrendingUp } from "lucide-react";
+import { Home, Store, Pickaxe, TrendingUp } from "lucide-react";
 import { soundEffects } from "../../engine/audio/soundEffects";
 import { useGameStore } from "../../stores/gameStore";
 
@@ -8,7 +8,6 @@ const MOBILE_LINKS = [
   { path: "/", label: "Home", icon: Home },
   { path: "/shop", label: "Toko", icon: Store },
   { path: "/mine", label: "Tambang", icon: Pickaxe },
-  { path: "/collection", label: "Koleksi", icon: Archive },
   { path: "/evolution", label: "Evolusi", icon: TrendingUp },
 ];
 

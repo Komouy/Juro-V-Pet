@@ -1,6 +1,6 @@
 /* oxlint-disable react/only-export-components */
 import React, { Suspense, lazy } from "react";
-import { createBrowserRouter } from "react-router-dom";
+import { Navigate, createBrowserRouter } from "react-router-dom";
 import { RootLayout } from "../components/layout/RootLayout";
 
 const HomePage = lazy(() =>
@@ -11,9 +11,6 @@ const ShopPage = lazy(() =>
 );
 const MiningPage = lazy(() =>
   import("../pages/MiningPage").then((m) => ({ default: m.MiningPage }))
-);
-const CollectionPage = lazy(() =>
-  import("../pages/CollectionPage").then((m) => ({ default: m.CollectionPage }))
 );
 const EvolutionPage = lazy(() =>
   import("../pages/EvolutionPage").then((m) => ({ default: m.EvolutionPage }))
@@ -56,7 +53,7 @@ export const router = createBrowserRouter([
       },
       {
         path: "collection",
-        element: withSuspense(CollectionPage),
+        element: <Navigate to="/shop?tab=skins" replace />,
       },
       {
         path: "evolution",

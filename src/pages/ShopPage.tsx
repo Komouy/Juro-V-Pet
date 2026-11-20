@@ -8,6 +8,7 @@ import {
   Check,
   ShoppingBag,
   ArrowRightLeft,
+  Palette,
 } from "lucide-react";
 import { Card } from "../components/ui/Card";
 import { Button } from "../components/ui/Button";
@@ -21,13 +22,15 @@ import {
   PICKAXE_TIERS,
   SHOP_FOODS,
   SHOP_TOYS,
+  SKIN_CATALOG,
+  getCrystalById,
   type CrystalId,
 } from "../data/economyCatalog";
 import { soundEffects } from "../engine/audio/soundEffects";
 
-type ShopTab = "food" | "toy" | "sell" | "tools";
+type ShopTab = "food" | "toy" | "skins" | "sell" | "tools";
 
-const VALID_TABS: ShopTab[] = ["food", "toy", "sell", "tools"];
+const VALID_TABS: ShopTab[] = ["food", "toy", "skins", "sell", "tools"];
 
 export const ShopPage: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -44,9 +47,13 @@ export const ShopPage: React.FC = () => {
     crystals,
     foodInventory,
     ownedToys,
+    unlockedSkins,
+    activeSkin,
     pickaxeLevel,
     buyFood,
     buyToy,
+    unlockSkin,
+    equipSkin,
     sellCrystal,
     sellAllCrystals,
     upgradePickaxe,
@@ -101,6 +108,26 @@ export const ShopPage: React.FC = () => {
     } else {
       soundEffects.playError();
       showToast("Koin belum cukup", "warn");
+    }
+  };
+
+  const handleEquipSkin = (skinId: string, name: string) => {
+    if (equipSkin(skinId)) {
+      soundEffects.playEquip();
+      addLog("interaction", `Mengganti tampilan warna Juro ke ${name}.`);
+      showToast(`Warna: ${name}`, "info");
+    }
+  };
+
+  const handleUnlockSkin = (skinId: string, name: string, costLabel: string) => {
+    if (unlockSkin(skinId)) {
+      soundEffects.playUnlock();
+      triggerWalletPulse();
+      addLog("interaction", `Membuka warna ${name} (-${costLabel})!`);
+      showToast(`Terbuka: ${name}`, "success");
+    } else {
+      soundEffects.playError();
+      showToast("Kristal belum cukup", "warn");
     }
   };
 
@@ -182,6 +209,7 @@ export const ShopPage: React.FC = () => {
           options={[
             { value: "food", label: "Makanan" },
             { value: "toy", label: "Mainan" },
+            { value: "skins", label: "Warna Juro" },
             {
               value: "sell",
               label: "Kristal",
@@ -308,7 +336,113 @@ export const ShopPage: React.FC = () => {
           </div>
         )}
 
-        {/* TAB 3: JUAL KRISTAL */}
+        {/* TAB 3: WARNA JURO */}
+        {activeTab === "skins" && (
+          <div className="space-y-3.5">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5">
+              {SKIN_CATALOG.map((skin) => {
+                const isUnlocked = unlockedSkins.includes(skin.id);
+                const isSelected = activeSkin === skin.id;
+
+                const crystalInfo = skin.crystalCost
+                  ? getCrystalById(skin.crystalCost.crystalId)
+                  : null;
+                const crystalShortName = crystalInfo
+                  ? crystalInfo.name.replace("Kristal ", "")
+                  : "";
+                const requiredQty = skin.crystalCost?.amount ?? 0;
+                const ownedQty = skin.crystalCost
+                  ? crystals[skin.crystalCost.crystalId] ?? 0
+                  : 0;
+                const canUnlock = !isUnlocked && ownedQty >= requiredQty;
+                const costLabel = skin.crystalCost
+                  ? `${requiredQty} ${crystalShortName}`
+                  : "Gratis";
+
+                return (
+                  <Card
+                    key={skin.id}
+                    shadowOffset="sm"
+                    className={`p-3.5 flex flex-col justify-between gap-3.5 transition-all ${
+                      isSelected ? "border-juro-orange ring-2 ring-juro-orange/25" : ""
+                    }`}
+                  >
+                    <div className="flex items-start gap-3.5">
+                      {/* Mini Pixel-Framed Juro Jelly Preview */}
+                      <div className="relative w-14 h-14 bg-warm-white dark:bg-neutral-900 border-2 border-charcoal dark:border-neutral-600 shadow-[2px_2px_0px_#171717] dark:shadow-[2px_2px_0px_#000000] flex items-center justify-center shrink-0">
+                        <div
+                          className="relative w-10 h-9 rounded-t-full rounded-b-[14px] border-2 border-charcoal overflow-hidden flex items-center justify-center"
+                          style={{
+                            background: `radial-gradient(circle at 35% 28%, ${skin.colorB} 0%, ${skin.colorA} 72%)`,
+                          }}
+                        >
+                          <span className="absolute top-1 left-2 w-2 h-1.5 bg-white/75 rounded-full" />
+                          <span className="flex items-center gap-2 mt-1">
+                            <span className="w-1.5 h-1.5 bg-charcoal rounded-full relative">
+                              <span className="absolute top-[1px] left-[1px] w-[2px] h-[2px] bg-white rounded-full" />
+                            </span>
+                            <span className="w-1.5 h-1.5 bg-charcoal rounded-full relative">
+                              <span className="absolute top-[1px] left-[1px] w-[2px] h-[2px] bg-white rounded-full" />
+                            </span>
+                          </span>
+                        </div>
+                        {isSelected && (
+                          <span className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-juro-orange text-white border-2 border-charcoal flex items-center justify-center">
+                            <Check size={10} strokeWidth={3} />
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center justify-between gap-2">
+                          <h3 className="pixel-text text-[11px] text-charcoal dark:text-white font-bold truncate">
+                            {skin.name}
+                          </h3>
+                          {isSelected ? (
+                            <Badge label="Aktif" variant="orange" size="sm" />
+                          ) : isUnlocked ? (
+                            <Badge label="Milik" variant="good" size="sm" />
+                          ) : (
+                            <Badge label={costLabel} variant="charcoal" size="sm" />
+                          )}
+                        </div>
+                        <p className="pixel-text text-[8px] sm:text-[9px] text-muted dark:text-neutral-400 mt-1.5 leading-relaxed">
+                          {skin.flavorDesc}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="pt-2.5 border-t border-charcoal/10 dark:border-neutral-700">
+                      {isUnlocked ? (
+                        <Button
+                          label={isSelected ? "Dipakai" : "Pakai Warna"}
+                          icon={isSelected ? Check : Palette}
+                          size="sm"
+                          variant={isSelected ? "secondary" : "primary"}
+                          disabled={isSelected}
+                          onClick={() => handleEquipSkin(skin.id, skin.name)}
+                          className="w-full"
+                        />
+                      ) : (
+                        <Button
+                          label={`Buka (${costLabel})`}
+                          icon={Gem}
+                          size="sm"
+                          variant={canUnlock ? "primary" : "secondary"}
+                          disabled={!canUnlock}
+                          onClick={() => handleUnlockSkin(skin.id, skin.name, costLabel)}
+                          className="w-full"
+                        />
+                      )}
+                    </div>
+                  </Card>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* TAB 4: JUAL KRISTAL */}
         {activeTab === "sell" && (
           <div className="space-y-3.5">
             <Card
@@ -393,7 +527,7 @@ export const ShopPage: React.FC = () => {
           </div>
         )}
 
-        {/* TAB 4: UPGRADE BELIUNG */}
+        {/* TAB 5: UPGRADE BELIUNG */}
         {activeTab === "tools" && (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5">
             {PICKAXE_TIERS.map((tier) => {

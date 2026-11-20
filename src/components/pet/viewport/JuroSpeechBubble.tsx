@@ -111,6 +111,7 @@ export const JuroSpeechBubble: React.FC<JuroSpeechBubbleProps> = ({
   return (
     <div
       ref={rootRef}
+      data-speech-bubble="true"
       style={{
         transform: `translate3d(${initialX}px, ${initialY}px, 0)`,
         maxWidth: `${bubbleW}px`,

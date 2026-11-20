@@ -10,7 +10,6 @@ const NAV_LINKS = [
   { path: "/", label: "Home" },
   { path: "/shop", label: "Toko" },
   { path: "/mine", label: "Tambang" },
-  { path: "/collection", label: "Koleksi" },
   { path: "/evolution", label: "Evolusi" },
 ];
 
