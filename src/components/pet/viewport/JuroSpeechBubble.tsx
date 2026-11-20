@@ -52,8 +52,8 @@ export const JuroSpeechBubble: React.FC<JuroSpeechBubbleProps> = ({
         const contH = contRect.height || window.innerHeight;
 
         const bubbleEl = rootRef.current;
-        const bubbleW = bubbleEl.offsetWidth || 240;
-        const bubbleH = bubbleEl.offsetHeight || 68;
+        const bubbleW = bubbleEl.offsetWidth || 220;
+        const bubbleH = bubbleEl.offsetHeight || 60;
 
         // Horizontally center bubble right over Juro's X coordinate
         const targetX = pos.x - bubbleW / 2;
@@ -98,8 +98,8 @@ export const JuroSpeechBubble: React.FC<JuroSpeechBubbleProps> = ({
   const contH = containerHeight || (typeof window !== "undefined" ? window.innerHeight : 600);
   const fallbackX = screenX ?? contW / 2;
   const fallbackY = headY ?? contH / 2;
-  const bubbleW = Math.min(310, contW - 24);
-  const bubbleH = 72;
+  const bubbleW = Math.min(260, contW - 24);
+  const bubbleH = 64;
 
   const initialX = Math.max(16, Math.min(contW - bubbleW - 16, fallbackX - bubbleW / 2));
   const placeAboveInitial = fallbackY - 14 >= bubbleH + 12;

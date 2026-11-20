@@ -57,13 +57,13 @@ const GEMINI_MODEL = "gemini-3.5-flash-lite";
 
 // Canned in-character witty fallbacks when offline or before API key is provided
 export const JURO_FALLBACK_REPLIES = [
-  "Bloop! Juro senang ngobrol sama kamu, tapi kepikiran puding lezat nih! Nyam nyam~",
+  "Bloop! Juro senang ngobrol, tapi lagi kepikiran puding nih! Nyam~",
   "Slimey! Perut jeli Juro berbunyi lembut... bloop bloop!",
-  "Hehe, Juro suka melompat-lompat di padang rumput sambil dengerin kamu!",
-  "Bloop bloop! Apapun ceritamu, Juro selalu ada di sini menemanimu!",
-  "Nyam! Juro lagi membayangkan stroberi manis yang kenyal dan segar!",
-  "Bloop! Tubuh jeli Juro bergoyang riang setiap kali kamu menyapa!",
-  "Zzz... eh Juro nggak tidur kok, cuma merem sedikit menikmati angin sepoi-sepoi!",
+  "Hehe, Juro suka melompat-lompat sambil dengerin kamu!",
+  "Bloop bloop! Apapun ceritamu, Juro selalu ada menemanimu!",
+  "Nyam! Juro lagi bayangin stroberi manis kenyal!",
+  "Bloop! Tubuh jeli Juro bergoyang riang saat kamu sapa!",
+  "Zzz... eh Juro nggak tidur kok, cuma merem santai menikmati angin!",
 ];
 
 /**
@@ -624,8 +624,8 @@ export function buildJuroSystemPrompt(context?: PetChatContext): string {
     `  * Jika sedang bosan: menghela napas imut, minta diajak aktivitas seru.`,
     `  * Jika sedang kotor: keluhkan tubuh jeli yang lengket atau berdebu, minta dimandikan.`,
     `- Sisipkan bunyi slime khas seperti "Bloop!", "Nyam nyam!", atau "Slimey~" secara alami (cukup 1 kali saja per jawaban).`,
-    `- JAWABAN HARUS SANGAT SINGKAT: MAKSIMAL 1 SAMPAI 2 KALIMAT PENDEK (sekitar 10 sampai 22 kata).`,
-    `- Jangan pernah menulis jawaban panjang, daftar poin, atau kalimat formal/kaku karena jawabanmu akan ditampilkan di dalam balon ucapan (speech bubble) retro kecil di atas layar game.`,
+    `- JAWABAN HARUS SANGAT SINGKAT & RINGKAS: MAKSIMAL 1 SAMPAI 2 KALIMAT PENDEK (maksimal 6 sampai 14 kata saja).`,
+    `- DILARANG KERAS menulis jawaban panjang, bercerita bertele-tele, atau memberikan penjelasan berlebihan. Juro adalah pet slime kecil imut, bicaralah singkat, padat, to-the-point, dan imut agar pas di balon ucapan retro kecil.`,
   ].filter(Boolean).join(" ");
 }
 
@@ -641,13 +641,31 @@ export function sanitizeJuroReply(rawText: string): string {
     .replace(/\s+/g, " ")
     .trim();
 
-  // If response is still longer than 150 characters, trim at the last full sentence
-  if (clean.length > 150) {
+  // Enforce strict brevity: keep response under 90 characters
+  if (clean.length > 90) {
     const sentences = clean.match(/[^.!?]+[.!?]+/g);
     if (sentences && sentences.length > 0) {
-      clean = sentences.slice(0, 2).join(" ").trim();
+      let combined = "";
+      for (const s of sentences) {
+        const candidate = combined ? `${combined} ${s.trim()}` : s.trim();
+        if (candidate.length <= 90) {
+          combined = candidate;
+        } else {
+          break;
+        }
+      }
+      if (combined) {
+        clean = combined;
+      } else {
+        clean = sentences[0].trim();
+        if (clean.length > 90) {
+          const lastSpace = clean.lastIndexOf(" ", 85);
+          clean = (lastSpace > 25 ? clean.slice(0, lastSpace) : clean.slice(0, 85)).trim() + "...";
+        }
+      }
     } else {
-      clean = clean.slice(0, 140) + "...";
+      const lastSpace = clean.lastIndexOf(" ", 85);
+      clean = (lastSpace > 25 ? clean.slice(0, lastSpace) : clean.slice(0, 85)).trim() + "...";
     }
   }
 
@@ -700,7 +718,7 @@ export async function chatWithJuro(
       contents: formattedContents,
       generationConfig: {
         temperature: 0.85,
-        maxOutputTokens: 100,
+        maxOutputTokens: 45,
       },
     };
 

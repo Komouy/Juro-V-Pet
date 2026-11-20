@@ -45,6 +45,7 @@ export const JuroContextMenu: React.FC<JuroContextMenuProps> = ({
   return (
     <div
       ref={menuRef}
+      data-juro-menu="true"
       style={{
         left: `${x}px`,
         top: `${y}px`,

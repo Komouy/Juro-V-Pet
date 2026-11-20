@@ -427,6 +427,7 @@ export const PetViewport: React.FC = () => {
   // Autonomous spontaneous chatter (Juro randomly blurts out cute thoughts based on his activity)
   const triggerSpontaneousChatter = useCallback(async () => {
     if (
+      juroMenu.open ||
       isChatOpen ||
       speechBubble.visible ||
       speechBubble.isLoading ||
@@ -458,6 +459,7 @@ export const PetViewport: React.FC = () => {
       isChatBusyRef.current = false;
     }
   }, [
+    juroMenu.open,
     isChatOpen,
     speechBubble.visible,
     speechBubble.isLoading,
@@ -1411,13 +1413,11 @@ export const PetViewport: React.FC = () => {
           setActiveTray("bath");
           break;
         case "pet":
-          soundEffects.playHappy();
-          setIsPettingActive(true);
-          addLog("play", "Mengelus tubuh Juro dengan penuh kasih sayang!");
+          handleDirectPet();
           break;
       }
     },
-    [isSittingOnBench, handleToggleSleep, addLog]
+    [isSittingOnBench, handleToggleSleep, handleDirectPet]
   );
 
   const handleToggleWeather = useCallback(() => {
