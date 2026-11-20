@@ -19,24 +19,7 @@ const STORAGE_KEY = "juro_firebase_custom_config";
  * Prioritas 2: Custom config dari localStorage yang diisi pengguna
  */
 export function getActiveFirebaseConfig(): FirebaseCustomConfig | null {
-  // 1. Cek dari environment variables (.env / .env.local)
-  const envDbUrl = import.meta.env.VITE_FIREBASE_DATABASE_URL;
-  const envApiKey = import.meta.env.VITE_FIREBASE_API_KEY;
-  const envProjectId = import.meta.env.VITE_FIREBASE_PROJECT_ID;
-
-  if (envDbUrl && envApiKey && envProjectId) {
-    return {
-      apiKey: envApiKey,
-      authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || `${envProjectId}.firebaseapp.com`,
-      databaseURL: envDbUrl,
-      projectId: envProjectId,
-      storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || `${envProjectId}.appspot.com`,
-      messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || "",
-      appId: import.meta.env.VITE_FIREBASE_APP_ID || "",
-    };
-  }
-
-  // 2. Cek apakah ada config tersimpan di localStorage
+  // 1. Cek apakah ada custom config tersimpan di localStorage (prioritas override)
   if (typeof window !== "undefined" && typeof localStorage !== "undefined") {
     try {
       const saved = localStorage.getItem(STORAGE_KEY);
@@ -51,6 +34,26 @@ export function getActiveFirebaseConfig(): FirebaseCustomConfig | null {
     }
   }
 
+  // 2. Cek dari environment variables (.env / .env.local)
+  const envApiKey = import.meta.env.VITE_FIREBASE_API_KEY;
+  const envProjectId = import.meta.env.VITE_FIREBASE_PROJECT_ID;
+  const envDbUrl = (
+    import.meta.env.VITE_FIREBASE_DATABASE_URL ||
+    (envProjectId ? `https://${envProjectId}-default-rtdb.firebaseio.com` : "")
+  ).replace(/\/+$/, "");
+
+  if (envApiKey && envProjectId && envDbUrl) {
+    return {
+      apiKey: envApiKey,
+      authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || `${envProjectId}.firebaseapp.com`,
+      databaseURL: envDbUrl,
+      projectId: envProjectId,
+      storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || `${envProjectId}.firebasestorage.app`,
+      messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || "",
+      appId: import.meta.env.VITE_FIREBASE_APP_ID || "",
+    };
+  }
+
   return null;
 }
 
@@ -59,6 +62,8 @@ export function getActiveFirebaseConfig(): FirebaseCustomConfig | null {
  */
 export function saveCustomFirebaseConfig(config: FirebaseCustomConfig | null): void {
   if (typeof window === "undefined" || typeof localStorage === "undefined") return;
+  cachedApp = null;
+  cachedDb = null;
   if (!config) {
     localStorage.removeItem(STORAGE_KEY);
   } else {
@@ -71,6 +76,60 @@ export function saveCustomFirebaseConfig(config: FirebaseCustomConfig | null): v
  */
 export function isFirebaseConfigured(): boolean {
   return getActiveFirebaseConfig() !== null;
+}
+
+/**
+ * Membantu mem-parsing snippet konfigurasi Firebase (JSON atau JavaScript object)
+ * yang disalin langsung dari Firebase Console
+ */
+export function parseFirebaseConfigSnippet(input: string): FirebaseCustomConfig | null {
+  const clean = input.trim();
+  if (!clean) return null;
+
+  // 1. Coba parse JSON murni
+  try {
+    const json = JSON.parse(clean);
+    if (json.apiKey && json.projectId) {
+      return {
+        apiKey: json.apiKey,
+        authDomain: json.authDomain || `${json.projectId}.firebaseapp.com`,
+        databaseURL: json.databaseURL || `https://${json.projectId}-default-rtdb.firebaseio.com`,
+        projectId: json.projectId,
+        storageBucket: json.storageBucket || `${json.projectId}.appspot.com`,
+        messagingSenderId: json.messagingSenderId || "",
+        appId: json.appId || "",
+      };
+    }
+  } catch {
+    // Lanjutkan dengan regex parsing jika bukan JSON murni
+  }
+
+  // 2. Ekstrak dengan regex dari objek JS (const firebaseConfig = { ... })
+  const extract = (key: string): string => {
+    const match = clean.match(new RegExp(`['"]?${key}['"]?\\s*:\\s*['"]([^'"]+)['"]`, "i"));
+    return match ? match[1].trim() : "";
+  };
+
+  const apiKey = extract("apiKey");
+  const projectId = extract("projectId");
+  let databaseURL = extract("databaseURL");
+
+  if (apiKey && projectId) {
+    if (!databaseURL) {
+      databaseURL = `https://${projectId}-default-rtdb.firebaseio.com`;
+    }
+    return {
+      apiKey,
+      projectId,
+      databaseURL,
+      authDomain: extract("authDomain") || `${projectId}.firebaseapp.com`,
+      storageBucket: extract("storageBucket") || `${projectId}.appspot.com`,
+      messagingSenderId: extract("messagingSenderId") || "",
+      appId: extract("appId") || "",
+    };
+  }
+
+  return null;
 }
 
 let cachedApp: FirebaseApp | null = null;

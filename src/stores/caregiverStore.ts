@@ -4,11 +4,13 @@ import type {
   CaregiverActionLog,
   SharedJuroState,
   CareActionType,
+  CaregiverRelationshipInfo,
 } from "../types/caregiver";
 import { juroSyncService } from "../services/firebase/juroSyncService";
 import { usePetStore } from "./petStore";
 import { useGameStore } from "./gameStore";
 import { soundEffects } from "../engine/audio/soundEffects";
+import { addPetMemory } from "../services/petMemoryService";
 
 const PROFILE_STORAGE_KEY = "juro_caregiver_profile";
 const ROOM_STORAGE_KEY = "juro_caregiver_room";
@@ -37,8 +39,11 @@ interface CaregiverState {
   errorMessage: string | null;
   activityLogs: CaregiverActionLog[];
   hasRegisteredName: boolean;
+  isHubModalOpen: boolean;
 
   // Actions
+  openHubModal: () => void;
+  closeHubModal: () => void;
   setProfile: (name: string, roleTitle?: string) => void;
   createRoom: () => Promise<{ ok: boolean; roomCode?: string; error?: string }>;
   joinRoom: (roomCode: string) => Promise<{ ok: boolean; error?: string }>;
@@ -49,6 +54,7 @@ interface CaregiverState {
     statChanges?: CaregiverActionLog["statChanges"],
     itemUsedName?: string
   ) => Promise<void>;
+  getCaregiverRelationship: () => CaregiverRelationshipInfo;
   initRealtimeSubscription: () => void;
 }
 
@@ -64,6 +70,10 @@ export const useCaregiverStore = create<CaregiverState>((set, get) => {
     errorMessage: null,
     activityLogs: [],
     hasRegisteredName: initialProfile !== null && initialProfile.name.trim().length > 0,
+    isHubModalOpen: false,
+
+    openHubModal: () => set({ isHubModalOpen: true }),
+    closeHubModal: () => set({ isHubModalOpen: false }),
 
     setProfile: (name: string, roleTitle = "Perawat Juro") => {
       const cleanName = name.trim();
@@ -260,6 +270,87 @@ export const useCaregiverStore = create<CaregiverState>((set, get) => {
       }
     },
 
+    getCaregiverRelationship: (): CaregiverRelationshipInfo => {
+      const { myProfile, partnerProfile, activityLogs } = get();
+      const myName = myProfile?.name || "Perawat Juro";
+      const partnerName = partnerProfile?.name;
+      const isDual = !!partnerName;
+      const caregiverCount: 1 | 2 = isDual ? 2 : 1;
+
+      const myActions = activityLogs.filter((l) => l.caregiverId === myProfile?.id);
+      const partnerActions = partnerProfile
+        ? activityLogs.filter((l) => l.caregiverId === partnerProfile.id)
+        : [];
+
+      const totalMy = myActions.length;
+      const totalPartner = partnerActions.length;
+
+      let feedCount = 0;
+      let playCount = 0;
+      let bathCount = 0;
+      let petCount = 0;
+
+      for (const log of activityLogs) {
+        if (log.actionType === "feed") feedCount++;
+        else if (log.actionType === "play") playCount++;
+        else if (log.actionType === "bath") bathCount++;
+        else if (log.actionType === "pet") petCount++;
+      }
+
+      let developmentTrait = "Sahabat Sejati";
+      let traitDescription = `Juro tumbuh bahagia dan setia bersama ${myName}.`;
+
+      if (isDual) {
+        if (totalMy > 0 && totalPartner > 0) {
+          if (Math.abs(totalMy - totalPartner) <= 3) {
+            developmentTrait = "Harmoni Dua Sahabat";
+            traitDescription = `Juro berkembang sangat seimbang dan penuh kasih karena ${myName} dan ${partnerName} merawatnya secara kompak.`;
+          } else {
+            const moreActive = totalMy > totalPartner ? myName : partnerName;
+            developmentTrait = "Dua Bintang Penjaga";
+            traitDescription = `Juro sangat bersyukur dijaga oleh dua perawat, dengan ${moreActive} yang saat ini paling aktif menemani.`;
+          }
+        } else {
+          developmentTrait = "Kemitraan Hangat";
+          traitDescription = `Juro menyadari ia memiliki dua perawat (${myName} dan ${partnerName}) dan selalu menantikan momen bersama keduanya.`;
+        }
+      } else {
+        const totalCare = feedCount + playCount + bathCount + petCount;
+        if (totalCare >= 2) {
+          if (feedCount >= playCount && feedCount >= bathCount && feedCount >= petCount) {
+            developmentTrait = "Gourmet Jeli";
+            traitDescription = `Juro tumbuh lahap dan gembul, sangat menantikan suapan camilan lezat dari ${myName}.`;
+          } else if (playCount >= feedCount && playCount >= bathCount && playCount >= petCount) {
+            developmentTrait = "Akrobatik Ceria";
+            traitDescription = `Juro tumbuh sangat lincah dan berenergi tinggi karena sering diajak bermain oleh ${myName}.`;
+          } else if (petCount >= feedCount && petCount >= playCount && petCount >= bathCount) {
+            developmentTrait = "Manja Penuh Kasih";
+            traitDescription = `Juro tumbuh sangat lekat dan hangat, selalu mendambakan elusan lembut dari ${myName}.`;
+          } else if (bathCount >= feedCount && bathCount >= playCount && bathCount >= petCount) {
+            developmentTrait = "Pusaka Berkilau";
+            traitDescription = `Juro tumbuh bersih bercahaya dan selalu segar berkat ketelatenan ${myName}.`;
+          }
+        }
+      }
+
+      const recent = activityLogs
+        .slice(0, 3)
+        .map((l) => `${l.caregiverName} (${l.actionType})`)
+        .join(", ");
+      const recentSummary = recent.length > 0 ? recent : "Belum ada catatan asuhan";
+
+      return {
+        caregiverCount,
+        myCaregiverName: myName,
+        partnerCaregiverName: partnerName,
+        totalMyActions: totalMy,
+        totalPartnerActions: totalPartner,
+        developmentTrait,
+        traitDescription,
+        recentSummary,
+      };
+    },
+
     initRealtimeSubscription: () => {
       const { activeRoomCode, myProfile } = get();
       if (!activeRoomCode || !myProfile) return;
@@ -288,7 +379,14 @@ export const useCaregiverStore = create<CaregiverState>((set, get) => {
         },
 
         onPartnerStatusChange: (partner) => {
+          const prevPartner = get().partnerProfile;
           set({ partnerProfile: partner });
+          if (partner && (!prevPartner || prevPartner.id !== partner.id)) {
+            addPetMemory(
+              `Juro memiliki 2 perawat yang merawatnya bersama: ${get().myProfile?.name} dan ${partner.name}.`,
+              "profile"
+            );
+          }
         },
 
         onActivityLogAdded: (newLog) => {

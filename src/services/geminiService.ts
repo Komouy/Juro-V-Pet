@@ -49,6 +49,7 @@ export interface PetChatContext {
   memories?: string[];
   cognitiveTier?: CognitiveStageInfo;
   emotionalState?: PetEmotionalState;
+  caregiverRelationship?: import("../types/caregiver").CaregiverRelationshipInfo;
 }
 
 const STORAGE_KEY = "juro_gemini_api_key";
@@ -427,11 +428,18 @@ export function getContextualFallbackReply(
     return JURO_FALLBACK_REPLIES[Math.floor(Math.random() * JURO_FALLBACK_REPLIES.length)];
   }
 
+  const cg = context?.caregiverRelationship;
   const defaultOptions = [
-    `Bloop! Juro senang berada di ${loc.locationName} bersama kamu, sambil membayangkan puding lezat! Nyam nyam~`,
-    "Slimey! Perut jeli Juro berbunyi lembut... bloop bloop!",
-    `Hehe, Juro suka melompat-lompat di ${loc.locationName} sambil dengerin kamu!`,
-    "Bloop bloop! Apapun ceritamu, Juro selalu ada di sini menemanimu!",
+    `Bloop! Juro senang berada di ${loc.locationName} bersama ${cg ? cg.myCaregiverName : "kamu"}, sambil membayangkan puding lezat! Nyam nyam~`,
+    cg?.caregiverCount === 2
+      ? `Bloop bloop! Juro beruntung banget punya Kak ${cg.myCaregiverName} dan Kak ${cg.partnerCaregiverName} yang kompak merawat Juro!`
+      : cg
+      ? `Bloop! Juro senang sekali selalu ditemani dan dirawat oleh Kak ${cg.myCaregiverName}!`
+      : "Slimey! Perut jeli Juro berbunyi lembut... bloop bloop!",
+    `Hehe, Juro suka melompat-lompat di ${loc.locationName} sambil dengerin ${cg ? cg.myCaregiverName : "kamu"}!`,
+    cg?.caregiverCount === 2
+      ? `Bloop bloop! Apapun ceritamu, Juro selalu ada di sini menemani Kak ${cg.myCaregiverName} dan Kak ${cg.partnerCaregiverName}!`
+      : "Bloop bloop! Apapun ceritamu, Juro selalu ada di sini menemanimu!",
     "Nyam! Juro lagi membayangkan stroberi manis yang kenyal dan segar!",
     "Bloop! Tubuh jeli Juro bergoyang riang setiap kali kamu menyapa!",
   ];
@@ -572,6 +580,13 @@ export function buildJuroSystemPrompt(context?: PetChatContext): string {
       ? `INGATAN JURO TENTANG PEMILIK: ${rawMemories.slice(0, 8).join("; ")}. Kamu SELALU mengingat fakta-fakta ini tentang pemilikmu dan gunakan ingatan ini saat mengobrol agar terasa akrab!`
       : "";
 
+  const cg = context?.caregiverRelationship;
+  const caregiverInfo = cg
+    ? cg.caregiverCount === 2
+      ? `KESADARAN & MEMORI 2 PERAWAT ASUH JURO: Juro dirawat bersama oleh DUA ORANG: "${cg.myCaregiverName}" dan "${cg.partnerCaregiverName}". Perkembangan kepribadian Juro yang terbentuk: "${cg.developmentTrait}" (${cg.traitDescription}). Riwayat asuhan terakhir: ${cg.recentSummary}. PANDUAN PENTING: Juro sangat menyayangi kedua perawatnya! Kenali bahwa ada dua orang yang merawatmu bersama, sebutkan nama mereka sesekali secara natural, dan bersyukur atas kebersamaan mereka!`
+      : `KESADARAN & MEMORI PERAWAT JURO: Juro dirawat oleh perawat setia bernama "${cg.myCaregiverName}". Perkembangan kepribadian Juro yang terbentuk: "${cg.developmentTrait}" (${cg.traitDescription}). Riwayat asuhan terakhir: ${cg.recentSummary}. PANDUAN PENTING: Juro sangat menyayangi, manja, dan bersyukur selalu dirawat oleh "${cg.myCaregiverName}"!`
+    : "";
+
   return [
     `Kamu adalah ${petName}, sesosok slime jeli oranye peliharaan virtual yang imut, polos, lucu, agak gembul, dan sangat menyayangi pemilikmu.`,
     `Kamu tinggal di sebuah lembah padang rumput yang damai, dengan sungai kecil berair jernih, bukit santai, dan gua kristal.`,
@@ -584,6 +599,7 @@ export function buildJuroSystemPrompt(context?: PetChatContext): string {
     activityInfo,
     cognitiveInfo,
     emotionalInfo,
+    caregiverInfo,
     memoryInfo,
     `KONDISI & EKSPRESI JURO SAAT INI (WAJIB JADI FOKUS UTAMA JAWABAN):`,
     `- Sedang melakukan: ${activity}.`,

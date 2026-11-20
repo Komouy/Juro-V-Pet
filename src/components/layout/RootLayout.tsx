@@ -3,6 +3,8 @@ import { Outlet, useLocation } from "react-router-dom";
 import { Navbar } from "./Navbar";
 import { MobileNav } from "./MobileNav";
 import { PixelToast } from "../ui/PixelToast";
+import { CaregiverHubModal } from "../caregiver/CaregiverHubModal";
+import { useCaregiverStore } from "../../stores/caregiverStore";
 import { soundEffects } from "../../engine/audio/soundEffects";
 import { isBedtimeHour } from "../../utils/timeOfDay";
 
@@ -11,6 +13,7 @@ const SUB_ROUTES = new Set(["/shop", "/mine", "/collection", "/evolution", "/set
 export const RootLayout: React.FC = () => {
   const location = useLocation();
   const isHome = !SUB_ROUTES.has(location.pathname);
+  const { isHubModalOpen, closeHubModal } = useCaregiverStore();
 
   // Seamless procedural retro BGM switching per page/environment
   useEffect(() => {
@@ -34,6 +37,7 @@ export const RootLayout: React.FC = () => {
     >
       <Navbar />
       <PixelToast />
+      <CaregiverHubModal isOpen={isHubModalOpen} onClose={closeHubModal} />
       <div
         className={`flex-1 flex flex-col w-full ${
           isHome ? "min-h-0 pb-15 md:pb-0" : "pb-20 md:pb-8"

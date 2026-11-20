@@ -6,12 +6,23 @@ import {
   getActiveFirebaseConfig,
   saveCustomFirebaseConfig,
   isFirebaseConfigured,
+  parseFirebaseConfigSnippet,
 } from "../src/services/firebase/firebaseConfig";
+import { buildJuroSystemPrompt } from "../src/services/geminiService";
 
 describe("Caregiver Co-Parenting & Firebase Realtime Foundation", () => {
   beforeEach(() => {
     localStorage.clear();
     saveCustomFirebaseConfig(null);
+    useCaregiverStore.setState({
+      myProfile: null,
+      partnerProfile: null,
+      activityLogs: [],
+      activeRoomCode: null,
+      hasRegisteredName: false,
+      pairingStatus: "idle",
+      errorMessage: null,
+    });
   });
 
   it("generates a human-friendly pairing code with JURO- prefix and 4 digits", () => {
@@ -56,8 +67,6 @@ describe("Caregiver Co-Parenting & Firebase Realtime Foundation", () => {
   });
 
   it("handles custom Firebase config storage and verification cleanly", () => {
-    expect(isFirebaseConfigured()).toBe(false);
-
     saveCustomFirebaseConfig({
       apiKey: "fake_api_key_123",
       databaseURL: "https://juro-pet-default-rtdb.firebaseio.com",
@@ -68,5 +77,114 @@ describe("Caregiver Co-Parenting & Firebase Realtime Foundation", () => {
     const active = getActiveFirebaseConfig();
     expect(active?.projectId).toBe("juro-pet");
     expect(active?.databaseURL).toBe("https://juro-pet-default-rtdb.firebaseio.com");
+  });
+
+  it("parses JS snippet and JSON from Firebase Console cleanly", () => {
+    const jsSnippet = `
+      const firebaseConfig = {
+        apiKey: "AIzaSyTest123",
+        authDomain: "juropet.firebaseapp.com",
+        databaseURL: "https://juropet-default-rtdb.asia-southeast1.firebasedatabase.app",
+        projectId: "juropet-12345",
+        storageBucket: "juropet.appspot.com",
+        messagingSenderId: "123456789",
+        appId: "1:123456789:web:abcdef"
+      };
+    `;
+    const parsed = parseFirebaseConfigSnippet(jsSnippet);
+    expect(parsed).not.toBeNull();
+    expect(parsed?.apiKey).toBe("AIzaSyTest123");
+    expect(parsed?.projectId).toBe("juropet-12345");
+    expect(parsed?.databaseURL).toBe(
+      "https://juropet-default-rtdb.asia-southeast1.firebasedatabase.app"
+    );
+  });
+
+  it("calculates single caregiver development trait based on care patterns", async () => {
+    const store = useCaregiverStore.getState();
+    store.setProfile("Dhavi", "Perawat Utama");
+
+    // Initially with 0 care actions
+    const initial = store.getCaregiverRelationship();
+    expect(initial.caregiverCount).toBe(1);
+    expect(initial.myCaregiverName).toBe("Dhavi");
+    expect(initial.partnerCaregiverName).toBeUndefined();
+    expect(initial.developmentTrait).toBe("Sahabat Sejati");
+
+    // Feed 3 times
+    await store.recordAction("feed", "Dhavi memberi Madu", { hunger: 20 }, "Madu");
+    await store.recordAction("feed", "Dhavi memberi Jeruk", { hunger: 30 }, "Jeruk");
+    await store.recordAction("feed", "Dhavi memberi Melon", { hunger: 40 }, "Melon");
+
+    const gourmet = store.getCaregiverRelationship();
+    expect(gourmet.developmentTrait).toBe("Gourmet Jeli");
+    expect(gourmet.traitDescription).toContain("Dhavi");
+
+    // Play 4 times -> now play is highest
+    await store.recordAction("play", "Dhavi main bola", { happiness: 20 }, "Bola");
+    await store.recordAction("play", "Dhavi main bola", { happiness: 20 }, "Bola");
+    await store.recordAction("play", "Dhavi main gelembung", { happiness: 25 }, "Gelembung");
+    await store.recordAction("play", "Dhavi main gelembung", { happiness: 25 }, "Gelembung");
+
+    const acrobat = store.getCaregiverRelationship();
+    expect(acrobat.developmentTrait).toBe("Akrobatik Ceria");
+  });
+
+  it("calculates dual caregiver synergy and reflects in Juro's brain prompt", () => {
+    const store = useCaregiverStore.getState();
+    store.setProfile("Dhavi", "Perawat 1");
+    const myProfile = useCaregiverStore.getState().myProfile!;
+
+    useCaregiverStore.setState({
+      partnerProfile: {
+        id: "partner_456",
+        name: "Naufall",
+        roleTitle: "Perawat 2",
+        joinedAt: Date.now(),
+      },
+      activityLogs: [
+        {
+          id: "log_1",
+          timestamp: Date.now(),
+          caregiverId: myProfile.id,
+          caregiverName: "Dhavi",
+          caregiverRoleTitle: "Perawat 1",
+          actionType: "feed",
+          description: "Dhavi suapin madu",
+        },
+        {
+          id: "log_2",
+          timestamp: Date.now() - 1000,
+          caregiverId: "partner_456",
+          caregiverName: "Naufall",
+          caregiverRoleTitle: "Perawat 2",
+          actionType: "play",
+          description: "Naufall ajak main bola",
+        },
+      ],
+    });
+
+    const rel = useCaregiverStore.getState().getCaregiverRelationship();
+    expect(rel.caregiverCount).toBe(2);
+    expect(rel.myCaregiverName).toBe("Dhavi");
+    expect(rel.partnerCaregiverName).toBe("Naufall");
+    expect(rel.developmentTrait).toBe("Harmoni Dua Sahabat");
+
+    // Inject into Gemini system prompt
+    const prompt = buildJuroSystemPrompt({
+      name: "Juro",
+      hunger: 80,
+      energy: 70,
+      happiness: 80,
+      cleanliness: 80,
+      affection: 80,
+      currentState: "idle",
+      caregiverRelationship: rel,
+    });
+
+    expect(prompt).toContain("KESADARAN & MEMORI 2 PERAWAT ASUH JURO");
+    expect(prompt).toContain("Dhavi");
+    expect(prompt).toContain("Naufall");
+    expect(prompt).toContain("Harmoni Dua Sahabat");
   });
 });

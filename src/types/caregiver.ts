@@ -90,3 +90,18 @@ export interface JuroPairingRoomData {
   };
   activityLogs?: Record<string, CaregiverActionLog>;
 }
+
+/**
+ * Ringkasan dinamika pengasuhan & perkembangan adaptif Juro (1 atau 2 perawat)
+ */
+export interface CaregiverRelationshipInfo {
+  caregiverCount: 1 | 2;
+  myCaregiverName: string;
+  partnerCaregiverName?: string;
+  totalMyActions: number;
+  totalPartnerActions: number;
+  developmentTrait: string;
+  traitDescription: string;
+  recentSummary: string;
+}
+

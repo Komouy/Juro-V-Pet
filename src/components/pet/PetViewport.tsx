@@ -16,6 +16,8 @@ import { Heart, CloudRain, Sun, Moon } from "lucide-react";
 import { usePetStore } from "../../stores/petStore";
 import { useGameStore } from "../../stores/gameStore";
 import { useUIStore } from "../../stores/uiStore";
+import { useCaregiverStore } from "../../stores/caregiverStore";
+import { CaregiverOnboardingModal } from "../caregiver/CaregiverOnboardingModal";
 import { SHOP_FOODS } from "../../data/economyCatalog";
 import { soundEffects } from "../../engine/audio/soundEffects";
 import {
@@ -89,6 +91,7 @@ export const PetViewport: React.FC = () => {
   const weather = useUIStore((s) => s.weather);
   const toggleWeather = useUIStore((s) => s.toggleWeather);
   const showToast = useUIStore((s) => s.showToast);
+  const hasRegisteredName = useCaregiverStore((s) => s.hasRegisteredName);
 
   const [activeTray, setActiveTray] = useState<ActiveTray>("none");
   const [showStatDetails, setShowStatDetails] = useState(false);
@@ -416,6 +419,7 @@ export const PetViewport: React.FC = () => {
         isSpontaneous,
         cognitiveTier,
         emotionalState,
+        caregiverRelationship: useCaregiverStore.getState().getCaregiverRelationship(),
         locationName: loc.locationName,
         locationDescription: loc.locationDescription,
         ambientDescription: ambient,
@@ -732,6 +736,11 @@ export const PetViewport: React.FC = () => {
         petStrokeCountRef.current += 1;
         if (petStrokeCountRef.current >= 4) {
           petStrokeCountRef.current = 0;
+          useCaregiverStore.getState().recordAction(
+            "pet",
+            "Mengelus lembut tubuh jeli Juro dengan hangat.",
+            { affection: 6, happiness: 4 }
+          );
           triggerInteractionSpeech("pet");
         }
 
@@ -883,6 +892,12 @@ export const PetViewport: React.FC = () => {
         "feed",
         `Memberikan ${food.name} kepada Juro. (+${food.hungerRestore} Lapar, +${food.xpReward} XP)`
       );
+      useCaregiverStore.getState().recordAction(
+        "feed",
+        `Memberikan ${food.name} kepada Juro.`,
+        { hunger: food.hungerRestore, happiness: food.happinessGain },
+        food.name
+      );
       setActiveTray("none");
       triggerInteractionSpeech("feed", { food });
     },
@@ -900,6 +915,12 @@ export const PetViewport: React.FC = () => {
         "play",
         `${actionVerb} ${toy.name}. (+${toy.happinessGain} Bahagia, +${toy.xpReward} XP)`
       );
+      useCaregiverStore.getState().recordAction(
+        "play",
+        `${actionVerb} ${toy.name} bersama Juro.`,
+        { happiness: toy.happinessGain, energy: -toy.energyCost },
+        toy.name
+      );
       setActiveTray("none");
       triggerInteractionSpeech("play", { toy });
     },
@@ -913,6 +934,11 @@ export const PetViewport: React.FC = () => {
     soundEffects.playSparkle();
     soundEffects.playHappy();
     addLog("clean", "Juro selesai disabuni dan dibilas hingga bersih berkilau!");
+    useCaregiverStore.getState().recordAction(
+      "bath",
+      "Memandikan dan membilas Juro hingga bersih berkilau dan wangi!",
+      { cleanliness: 35, happiness: 8 }
+    );
     hadMeaningfulSoapRef.current = false;
     setSoapBadgePercent(0);
     triggerInteractionSpeech("bath_rinse");
@@ -1192,6 +1218,11 @@ export const PetViewport: React.FC = () => {
       sleep();
       soundEffects.playSleep();
       addLog("sleep", "Juro sampai di sofa tidurnya dan mulai tidur lelap. Zzz...");
+      useCaregiverStore.getState().recordAction(
+        "sleep",
+        "Menidurkan Juro di sofa empuk untuk beristirahat.",
+        { energy: 35 }
+      );
     }
   }, [sleep, addLog]);
 
@@ -1247,12 +1278,22 @@ export const PetViewport: React.FC = () => {
       wakeUp();
       soundEffects.playWakeUp();
       addLog("interaction", "Juro dibangunkan dari sofa tidurnya.");
+      useCaregiverStore.getState().recordAction(
+        "wake",
+        "Membangunkan Juro dari sofa tidurnya.",
+        {}
+      );
       wakeCooldownUntilRef.current = Date.now() + 180_000;
       isHeadingToBedRef.current = false;
     } else {
       isHeadingToBedRef.current = true;
       setWalkCommand({ x: JURO_BED_POS.x, z: JURO_BED_POS.z, nonce: Date.now() });
       addLog("sleep", "Juro berjalan menuju sofa untuk tidur lelap.");
+      useCaregiverStore.getState().recordAction(
+        "sleep",
+        "Menuntun Juro tidur di sofa empuk.",
+        { energy: 35 }
+      );
       soundEffects.playClick();
     }
   }, [currentState, wakeUp, addLog, isSittingOnBench]);
@@ -1265,12 +1306,22 @@ export const PetViewport: React.FC = () => {
       wakeUp();
       soundEffects.playWakeUp();
       addLog("interaction", "Juro terbangun segar dari tidurnya!");
+      useCaregiverStore.getState().recordAction(
+        "wake",
+        "Membangunkan Juro dari tidurnya.",
+        {}
+      );
       wakeCooldownUntilRef.current = Date.now() + 180_000;
       isHeadingToBedRef.current = false;
     } else {
       isHeadingToBedRef.current = true;
       setWalkCommand({ x: JURO_BED_POS.x, z: JURO_BED_POS.z, nonce: Date.now() });
       addLog("sleep", "Juro berjalan menuju sofa untuk tidur lelap.");
+      useCaregiverStore.getState().recordAction(
+        "sleep",
+        "Menuntun Juro tidur di sofa empuk.",
+        { energy: 35 }
+      );
       soundEffects.playClick();
     }
     setActiveTray("none");
@@ -1754,6 +1805,8 @@ export const PetViewport: React.FC = () => {
           </div>
         </div>
       )}
+      {/* Mandatory Onboarding Name Modal for New Caregiver */}
+      {!hasRegisteredName && <CaregiverOnboardingModal />}
     </div>
   );
 };

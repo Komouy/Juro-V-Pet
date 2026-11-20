@@ -1,10 +1,11 @@
 import React from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { Settings, Sun, Moon, Volume2, VolumeX, RotateCcw } from "lucide-react";
+import { Settings, Sun, Moon, Volume2, VolumeX, RotateCcw, Users } from "lucide-react";
 import { IconButton } from "../ui/IconButton";
 import { soundEffects } from "../../engine/audio/soundEffects";
 import { useUIStore } from "../../stores/uiStore";
 import { useGameStore } from "../../stores/gameStore";
+import { useCaregiverStore } from "../../stores/caregiverStore";
 
 const NAV_LINKS = [
   { path: "/", label: "Home" },
@@ -17,6 +18,7 @@ export const Navbar: React.FC = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const { theme, soundEnabled, toggleTheme, toggleSound, triggerCameraReset } = useUIStore();
+  const { myProfile, partnerProfile, openHubModal } = useCaregiverStore();
   const hasCrystals = useGameStore(
     (s) =>
       (s.crystals.quartz ?? 0) +
@@ -100,7 +102,29 @@ export const Navbar: React.FC = () => {
         </div>
 
         {/* Action Controls */}
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5 sm:gap-2">
+          {/* Caregiver Hub Button */}
+          <button
+            type="button"
+            onClick={() => {
+              soundEffects.playClick();
+              openHubModal();
+            }}
+            className="flex items-center gap-1 sm:gap-1.5 px-2 sm:px-2.5 py-1 border-2 border-charcoal dark:border-neutral-600 bg-amber-50 dark:bg-neutral-800 text-charcoal dark:text-neutral-100 shadow-[2px_2px_0px_#171717] dark:shadow-[2px_2px_0px_#000000] hover:bg-amber-100 dark:hover:bg-neutral-700 active:translate-x-[1px] active:translate-y-[1px] cursor-pointer transition-colors"
+            title="Buku Asuh & Kemitraan 2 Perawat"
+            aria-label="Buka Hub Perawat Juro"
+          >
+            <Users size={13} className="text-juro-orange" />
+            <span className="pixel-text text-[9px] uppercase font-bold tracking-tight max-w-[64px] sm:max-w-none truncate">
+              {myProfile?.name || "Perawat"}
+            </span>
+            {partnerProfile && (
+              <span className="px-1 py-0.2 bg-emerald-500 text-white pixel-text text-[7px] uppercase font-bold border border-charcoal">
+                2P
+              </span>
+            )}
+          </button>
+
           <IconButton
             icon={RotateCcw}
             label="Reset sudut pandang kamera"
