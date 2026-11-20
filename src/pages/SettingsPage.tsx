@@ -76,7 +76,7 @@ export const SettingsPage: React.FC = () => {
   };
 
   const APK_DOWNLOAD_URL =
-    "https://github.com/Komouy/Juro-V-Pet/releases/latest/download/Juro-Virtual-Pet.apk";
+    "https://github.com/Komouy/Juro-V-Pet/releases/download/latest/Juro-Virtual-Pet.apk";
   const RELEASES_PAGE_URL = "https://github.com/Komouy/Juro-V-Pet/releases";
 
   const handleDownloadApk = () => {
