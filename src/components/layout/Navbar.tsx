@@ -185,7 +185,6 @@ export const Navbar: React.FC = () => {
                 <span className="pixel-text text-[8px] uppercase font-bold text-neutral-400">
                   Menu & Opsi
                 </span>
-                <span className="pixel-text text-[8px] text-neutral-400">ESC untuk tutup</span>
               </div>
 
               {/* Item 1: Reset Sudut Kamera */}
@@ -200,7 +199,7 @@ export const Navbar: React.FC = () => {
                 <div className="flex items-center gap-2.5 min-w-0">
                   <RotateCcw size={14} className="text-juro-orange shrink-0" />
                   <span className="pixel-text text-[9.5px] uppercase font-bold text-charcoal dark:text-white truncate">
-                    Reset Kamera 3D
+                    Reset Kamera
                   </span>
                 </div>
               </button>
@@ -248,9 +247,6 @@ export const Navbar: React.FC = () => {
                     Tema Tampilan
                   </span>
                 </div>
-                <span className="pixel-text text-[8px] uppercase font-bold px-1.5 py-0.5 border border-charcoal bg-neutral-100 dark:bg-neutral-800 text-charcoal dark:text-white">
-                  {theme === "dark" ? "Gelap" : "Terang"}
-                </span>
               </button>
 
               <div className="border-t border-charcoal/20 dark:border-neutral-700 my-0.5" />
