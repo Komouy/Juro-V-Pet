@@ -7,6 +7,7 @@ import { usePetStore } from "../stores/petStore";
 import { useUIStore } from "../stores/uiStore";
 import { soundEffects } from "../engine/audio/soundEffects";
 import { persistenceService } from "../services/persistenceService";
+import { notificationService } from "../services/notificationService";
 import {
   User,
   Sliders,
@@ -16,6 +17,7 @@ import {
   Upload,
   Database,
   Settings,
+  Bell,
 } from "lucide-react";
 
 export const SettingsPage: React.FC = () => {
@@ -24,6 +26,8 @@ export const SettingsPage: React.FC = () => {
   const [draftName, setDraftName] = useState<string | null>(null);
   const [savedSuccess, setSavedSuccess] = useState(false);
   const [confirmingReset, setConfirmingReset] = useState(false);
+  const [notifEnabled, setNotifEnabled] = useState(() => notificationService.isEnabled());
+  const [testingNotif, setTestingNotif] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const savedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -33,6 +37,40 @@ export const SettingsPage: React.FC = () => {
       if (savedTimerRef.current) clearTimeout(savedTimerRef.current);
     };
   }, []);
+
+  const handleToggleNotifications = async () => {
+    if (!notifEnabled) {
+      const granted = await notificationService.requestPermission();
+      if (granted) {
+        setNotifEnabled(true);
+        notificationService.setEnabled(true);
+        soundEffects.playSuccess();
+        showToast("Notifikasi diaktifkan", "success");
+      } else {
+        soundEffects.playWarning();
+        showToast("Izin notifikasi belum diberikan di perangkat", "warn");
+      }
+    } else {
+      setNotifEnabled(false);
+      notificationService.setEnabled(false);
+      soundEffects.playDismiss();
+      showToast("Notifikasi dinonaktifkan", "info");
+    }
+  };
+
+  const handleTestNotification = async () => {
+    setTestingNotif(true);
+    const success = await notificationService.sendTestNotification();
+    setTestingNotif(false);
+    if (success) {
+      setNotifEnabled(true);
+      soundEffects.playSuccess();
+      showToast("Notifikasi tes terkirim!", "success");
+    } else {
+      soundEffects.playWarning();
+      showToast("Izin notifikasi belum diizinkan", "warn");
+    }
+  };
 
   const petNameInput = draftName ?? name;
   const trimmedName = petNameInput.trim();
@@ -155,6 +193,34 @@ export const SettingsPage: React.FC = () => {
               checked={soundEnabled}
               onChange={toggleSound}
             />
+          </div>
+        </Card>
+
+        {/* Notifications & Reminders */}
+        <Card shadowOffset="sm" className="p-4 md:col-span-2 space-y-3.5">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <h2 className="pixel-text text-[11px] text-charcoal dark:text-white uppercase flex items-center gap-2">
+              <Bell size={13} strokeWidth={2.5} className="text-juro-orange" />
+              <span>Notifikasi & Pengingat Asuh</span>
+            </h2>
+            <Button
+              label={testingNotif ? "Mengirim..." : "Tes Notifikasi"}
+              size="sm"
+              variant="secondary"
+              disabled={testingNotif}
+              onClick={handleTestNotification}
+            />
+          </div>
+
+          <div className="pt-2 border-t border-charcoal/10 dark:border-neutral-700 space-y-2">
+            <PixelSwitch
+              label="Aktifkan Notifikasi Pengingat"
+              checked={notifEnabled}
+              onChange={handleToggleNotifications}
+            />
+            <p className="pixel-text text-[8.5px] text-neutral-500 dark:text-neutral-400 leading-relaxed">
+              Kirimkan pemberitahuan saat Juro membutuhkan perhatian (lapar, mengantuk, atau kotor) serta saat pasangan perawat merawat Juro ketika aplikasi sedang diminimalkan.
+            </p>
           </div>
         </Card>
 

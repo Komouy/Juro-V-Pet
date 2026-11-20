@@ -12,6 +12,7 @@ import { useGameStore } from "./gameStore";
 import { useUIStore } from "./uiStore";
 import { soundEffects } from "../engine/audio/soundEffects";
 import { addPetMemory } from "../services/petMemoryService";
+import { notificationService } from "../services/notificationService";
 
 const PROFILE_STORAGE_KEY = "juro_caregiver_profile";
 const ROOM_STORAGE_KEY = "juro_caregiver_room";
@@ -472,6 +473,11 @@ export const useCaregiverStore = create<CaregiverState>((set, get) => {
             useUIStore.getState().showToast(
               `${newLog.caregiverName}: ${newLog.description}`,
               "info"
+            );
+            // Kirim notifikasi sistem ke perangkat / browser
+            notificationService.notifyPartnerAction(
+              newLog.caregiverName,
+              newLog.description
             );
           }
         },
