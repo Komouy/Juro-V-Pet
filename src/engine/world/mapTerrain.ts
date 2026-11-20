@@ -51,7 +51,7 @@ export const MAP_OBSTACLES: SolidObstacle[] = [
   { x: 3.84, z: 1.13, radius: 0.24, topY: BASE_GROUND_Y + 0.82, tag: "bench" },
 
   // Bouncy Mushroom Trampoline in South-West Meadow
-  { x: -1.75, z: 1.25, radius: 0.44, topY: BASE_GROUND_Y + 0.55, tag: "trampoline" },
+  { x: -1.75, z: 1.25, radius: 0.50, topY: BASE_GROUND_Y + 0.44, tag: "trampoline" },
 
   // West Knoll Sofa Bed Frame (Backrest, Armrests & Nightstand)
   { x: -3.88, z: -0.52, radius: 0.24, topY: BASE_GROUND_Y + 0.85, tag: "bed-frame" }, // Nightstand & Lamp
@@ -139,7 +139,7 @@ export const JURO_BENCH_POS = {
 export const JURO_TRAMPOLINE_POS = {
   x: -1.75,
   z: 1.25,
-  surfaceY: BASE_GROUND_Y + 0.36,
+  surfaceY: BASE_GROUND_Y + 0.42,
   label: "Trampolin Jamur",
 } as const;
 
@@ -168,8 +168,8 @@ export const MAP_PLATFORMS: ElevatedPlatform[] = [
     kind: "stump",
     x: -1.75,
     z: 1.25,
-    radius: 0.44,
-    height: 0.36,
+    radius: 0.50,
+    height: 0.42,
     label: "Trampolin Jamur",
   },
   {
@@ -426,7 +426,8 @@ export function pickScenicWaypoint(bias?: "water" | "bed" | "food" | "bench" | "
   // 35% chance to specifically visit an elevated platform or stump
   const roll = Math.random();
   if (roll < 0.35) {
-    const platform = MAP_PLATFORMS[Math.floor(Math.random() * MAP_PLATFORMS.length)];
+    const eligiblePlatforms = MAP_PLATFORMS.filter((p) => p.id !== "mushroom-trampoline");
+    const platform = eligiblePlatforms[Math.floor(Math.random() * eligiblePlatforms.length)];
     for (let attempt = 0; attempt < 12; attempt++) {
       const angle = Math.random() * Math.PI * 2;
       const r = Math.random() * platform.radius * 0.55;

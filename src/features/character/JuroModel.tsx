@@ -329,6 +329,9 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
     const isBenchTarget =
       Boolean(isHeadingToBenchRef?.current) ||
       Math.hypot(rawX - JURO_BENCH_POS.x, rawZ - JURO_BENCH_POS.z) < 0.25;
+    const isTrampolineTarget =
+      Boolean(isHeadingToTrampolineRef?.current) ||
+      Math.hypot(rawX - JURO_TRAMPOLINE_POS.x, rawZ - JURO_TRAMPOLINE_POS.z) < 0.35;
 
     let targetX = rawX;
     let targetZ = rawZ;
@@ -339,6 +342,9 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
     } else if (isBenchTarget) {
       targetX = JURO_BENCH_POS.x;
       targetZ = JURO_BENCH_POS.z;
+    } else if (isTrampolineTarget) {
+      targetX = JURO_TRAMPOLINE_POS.x;
+      targetZ = JURO_TRAMPOLINE_POS.z;
     } else {
       const rawSurface = getTerrainHeightAt(rawX, rawZ);
       const safeTarget = resolveHorizontalCollisions(
@@ -348,19 +354,24 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
         JURO_COLLISION_RADIUS,
         true,
         false,
+        false,
         false
       );
       targetX = safeTarget.x;
       targetZ = safeTarget.z;
     }
 
-    const ty = isBenchTarget ? JURO_BENCH_POS.seatY : getTerrainHeightAt(targetX, targetZ);
+    const ty = isBenchTarget
+      ? JURO_BENCH_POS.seatY
+      : isTrampolineTarget
+      ? JURO_TRAMPOLINE_POS.surfaceY
+      : getTerrainHeightAt(targetX, targetZ);
     fsm.wanderTarget.set(targetX, ty, targetZ);
     fsm.transitionTo("wander", true);
-    fsm.stateDuration = isBedTarget || isBenchTarget ? 24.0 : 9.0;
+    fsm.stateDuration = isBedTarget || isBenchTarget || isTrampolineTarget ? 24.0 : 9.0;
     fsm.timeInState = 0;
     setBehaviorState("wander");
-  }, [walkCommand, fsm, setBehaviorState, isHeadingToBedRef, isHeadingToBenchRef]);
+  }, [walkCommand, fsm, setBehaviorState, isHeadingToBedRef, isHeadingToBenchRef, isHeadingToTrampolineRef]);
 
   // Eye blinking state
   const blinkState = useRef({ timer: 0, nextBlink: 2.5, isBlinking: false });
@@ -726,7 +737,7 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
         spring.position.x - JURO_TRAMPOLINE_POS.x,
         spring.position.z - JURO_TRAMPOLINE_POS.z
       );
-      if (distToTrampoline < 0.38) {
+      if (distToTrampoline < 0.45) {
         spring.position.x = JURO_TRAMPOLINE_POS.x;
         spring.position.z = JURO_TRAMPOLINE_POS.z;
         spring.target.x = JURO_TRAMPOLINE_POS.x;
@@ -1112,40 +1123,32 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
           }
         } else if (isBouncingOnTrampoline) {
           // Bouncy fun on the Mushroom Trampoline!
-          const distToTrampoline = Math.hypot(
-            spring.position.x - JURO_TRAMPOLINE_POS.x,
-            spring.position.z - JURO_TRAMPOLINE_POS.z
-          );
-          if (distToTrampoline > 0.04) {
-            spring.position.x = THREE.MathUtils.lerp(spring.position.x, JURO_TRAMPOLINE_POS.x, 0.2);
-            spring.position.z = THREE.MathUtils.lerp(spring.position.z, JURO_TRAMPOLINE_POS.z, 0.2);
-          } else {
-            spring.position.x = JURO_TRAMPOLINE_POS.x;
-            spring.position.z = JURO_TRAMPOLINE_POS.z;
-          }
+          // Strictly lock Juro centered atop the mushroom cap
+          spring.position.x = JURO_TRAMPOLINE_POS.x;
+          spring.position.z = JURO_TRAMPOLINE_POS.z;
           spring.target.x = JURO_TRAMPOLINE_POS.x;
           spring.target.z = JURO_TRAMPOLINE_POS.z;
-          spring.velocity.x *= 0.1;
-          spring.velocity.z *= 0.1;
+          spring.velocity.x = 0;
+          spring.velocity.z = 0;
 
           // Spring bounce arc rhythm
           const bouncePhase = Math.sin(t * 7.5);
           const bounceUp = Math.max(0, bouncePhase);
-          const bounceY = JURO_TRAMPOLINE_POS.surfaceY + currentBottomOffset + bounceUp * 0.42;
+          const bounceY = JURO_TRAMPOLINE_POS.surfaceY + currentBottomOffset + bounceUp * 0.48;
           _targetVec.set(JURO_TRAMPOLINE_POS.x, bounceY, JURO_TRAMPOLINE_POS.z);
           spring.setTarget(_targetVec);
 
           // Squash & stretch physics synced with mushroom
           if (bouncePhase < 0) {
             // Impact squash
-            crawlScaleY = 0.78 + bouncePhase * 0.12;
-            crawlScaleX = 1.18 - bouncePhase * 0.08;
-            crawlScaleZ = 1.18 - bouncePhase * 0.08;
+            crawlScaleY = 0.76 + bouncePhase * 0.14;
+            crawlScaleX = 1.18 - bouncePhase * 0.10;
+            crawlScaleZ = 1.18 - bouncePhase * 0.10;
           } else {
             // Airborne stretch
             crawlScaleY = 1.0 + bouncePhase * 0.22;
-            crawlScaleX = 1.0 - bouncePhase * 0.1;
-            crawlScaleZ = 1.0 - bouncePhase * 0.1;
+            crawlScaleX = 1.0 - bouncePhase * 0.10;
+            crawlScaleZ = 1.0 - bouncePhase * 0.10;
           }
 
           if (groupRef.current) {
@@ -1153,7 +1156,7 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
             groupRef.current.rotation.x = THREE.MathUtils.lerp(groupRef.current.rotation.x, 0, 0.08);
             groupRef.current.rotation.z = THREE.MathUtils.lerp(
               groupRef.current.rotation.z,
-              Math.sin(t * 7.5) * 0.08 * motionScale,
+              Math.sin(t * 7.5) * 0.06 * motionScale,
               0.08
             );
           }
@@ -1239,6 +1242,8 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
       (isHeadingToBedRef?.current ?? false);
     const isSittingOrHeadingToBench =
       isSittingOnBench || (isHeadingToBenchRef?.current ?? false);
+    const isBouncingOrHeadingToTrampoline =
+      isBouncingOnTrampoline || (isHeadingToTrampolineRef?.current ?? false);
 
     const postStepCollision = resolveHorizontalCollisions(
       spring.position.x,
@@ -1247,7 +1252,8 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
       JURO_COLLISION_RADIUS,
       jumpRef.current.active,
       isSleepingOrHeading,
-      isSittingOrHeadingToBench
+      isSittingOrHeadingToBench,
+      isBouncingOrHeadingToTrampoline
     );
     if (postStepCollision.hitObstacle) {
       spring.resolveHorizontal(postStepCollision.x, postStepCollision.z, 0.1);
@@ -1370,15 +1376,20 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
       // Scale entire character cleanly to pocket-sized currentPetScale
       scale.multiplyScalar(currentPetScale);
 
-      // Hard terrain collision boundary: keep Juro's bottom resting cleanly on grass/hill/bridge/stump/mattress/bench
+      // Hard terrain collision boundary: keep Juro's bottom resting cleanly on grass/hill/bridge/stump/mattress/bench/trampoline
       const isSleepingOnBed =
         currentState === "sleep" &&
         Math.hypot(spring.position.x - JURO_BED_POS.x, spring.position.z - JURO_BED_POS.z) < 0.85;
       const isSittingOnBenchNear =
         isSittingOnBench &&
         Math.hypot(spring.position.x - JURO_BENCH_POS.x, spring.position.z - JURO_BENCH_POS.z) < 0.65;
+      const isBouncingOnTrampolineNear =
+        isBouncingOnTrampoline &&
+        Math.hypot(spring.position.x - JURO_TRAMPOLINE_POS.x, spring.position.z - JURO_TRAMPOLINE_POS.z) < 0.65;
       const surfaceBaseY = isSittingOnBenchNear
         ? JURO_BENCH_POS.seatY
+        : isBouncingOnTrampolineNear
+        ? JURO_TRAMPOLINE_POS.surfaceY
         : liveSurfaceY + (isSleepingOnBed ? 0.120 : 0);
       const minCenterY = surfaceBaseY + BODY_BOTTOM_LOCAL * scale.y;
       spring.clampFloor(minCenterY, 0.22);
