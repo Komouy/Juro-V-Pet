@@ -1,7 +1,7 @@
 <?xml version='1.0' encoding='utf-8'?>
 <resources>
-    <string name="app_name">Juro V-Pet</string>
-    <string name="title_activity_main">Juro V-Pet</string>
+    <string name="app_name">Juro Virtual Pet</string>
+    <string name="title_activity_main">Juro Virtual Pet</string>
     <string name="package_name">com.jurovpet.app</string>
     <string name="custom_url_scheme">com.jurovpet.app</string>
 </resources>
