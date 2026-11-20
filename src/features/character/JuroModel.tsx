@@ -21,6 +21,7 @@ import {
   MAP_BOUNDS,
   JURO_BED_POS,
   JURO_BENCH_POS,
+  JURO_TRAMPOLINE_POS,
   getTerrainHeightAt,
   resolveHorizontalCollisions,
   isWaterAt,
@@ -41,6 +42,7 @@ const _bathDummy = new THREE.Object3D();
 const _targetVec = new THREE.Vector3();
 const _bedTargetVec = new THREE.Vector3();
 const _benchTargetVec = new THREE.Vector3();
+const _trampolineTargetVec = new THREE.Vector3();
 
 function lerpAngle(current: number, target: number, alpha: number): number {
   let diff = ((target - current + Math.PI) % (Math.PI * 2)) - Math.PI;
@@ -80,6 +82,9 @@ export interface JuroModelProps {
   isHeadingToBenchRef?: React.RefObject<boolean>;
   onBenchArrival?: () => void;
   isSittingOnBench?: boolean;
+  isHeadingToTrampolineRef?: React.RefObject<boolean>;
+  onTrampolineArrival?: () => void;
+  isBouncingOnTrampoline?: boolean;
   isBlowingBubbles?: boolean;
   isDraggingFood?: boolean;
   isRaining?: boolean;
@@ -100,6 +105,9 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
   isHeadingToBenchRef,
   onBenchArrival,
   isSittingOnBench = false,
+  isHeadingToTrampolineRef,
+  onTrampolineArrival,
+  isBouncingOnTrampoline = false,
   isBlowingBubbles = false,
   isDraggingFood = false,
   isRaining = false,
@@ -594,6 +602,20 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
       }
       fsm.stateDuration = 999.0;
       fsm.timeInState = 0;
+    } else if (isHeadingToTrampolineRef?.current) {
+      if (fsm.currentState !== "wander") {
+        fsm.transitionTo("wander", true);
+        setBehaviorState("wander");
+      }
+      fsm.stateDuration = 24.0;
+      fsm.timeInState = 0;
+    } else if (isBouncingOnTrampoline) {
+      if (fsm.currentState !== "happy") {
+        fsm.transitionTo("happy", true);
+        setBehaviorState("happy");
+      }
+      fsm.stateDuration = 999.0;
+      fsm.timeInState = 0;
     } else {
       const activeState = fsm.update(delta, liveAttributes, liveMood);
       if (activeState !== storeState) {
@@ -699,6 +721,21 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
       }
     }
 
+    if (isHeadingToTrampolineRef?.current) {
+      const distToTrampoline = Math.hypot(
+        spring.position.x - JURO_TRAMPOLINE_POS.x,
+        spring.position.z - JURO_TRAMPOLINE_POS.z
+      );
+      if (distToTrampoline < 0.38) {
+        spring.position.x = JURO_TRAMPOLINE_POS.x;
+        spring.position.z = JURO_TRAMPOLINE_POS.z;
+        spring.target.x = JURO_TRAMPOLINE_POS.x;
+        spring.target.z = JURO_TRAMPOLINE_POS.z;
+        spring.velocity.set(0, 0, 0);
+        onTrampolineArrival?.();
+      }
+    }
+
     const currGroundY = getTerrainHeightAt(spring.position.x, spring.position.z);
     const restY = currGroundY + currentBottomOffset;
 
@@ -754,6 +791,12 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
                 JURO_BENCH_POS.x,
                 JURO_BENCH_POS.seatY,
                 JURO_BENCH_POS.z
+              )
+            : isHeadingToTrampolineRef?.current
+            ? _trampolineTargetVec.set(
+                JURO_TRAMPOLINE_POS.x,
+                JURO_TRAMPOLINE_POS.surfaceY,
+                JURO_TRAMPOLINE_POS.z
               )
             : fsm.wanderTarget;
           const dx = currentTarget.x - spring.position.x;
@@ -812,7 +855,9 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
 
             if (aheadGroundY > currGroundY + 0.05 || aheadGroundY < currGroundY - 0.14) {
               const isHeadingSpecial =
-                (isHeadingToBedRef?.current ?? false) || (isHeadingToBenchRef?.current ?? false);
+                (isHeadingToBedRef?.current ?? false) ||
+                (isHeadingToBenchRef?.current ?? false) ||
+                (isHeadingToTrampolineRef?.current ?? false);
               const safeLanding = isHeadingSpecial
                 ? { x: probeX, z: probeZ }
                 : resolveHorizontalCollisions(
@@ -822,7 +867,8 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
                     JURO_COLLISION_RADIUS,
                     true,
                     isHeadingToBedRef?.current ?? false,
-                    isHeadingToBenchRef?.current ?? false
+                    isHeadingToBenchRef?.current ?? false,
+                    isHeadingToTrampolineRef?.current ?? false
                   );
               const landSurfaceY = getTerrainHeightAt(safeLanding.x, safeLanding.z);
               j.active = true;
@@ -844,7 +890,9 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
               const rawNextX = spring.position.x + dirX * step;
               const rawNextZ = spring.position.z + dirZ * step;
               const isHeadingSpecial =
-                (isHeadingToBedRef?.current ?? false) || (isHeadingToBenchRef?.current ?? false);
+                (isHeadingToBedRef?.current ?? false) ||
+                (isHeadingToBenchRef?.current ?? false) ||
+                (isHeadingToTrampolineRef?.current ?? false);
               const resolvedStep = isHeadingSpecial
                 ? { x: rawNextX, z: rawNextZ, hitObstacle: false }
                 : resolveHorizontalCollisions(
@@ -854,7 +902,8 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
                     JURO_COLLISION_RADIUS,
                     false,
                     isHeadingToBedRef?.current ?? false,
-                    isHeadingToBenchRef?.current ?? false
+                    isHeadingToBenchRef?.current ?? false,
+                    isHeadingToTrampolineRef?.current ?? false
                   );
 
               // If grazing an obstacle, add subtle tangential slide so Juro curves around rocks/trees!
@@ -870,7 +919,8 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
                   JURO_COLLISION_RADIUS,
                   false,
                   isHeadingToBedRef?.current ?? false,
-                  isHeadingToBenchRef?.current ?? false
+                  isHeadingToBenchRef?.current ?? false,
+                  isHeadingToTrampolineRef?.current ?? false
                 );
                 finalX = slid.x;
                 finalZ = slid.z;
@@ -1057,6 +1107,53 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
             groupRef.current.rotation.z = THREE.MathUtils.lerp(
               groupRef.current.rotation.z,
               Math.sin(t * 1.6) * 0.015 * motionScale,
+              0.08
+            );
+          }
+        } else if (isBouncingOnTrampoline) {
+          // Bouncy fun on the Mushroom Trampoline!
+          const distToTrampoline = Math.hypot(
+            spring.position.x - JURO_TRAMPOLINE_POS.x,
+            spring.position.z - JURO_TRAMPOLINE_POS.z
+          );
+          if (distToTrampoline > 0.04) {
+            spring.position.x = THREE.MathUtils.lerp(spring.position.x, JURO_TRAMPOLINE_POS.x, 0.2);
+            spring.position.z = THREE.MathUtils.lerp(spring.position.z, JURO_TRAMPOLINE_POS.z, 0.2);
+          } else {
+            spring.position.x = JURO_TRAMPOLINE_POS.x;
+            spring.position.z = JURO_TRAMPOLINE_POS.z;
+          }
+          spring.target.x = JURO_TRAMPOLINE_POS.x;
+          spring.target.z = JURO_TRAMPOLINE_POS.z;
+          spring.velocity.x *= 0.1;
+          spring.velocity.z *= 0.1;
+
+          // Spring bounce arc rhythm
+          const bouncePhase = Math.sin(t * 7.5);
+          const bounceUp = Math.max(0, bouncePhase);
+          const bounceY = JURO_TRAMPOLINE_POS.surfaceY + currentBottomOffset + bounceUp * 0.42;
+          _targetVec.set(JURO_TRAMPOLINE_POS.x, bounceY, JURO_TRAMPOLINE_POS.z);
+          spring.setTarget(_targetVec);
+
+          // Squash & stretch physics synced with mushroom
+          if (bouncePhase < 0) {
+            // Impact squash
+            crawlScaleY = 0.78 + bouncePhase * 0.12;
+            crawlScaleX = 1.18 - bouncePhase * 0.08;
+            crawlScaleZ = 1.18 - bouncePhase * 0.08;
+          } else {
+            // Airborne stretch
+            crawlScaleY = 1.0 + bouncePhase * 0.22;
+            crawlScaleX = 1.0 - bouncePhase * 0.1;
+            crawlScaleZ = 1.0 - bouncePhase * 0.1;
+          }
+
+          if (groupRef.current) {
+            groupRef.current.rotation.y = lerpAngle(groupRef.current.rotation.y, 0, 0.08);
+            groupRef.current.rotation.x = THREE.MathUtils.lerp(groupRef.current.rotation.x, 0, 0.08);
+            groupRef.current.rotation.z = THREE.MathUtils.lerp(
+              groupRef.current.rotation.z,
+              Math.sin(t * 7.5) * 0.08 * motionScale,
               0.08
             );
           }

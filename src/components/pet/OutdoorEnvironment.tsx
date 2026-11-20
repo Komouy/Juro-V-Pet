@@ -5,6 +5,7 @@ import type { TimeThemeConfig } from "../../utils/timeOfDay";
 import { BASE_GROUND_Y, MAP_PLATFORMS } from "../../engine/world/mapTerrain";
 import { PetSofaBed } from "./environment/PetSofaBed";
 import { ParkBench } from "./environment/ParkBench";
+import { BouncyMushroomTrampoline } from "./environment/BouncyMushroomTrampoline";
 import { ShopBuildingLandmark } from "./environment/ShopBuildingLandmark";
 import { MineCaveLandmark } from "./environment/MineCaveLandmark";
 import { PixelRain } from "./environment/PixelRain";
@@ -46,6 +47,12 @@ interface OutdoorEnvironmentProps {
   onStandFromBench?: () => void;
   onCloseBenchMenu?: () => void;
   isSittingOnBench?: boolean;
+  isTrampolineMenuOpen?: boolean;
+  onTrampolineClick?: () => void;
+  onStartBounce?: () => void;
+  onStopBounce?: () => void;
+  onCloseTrampolineMenu?: () => void;
+  isBouncingOnTrampoline?: boolean;
 }
 
 // Reusable scratch objects at module scope (zero GC allocations per frame, 0 lint warnings)
@@ -67,8 +74,16 @@ export const OutdoorEnvironment: React.FC<OutdoorEnvironmentProps> = React.memo(
     onStandFromBench,
     onCloseBenchMenu,
     isSittingOnBench = false,
+    isTrampolineMenuOpen = false,
+    onTrampolineClick,
+    onStartBounce,
+    onStopBounce,
+    onCloseTrampolineMenu,
+    isBouncingOnTrampoline = false,
   }) => {
-    const [hoveredLandmark, setHoveredLandmark] = useState<"none" | "shop" | "mine" | "bed" | "bench">("none");
+    const [hoveredLandmark, setHoveredLandmark] = useState<
+      "none" | "shop" | "mine" | "bed" | "bench" | "trampoline"
+    >("none");
 
     // Signboard textures for interactive 3D Shop ("TOKO") & Mine Cave ("TAMBANG")
     const shopSignTex = useMemo(
@@ -590,7 +605,7 @@ export const OutdoorEnvironment: React.FC<OutdoorEnvironmentProps> = React.memo(
 
         {/* 8. Jumpable Elevated Platforms, Grassy Knolls, Rock Ledge & Tree Stumps (Synced to MAP_PLATFORMS!) */}
         <group onPointerDown={handleGroundPointerDown} onClick={handleGroundClick}>
-          {MAP_PLATFORMS.map((p) => {
+          {MAP_PLATFORMS.filter((p) => p.id !== "mushroom-trampoline").map((p) => {
             if (p.kind === "terrace") {
               return (
                 <group key={p.id} position={[p.x, BASE_GROUND_Y, p.z]}>
@@ -650,6 +665,18 @@ export const OutdoorEnvironment: React.FC<OutdoorEnvironmentProps> = React.memo(
           onSit={onSitOnBench}
           onStand={onStandFromBench}
           onCloseMenu={onCloseBenchMenu}
+        />
+
+        {/* Interactive Bouncy Mushroom Trampoline in South-West Meadow */}
+        <BouncyMushroomTrampoline
+          onTrampolineClick={onTrampolineClick}
+          onHoverChange={(hovered) => setHoveredLandmark(hovered ? "trampoline" : "none")}
+          isHovered={hoveredLandmark === "trampoline"}
+          isBouncing={isBouncingOnTrampoline}
+          isMenuOpen={isTrampolineMenuOpen}
+          onStartBounce={onStartBounce}
+          onStopBounce={onStopBounce}
+          onCloseMenu={onCloseTrampolineMenu}
         />
 
         {/* Interactive 3D Juro Shop Building ("TOKO") on Back-Right Hillside — Click to open /shop! */}

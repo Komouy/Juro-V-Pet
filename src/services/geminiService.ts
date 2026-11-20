@@ -40,6 +40,7 @@ export interface PetChatContext {
   isNightSleepy?: boolean;
   isRaining?: boolean;
   isSittingOnBench?: boolean;
+  isBouncingOnTrampoline?: boolean;
   isInWater?: boolean;
   isSpontaneous?: boolean;
   locationName?: string;
@@ -71,6 +72,7 @@ export const JURO_FALLBACK_REPLIES = [
  */
 export function computePetLocation(context: {
   isSittingOnBench?: boolean;
+  isBouncingOnTrampoline?: boolean;
   isInWater?: boolean;
   isSleeping?: boolean;
   currentState?: string;
@@ -80,6 +82,12 @@ export function computePetLocation(context: {
     return {
       locationName: "Bangku Kayu Bukit Timur",
       locationDescription: "duduk santai di atas bangku taman kayu di Bukit Timur memandang lembah luas",
+    };
+  }
+  if (context.isBouncingOnTrampoline) {
+    return {
+      locationName: "Trampolin Jamur Lembah Barat",
+      locationDescription: "sedang melompat-lompat riang di atas trampolin jamur merah berbintik",
     };
   }
   if (context.isInWater) {
@@ -179,6 +187,7 @@ export function computePetActivity(context: {
   isDragging?: boolean;
   isDizzy?: boolean;
   isSittingOnBench?: boolean;
+  isBouncingOnTrampoline?: boolean;
   isInWater?: boolean;
   currentFoodName?: string;
   currentToyName?: string;
@@ -191,6 +200,9 @@ export function computePetActivity(context: {
   }
   if (context.isSittingOnBench) {
     return "sedang duduk santai di kursi kayu bukit timur memandang pemandangan lembah yang damai";
+  }
+  if (context.isBouncingOnTrampoline) {
+    return "sedang melompat-lompat riang gembira di atas trampolin jamur merah boing boing~";
   }
   if (context.isInWater) {
     return "sedang mengapung dan berenang riang mengarungi air sungai yang jernih dan sejuk";

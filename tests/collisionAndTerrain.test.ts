@@ -5,6 +5,7 @@ import {
   MAP_PLATFORMS,
   JURO_BED_POS,
   JURO_BENCH_POS,
+  JURO_TRAMPOLINE_POS,
   getTerrainHeightAt,
   getBridgeElevation,
   isWaterAt,
@@ -177,6 +178,35 @@ describe("Terrain & Object Collision Hull System", () => {
     expect(wallCol.hitObstacle).toBe(true);
     // Pushed outside platform radius
     expect(Math.hypot(wallCol.x - 3.45, wallCol.z - 0.75)).toBeGreaterThan(1.4);
+  });
+
+  it("treats mushroom trampoline as solid obstacle when wandering, but allows Juro onto it when bouncing", () => {
+    // When wandering normally, walking directly into trampoline is blocked
+    const wanderCol = resolveHorizontalCollisions(
+      JURO_TRAMPOLINE_POS.x,
+      JURO_TRAMPOLINE_POS.z,
+      BASE_GROUND_Y,
+      0.38,
+      false,
+      false,
+      false,
+      false
+    );
+    expect(wanderCol.hitObstacle).toBe(true);
+
+    // When bouncing on trampoline: can occupy the trampoline position
+    const bounceCol = resolveHorizontalCollisions(
+      JURO_TRAMPOLINE_POS.x,
+      JURO_TRAMPOLINE_POS.z,
+      JURO_TRAMPOLINE_POS.surfaceY,
+      0.38,
+      false,
+      false,
+      false,
+      true
+    );
+    expect(bounceCol.x).toBeCloseTo(JURO_TRAMPOLINE_POS.x, 2);
+    expect(bounceCol.z).toBeCloseTo(JURO_TRAMPOLINE_POS.z, 2);
   });
 
   it("picks scenic waypoints that never spawn inside obstacles", () => {

@@ -13,7 +13,7 @@ export interface SolidObstacle {
   z: number;
   radius: number;
   topY: number; // world Y above which Juro could jump/fly over it
-  tag?: "bed-frame" | "bench";
+  tag?: "bed-frame" | "bench" | "trampoline";
 }
 
 export const BASE_GROUND_Y = -0.92;
@@ -49,6 +49,9 @@ export const MAP_OBSTACLES: SolidObstacle[] = [
   { x: 3.46, z: 0.77, radius: 0.24, topY: BASE_GROUND_Y + 0.82, tag: "bench" },
   { x: 3.65, z: 0.95, radius: 0.24, topY: BASE_GROUND_Y + 0.82, tag: "bench" },
   { x: 3.84, z: 1.13, radius: 0.24, topY: BASE_GROUND_Y + 0.82, tag: "bench" },
+
+  // Bouncy Mushroom Trampoline in South-West Meadow
+  { x: -1.75, z: 1.25, radius: 0.44, topY: BASE_GROUND_Y + 0.55, tag: "trampoline" },
 
   // West Knoll Sofa Bed Frame (Backrest, Armrests & Nightstand)
   { x: -3.88, z: -0.52, radius: 0.24, topY: BASE_GROUND_Y + 0.85, tag: "bed-frame" }, // Nightstand & Lamp
@@ -132,6 +135,14 @@ export const JURO_BENCH_POS = {
   platformId: "east-knoll",
 } as const;
 
+// Interactive bouncy mushroom trampoline in South-West Meadow
+export const JURO_TRAMPOLINE_POS = {
+  x: -1.75,
+  z: 1.25,
+  surfaceY: BASE_GROUND_Y + 0.36,
+  label: "Trampolin Jamur",
+} as const;
+
 // Elevated platforms, terraces, rock ledges & tree stumps Juro can climb/jump onto!
 export const MAP_PLATFORMS: ElevatedPlatform[] = [
   {
@@ -151,6 +162,15 @@ export const MAP_PLATFORMS: ElevatedPlatform[] = [
     radius: 1.45,
     height: 0.42,
     label: "Bukit Santai Timur",
+  },
+  {
+    id: "mushroom-trampoline",
+    kind: "stump",
+    x: -1.75,
+    z: 1.25,
+    radius: 0.44,
+    height: 0.36,
+    label: "Trampolin Jamur",
   },
   {
     id: "stump-se",
@@ -234,7 +254,8 @@ export function isInsideObstacle(
   z: number,
   pad = 0.35,
   isSleepingOrHeading = false,
-  isSittingOrHeadingToBench = false
+  isSittingOrHeadingToBench = false,
+  isBouncingOrHeadingToTrampoline = false
 ): boolean {
   for (let i = 0; i < MAP_OBSTACLES.length; i++) {
     const obs = MAP_OBSTACLES[i];
@@ -242,6 +263,9 @@ export function isInsideObstacle(
       continue;
     }
     if (isSittingOrHeadingToBench && (obs.tag === "bench" || Math.hypot(obs.x - JURO_BENCH_POS.x, obs.z - JURO_BENCH_POS.z) < 0.65)) {
+      continue;
+    }
+    if (isBouncingOrHeadingToTrampoline && (obs.tag === "trampoline" || Math.hypot(obs.x - JURO_TRAMPOLINE_POS.x, obs.z - JURO_TRAMPOLINE_POS.z) < 0.65)) {
       continue;
     }
     if (Math.hypot(x - obs.x, z - obs.z) < obs.radius + pad) {
@@ -263,7 +287,8 @@ export function resolveHorizontalCollisions(
   petRadius = 0.38,
   allowClimbing = false,
   isSleepingOrHeadingToBed = false,
-  isSittingOrHeadingToBench = false
+  isSittingOrHeadingToBench = false,
+  isBouncingOrHeadingToTrampoline = false
 ): { x: number; z: number; hitObstacle: boolean } {
   let rx = Math.max(MAP_BOUNDS.minX, Math.min(MAP_BOUNDS.maxX, x));
   let rz = Math.max(MAP_BOUNDS.minZ, Math.min(MAP_BOUNDS.maxZ, z));
@@ -283,6 +308,12 @@ export function resolveHorizontalCollisions(
       if (
         isSittingOrHeadingToBench &&
         (obs.tag === "bench" || Math.hypot(obs.x - JURO_BENCH_POS.x, obs.z - JURO_BENCH_POS.z) < 0.65)
+      ) {
+        continue;
+      }
+      if (
+        isBouncingOrHeadingToTrampoline &&
+        (obs.tag === "trampoline" || Math.hypot(obs.x - JURO_TRAMPOLINE_POS.x, obs.z - JURO_TRAMPOLINE_POS.z) < 0.65)
       ) {
         continue;
       }
@@ -320,6 +351,7 @@ export function resolveHorizontalCollisions(
       const p = MAP_PLATFORMS[i];
       if (isSleepingOrHeadingToBed && p.id === "west-knoll") continue;
       if (isSittingOrHeadingToBench && p.id === "east-knoll") continue;
+      if (isBouncingOrHeadingToTrampoline && p.id === "mushroom-trampoline") continue;
       const platformTopY = BASE_GROUND_Y + p.height;
       // If Juro's bottom is below the platform top rim, treat the wall as solid even during early jump arc
       const threshold = allowClimbing ? platformTopY - 0.06 : platformTopY - 0.14;
@@ -347,7 +379,7 @@ export function resolveHorizontalCollisions(
 }
 
 // Pick a scenic, walkable waypoint anywhere on the wide map (meadow, hills, water, stumps!)
-export function pickScenicWaypoint(bias?: "water" | "bed" | "food" | "bench"): { x: number; z: number } {
+export function pickScenicWaypoint(bias?: "water" | "bed" | "food" | "bench" | "trampoline"): { x: number; z: number } {
   // If specific need bias is given, strongly prioritize that area of the living meadow
   if (bias === "water") {
     // 80% chance to target the clear water stream/brook for a refreshing splash or wash
@@ -372,6 +404,13 @@ export function pickScenicWaypoint(bias?: "water" | "bed" | "food" | "bench"): {
     const benchZ = 1.25 + (Math.random() - 0.5) * 0.5;
     if (!isInsideObstacle(benchX, benchZ, 0.3)) {
       return { x: benchX, z: benchZ };
+    }
+  } else if (bias === "trampoline") {
+    // Grassy area in front of the bouncy mushroom trampoline
+    const tx = -1.35 + (Math.random() - 0.5) * 0.4;
+    const tz = 1.25 + (Math.random() - 0.5) * 0.4;
+    if (!isInsideObstacle(tx, tz, 0.3)) {
+      return { x: tx, z: tz };
     }
   } else if (bias === "food") {
     // Sunny foreground meadow where berries & picnics happen

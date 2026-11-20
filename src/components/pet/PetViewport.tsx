@@ -26,7 +26,12 @@ import {
   TIME_THEMES,
   type TimePhase,
 } from "../../utils/timeOfDay";
-import { JURO_BED_POS, JURO_BENCH_POS, isWaterAt } from "../../engine/world/mapTerrain";
+import {
+  JURO_BED_POS,
+  JURO_BENCH_POS,
+  JURO_TRAMPOLINE_POS,
+  isWaterAt,
+} from "../../engine/world/mapTerrain";
 import { getCognitiveTier, computePetEmotionalState } from "../../engine/ai/cognitiveCore";
 import type { FoodItem, ToyItem } from "../../types/pet";
 import { ResponsiveCamera } from "./viewport/ResponsiveCamera";
@@ -173,6 +178,11 @@ export const PetViewport: React.FC = () => {
   const [isSittingOnBench, setIsSittingOnBench] = useState(false);
   const isHeadingToBenchRef = useRef<boolean>(false);
 
+  // Trampoline interaction state & refs
+  const [isTrampolineMenuOpen, setIsTrampolineMenuOpen] = useState(false);
+  const [isBouncingOnTrampoline, setIsBouncingOnTrampoline] = useState(false);
+  const isHeadingToTrampolineRef = useRef<boolean>(false);
+
   // Coarse UI states (only change on discrete state flips — NEVER on pointermove pixels!)
   const [dragVisual, setDragVisual] = useState<DragVisualState | null>(null);
   const [soapBadgePercent, setSoapBadgePercent] = useState(0);
@@ -186,9 +196,16 @@ export const PetViewport: React.FC = () => {
       if (isSittingOnBench) {
         setIsSittingOnBench(false);
       }
+      if (isBouncingOnTrampoline) {
+        setIsBouncingOnTrampoline(false);
+      }
       isHeadingToBenchRef.current = false;
+      isHeadingToTrampolineRef.current = false;
       if (isBenchMenuOpen) {
         setIsBenchMenuOpen(false);
+      }
+      if (isTrampolineMenuOpen) {
+        setIsTrampolineMenuOpen(false);
       }
       soundEffects.playGuideTap();
       setIsChatOpen(false);
@@ -197,37 +214,44 @@ export const PetViewport: React.FC = () => {
       setShowStatDetails(false);
       setWalkCommand({ x, z, nonce: Date.now() });
     },
-    [isPettingActive, isSittingOnBench, isBenchMenuOpen, setActiveTray, setShowStatDetails]
+    [isPettingActive, isSittingOnBench, isBouncingOnTrampoline, isBenchMenuOpen, isTrampolineMenuOpen, setActiveTray, setShowStatDetails]
   );
 
   const handleOpenShopFromMap = useCallback(() => {
     if (isPettingActive) setIsPettingActive(false);
     if (isSittingOnBench) setIsSittingOnBench(false);
+    if (isBouncingOnTrampoline) setIsBouncingOnTrampoline(false);
     isHeadingToBenchRef.current = false;
+    isHeadingToTrampolineRef.current = false;
     setIsBenchMenuOpen(false);
+    setIsTrampolineMenuOpen(false);
     setIsChatOpen(false);
     setJuroMenu((prev) => ({ ...prev, open: false }));
     soundEffects.playClick();
     navigate("/shop");
-  }, [isPettingActive, isSittingOnBench, navigate]);
+  }, [isPettingActive, isSittingOnBench, isBouncingOnTrampoline, navigate]);
 
   const handleOpenMineFromMap = useCallback(() => {
     if (isPettingActive) setIsPettingActive(false);
     if (isSittingOnBench) setIsSittingOnBench(false);
+    if (isBouncingOnTrampoline) setIsBouncingOnTrampoline(false);
     isHeadingToBenchRef.current = false;
+    isHeadingToTrampolineRef.current = false;
     setIsBenchMenuOpen(false);
+    setIsTrampolineMenuOpen(false);
     setIsChatOpen(false);
     setJuroMenu((prev) => ({ ...prev, open: false }));
     soundEffects.playClick();
     navigate("/mine");
-  }, [isPettingActive, isSittingOnBench, navigate]);
+  }, [isPettingActive, isSittingOnBench, isBouncingOnTrampoline, navigate]);
 
-  // Dismiss open trays / stat popover / bench menu / Petting Mode / Speech Bubble / Chat / Juro Menu on Escape key
+  // Dismiss open trays / stat popover / bench menu / trampoline menu / Petting Mode / Speech Bubble / Chat / Juro Menu on Escape key
   useEffect(() => {
     if (
       activeTray === "none" &&
       !showStatDetails &&
       !isBenchMenuOpen &&
+      !isTrampolineMenuOpen &&
       !isPettingActive &&
       !speechBubble.visible &&
       !isChatOpen &&
@@ -240,6 +264,7 @@ export const PetViewport: React.FC = () => {
         setActiveTray("none");
         setShowStatDetails(false);
         setIsBenchMenuOpen(false);
+        setIsTrampolineMenuOpen(false);
         setIsChatOpen(false);
         setJuroMenu((prev) => ({ ...prev, open: false }));
         setSpeechBubble((s) => ({ ...s, visible: false }));
@@ -247,7 +272,7 @@ export const PetViewport: React.FC = () => {
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [activeTray, showStatDetails, isBenchMenuOpen, isPettingActive, speechBubble.visible, isChatOpen, juroMenu.open]);
+  }, [activeTray, showStatDetails, isBenchMenuOpen, isTrampolineMenuOpen, isPettingActive, speechBubble.visible, isChatOpen, juroMenu.open]);
 
   // Dynamically assemble pet context: activities, emotions, sensations & environmental state
   const getLiveChatContext = useCallback(
@@ -317,6 +342,7 @@ export const PetViewport: React.FC = () => {
         isDragging,
         isDizzy,
         isSittingOnBench,
+        isBouncingOnTrampoline,
         isInWater: inWater,
         currentFoodName: petState.currentFoodBeingEaten?.name,
         currentToyName: petState.currentToyBeingPlayed?.name,
@@ -324,6 +350,7 @@ export const PetViewport: React.FC = () => {
 
       const loc = computePetLocation({
         isSittingOnBench,
+        isBouncingOnTrampoline,
         isInWater: inWater,
         isSleeping,
         currentState: petState.currentState,
@@ -370,7 +397,7 @@ export const PetViewport: React.FC = () => {
         ambientDescription: ambient,
       };
     },
-    [weather, isPettingActive, isDraggingPet, isSittingOnBench]
+    [weather, isPettingActive, isDraggingPet, isSittingOnBench, isBouncingOnTrampoline]
   );
 
   // AI Pet Chat message handler (triggers Gemini API or fallback & shows speech bubble)
@@ -757,6 +784,25 @@ export const PetViewport: React.FC = () => {
     };
   }, [isBenchMenuOpen]);
 
+  // Dismiss trampoline menu when tapping/clicking outside (supporting both mouse and touch)
+  useEffect(() => {
+    if (!isTrampolineMenuOpen) return;
+    const onWindowPointer = (e: Event) => {
+      const target = e.target as HTMLElement | null;
+      if (target?.closest?.('[data-trampoline-menu="true"]')) {
+        return;
+      }
+      setIsTrampolineMenuOpen(false);
+    };
+    const timer = setTimeout(() => {
+      window.addEventListener("pointerdown", onWindowPointer);
+    }, 80);
+    return () => {
+      clearTimeout(timer);
+      window.removeEventListener("pointerdown", onWindowPointer);
+    };
+  }, [isTrampolineMenuOpen]);
+
   // Dismiss speech bubble when tapping/clicking outside (matching behavior of other menus)
   useEffect(() => {
     if (!speechBubble.visible) return;
@@ -780,12 +826,13 @@ export const PetViewport: React.FC = () => {
     };
   }, [speechBubble.visible]);
 
-  // Dismiss bench menu & Juro menu when user rotates or zooms camera with OrbitControls
+  // Dismiss bench menu, trampoline menu & Juro menu when user rotates or zooms camera with OrbitControls
   useEffect(() => {
     const controls = controlsRef.current;
     if (!controls) return;
     const onOrbitStart = () => {
       setIsBenchMenuOpen(false);
+      setIsTrampolineMenuOpen(false);
       if (juroMenu.open) {
         setJuroMenu((prev) => ({ ...prev, open: false }));
       }
@@ -897,8 +944,11 @@ export const PetViewport: React.FC = () => {
     }
     if (dragging) {
       setIsSittingOnBench(false);
+      setIsBouncingOnTrampoline(false);
       isHeadingToBenchRef.current = false;
+      isHeadingToTrampolineRef.current = false;
       setIsBenchMenuOpen(false);
+      setIsTrampolineMenuOpen(false);
     }
     setIsDraggingPet(dragging);
   }, []);
@@ -1299,6 +1349,7 @@ export const PetViewport: React.FC = () => {
     setShowStatDetails(false);
     setActiveTray("none");
     setIsChatOpen(false);
+    setIsTrampolineMenuOpen(false);
 
     if (isBenchMenuOpen) {
       soundEffects.playDismiss();
@@ -1313,8 +1364,11 @@ export const PetViewport: React.FC = () => {
   const handleSitOnBench = useCallback(() => {
     soundEffects.playClick();
     setIsBenchMenuOpen(false);
+    setIsTrampolineMenuOpen(false);
     isHeadingToBenchRef.current = true;
     setIsSittingOnBench(false);
+    setIsBouncingOnTrampoline(false);
+    isHeadingToTrampolineRef.current = false;
     setWalkCommand({ x: JURO_BENCH_POS.x, z: JURO_BENCH_POS.z, nonce: Date.now() });
     addLog("interaction", "Juro berjalan menuju kursi taman untuk duduk santai.");
   }, [addLog]);
@@ -1330,11 +1384,67 @@ export const PetViewport: React.FC = () => {
     addLog("interaction", "Juro berdiri dari kursi taman dan kembali menjelajah.");
   }, [addLog]);
 
+  const handleTrampolineArrival = useCallback(() => {
+    isHeadingToTrampolineRef.current = false;
+    setIsBouncingOnTrampoline(true);
+    soundEffects.playBoing();
+    addLog("play", "Juro sampai di trampolin jamur dan melompat riang gembira! Boing boing~");
+    useCaregiverStore.getState().recordAction(
+      "play",
+      "Bermain melompat riang di atas trampolin jamur.",
+      { happiness: 12, affection: 6 },
+      "Trampolin Jamur"
+    );
+  }, [addLog]);
+
+  const handleTrampolineClick = useCallback(() => {
+    if (isPettingActive) setIsPettingActive(false);
+    setShowStatDetails(false);
+    setActiveTray("none");
+    setIsChatOpen(false);
+    setIsBenchMenuOpen(false);
+
+    if (isTrampolineMenuOpen) {
+      soundEffects.playDismiss();
+      setIsTrampolineMenuOpen(false);
+      return;
+    }
+
+    soundEffects.playPop();
+    setIsTrampolineMenuOpen(true);
+  }, [isTrampolineMenuOpen, isPettingActive]);
+
+  const handleStartBounce = useCallback(() => {
+    soundEffects.playClick();
+    setIsTrampolineMenuOpen(false);
+    setIsBenchMenuOpen(false);
+    if (isSittingOnBench) setIsSittingOnBench(false);
+    isHeadingToBenchRef.current = false;
+    isHeadingToTrampolineRef.current = true;
+    setIsBouncingOnTrampoline(false);
+    setWalkCommand({ x: JURO_TRAMPOLINE_POS.x, z: JURO_TRAMPOLINE_POS.z, nonce: Date.now() });
+    addLog("play", "Juro berjalan menuju trampolin jamur untuk bermain.");
+  }, [addLog, isSittingOnBench]);
+
+  const handleStopBounce = useCallback(() => {
+    soundEffects.playClick();
+    setIsTrampolineMenuOpen(false);
+    setIsBouncingOnTrampoline(false);
+    isHeadingToTrampolineRef.current = false;
+    soundEffects.playPlop();
+    // Walk to clear ground slightly beside the trampoline
+    setWalkCommand({ x: -1.35, z: 1.25, nonce: Date.now() });
+    addLog("interaction", "Juro selesai bermain trampolin dan melangkah kembali ke padang rumput.");
+  }, [addLog]);
+
   const handleBedClick = useCallback(() => {
     soundEffects.playClick();
     if (isSittingOnBench) setIsSittingOnBench(false);
+    if (isBouncingOnTrampoline) setIsBouncingOnTrampoline(false);
     isHeadingToBenchRef.current = false;
+    isHeadingToTrampolineRef.current = false;
     setIsBenchMenuOpen(false);
+    setIsTrampolineMenuOpen(false);
     if (currentState === "sleep") {
       wakeUp();
       soundEffects.playWakeUp();
@@ -1357,12 +1467,15 @@ export const PetViewport: React.FC = () => {
       );
       soundEffects.playClick();
     }
-  }, [currentState, wakeUp, addLog, isSittingOnBench]);
+  }, [currentState, wakeUp, addLog, isSittingOnBench, isBouncingOnTrampoline]);
 
   const handleToggleSleep = useCallback(() => {
     if (isSittingOnBench) setIsSittingOnBench(false);
+    if (isBouncingOnTrampoline) setIsBouncingOnTrampoline(false);
     isHeadingToBenchRef.current = false;
+    isHeadingToTrampolineRef.current = false;
     setIsBenchMenuOpen(false);
+    setIsTrampolineMenuOpen(false);
     if (currentState === "sleep") {
       wakeUp();
       soundEffects.playWakeUp();
@@ -1386,13 +1499,16 @@ export const PetViewport: React.FC = () => {
       soundEffects.playClick();
     }
     setActiveTray("none");
-  }, [currentState, wakeUp, addLog, isSittingOnBench]);
+  }, [currentState, wakeUp, addLog, isSittingOnBench, isBouncingOnTrampoline]);
 
   const handleMenuAction = useCallback(
     (action: "food" | "toy" | "sleep" | "bath" | "pet") => {
       if (isSittingOnBench) setIsSittingOnBench(false);
+      if (isBouncingOnTrampoline) setIsBouncingOnTrampoline(false);
       isHeadingToBenchRef.current = false;
+      isHeadingToTrampolineRef.current = false;
       setIsBenchMenuOpen(false);
+      setIsTrampolineMenuOpen(false);
       setJuroMenu((prev) => ({ ...prev, open: false }));
       setShowStatDetails(false);
 
@@ -1417,7 +1533,7 @@ export const PetViewport: React.FC = () => {
           break;
       }
     },
-    [isSittingOnBench, handleToggleSleep, handleDirectPet]
+    [isSittingOnBench, isBouncingOnTrampoline, handleToggleSleep, handleDirectPet]
   );
 
   const handleToggleWeather = useCallback(() => {
@@ -1634,6 +1750,12 @@ export const PetViewport: React.FC = () => {
             onStandFromBench={handleStandFromBench}
             onCloseBenchMenu={() => setIsBenchMenuOpen(false)}
             isSittingOnBench={isSittingOnBench}
+            isTrampolineMenuOpen={isTrampolineMenuOpen}
+            onTrampolineClick={handleTrampolineClick}
+            onStartBounce={handleStartBounce}
+            onStopBounce={handleStopBounce}
+            onCloseTrampolineMenu={() => setIsTrampolineMenuOpen(false)}
+            isBouncingOnTrampoline={isBouncingOnTrampoline}
           />
 
           {/* Juro Pocket-Sized 3D Slime Model with Crawling, Jumping, Bathing & Elus */}
@@ -1650,6 +1772,9 @@ export const PetViewport: React.FC = () => {
             isHeadingToBenchRef={isHeadingToBenchRef}
             onBenchArrival={handleBenchArrival}
             isSittingOnBench={isSittingOnBench}
+            isHeadingToTrampolineRef={isHeadingToTrampolineRef}
+            onTrampolineArrival={handleTrampolineArrival}
+            isBouncingOnTrampoline={isBouncingOnTrampoline}
             isRaining={weather === "rain"}
             isDizzyRef={isDizzyRef}
             level={level}
