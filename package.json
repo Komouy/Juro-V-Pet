@@ -16,6 +16,7 @@
     "@tailwindcss/vite": "^4.3.5",
     "@types/three": "^0.187.0",
     "dexie": "^4.4.7",
+    "firebase": "^13.4.0",
     "lucide-react": "^1.74.0",
     "motion": "^14.14.0",
     "react": "^19.3.1",
