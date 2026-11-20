@@ -33,7 +33,7 @@ export class BehaviorStateMachine {
   }
 
   // Force transition with priority check
-  transitionTo(nextState: PetBehaviorState, force = false): boolean {
+  transitionTo(nextState: PetBehaviorState, force = false, attributes?: PetAttributes): boolean {
     if (this.currentState === nextState) return false;
 
     const currentConfig = BEHAVIOR_CONFIGS[this.currentState];
@@ -51,7 +51,7 @@ export class BehaviorStateMachine {
 
     // Setup specific state behaviors
     if (nextState === "wander") {
-      this.pickNewWanderTarget();
+      this.pickNewWanderTarget(undefined, attributes);
       // Give Juro enough time to crawl across the valley and hop onto hills/stumps
       this.stateDuration = 5.5 + Math.random() * 4.5;
     } else if (nextState === "curious") {
@@ -61,12 +61,23 @@ export class BehaviorStateMachine {
     return true;
   }
 
-  public pickNewWanderTarget(currentPos?: THREE.Vector3) {
-    // Pick an accessible scenic spot across the entire 3D map (meadow, hills, stumps, bridge)
-    let pt = pickScenicWaypoint();
+  public pickNewWanderTarget(currentPos?: THREE.Vector3, attributes?: PetAttributes) {
+    let bias: "water" | "bed" | "food" | "bench" | undefined;
+    if (attributes) {
+      if (attributes.cleanliness < 45) {
+        bias = "water";
+      } else if (attributes.energy < 45) {
+        bias = Math.random() < 0.65 ? "bed" : "bench";
+      } else if (attributes.hunger < 45) {
+        bias = "food";
+      }
+    }
+
+    // Pick an accessible scenic spot across the entire 3D map (meadow, hills, stumps, bridge, water)
+    let pt = pickScenicWaypoint(bias);
     if (currentPos) {
       for (let attempt = 0; attempt < 8; attempt++) {
-        const candidate = pickScenicWaypoint();
+        const candidate = pickScenicWaypoint(bias);
         if (Math.hypot(candidate.x - currentPos.x, candidate.z - currentPos.z) > 1.2) {
           pt = candidate;
           break;
@@ -124,9 +135,70 @@ export class BehaviorStateMachine {
       return;
     }
 
-    // 2. State transition probability matrix
+    // 2. High priority need-based behavioral transitions
     const roll = Math.random();
 
+    // Sleepy / low energy: stay put or wander towards bed
+    if (attributes.energy < 45 || mood === "sleepy") {
+      if (this.currentState === "sleep") {
+        if (attributes.energy > 60 || roll > 0.45) {
+          this.transitionTo("idle", true);
+        }
+        return;
+      }
+      if (roll < 0.55) {
+        this.transitionTo("idle");
+      } else if (roll < 0.82) {
+        this.transitionTo("wander", false, attributes); // bias to bed/bench
+      } else {
+        this.transitionTo("sleep");
+      }
+      return;
+    }
+
+    // Hungry: curious sniffing grass or wandering towards picnic area
+    if (attributes.hunger < 45) {
+      if (this.currentState === "idle") {
+        this.transitionTo(roll < 0.55 ? "curious" : "wander", false, attributes);
+      } else if (this.currentState === "wander") {
+        this.transitionTo(roll < 0.6 ? "curious" : "idle");
+      } else {
+        this.transitionTo(roll < 0.5 ? "idle" : "wander", false, attributes);
+      }
+      return;
+    }
+
+    // Dirty: higher probability of heading to water brook or shaking dust
+    if (attributes.cleanliness < 45) {
+      if (this.currentState === "wander") {
+        this.transitionTo(roll < 0.5 ? "idle" : "curious");
+      } else {
+        this.transitionTo(roll < 0.6 ? "wander" : "idle", false, attributes);
+      }
+      return;
+    }
+
+    // Lonely / low affection: stay seated waiting for player
+    if (attributes.affection < 40) {
+      if (this.currentState !== "idle") {
+        this.transitionTo(roll < 0.65 ? "idle" : "curious");
+      } else {
+        this.transitionTo(roll < 0.7 ? "idle" : "curious");
+      }
+      return;
+    }
+
+    // Thriving (well-fed, rested, clean, happy): spontaneous happy hops
+    if (attributes.happiness > 75 && attributes.hunger > 60 && attributes.cleanliness > 60) {
+      if (this.currentState === "idle") {
+        if (roll < 0.35) this.transitionTo("happy");
+        else if (roll < 0.75) this.transitionTo("wander", false, attributes);
+        else this.transitionTo("curious");
+        return;
+      }
+    }
+
+    // 3. General baseline state transition matrix
     switch (this.currentState) {
       case "idle":
         if (mood === "happy" || mood === "excited") {
@@ -134,8 +206,6 @@ export class BehaviorStateMachine {
           if (roll < 0.5) this.transitionTo("wander");
           else if (roll < 0.8) this.transitionTo("curious");
           else this.transitionTo("happy");
-        } else if (mood === "sleepy") {
-          this.transitionTo(roll < 0.7 ? "sleep" : "idle");
         } else {
           // Normal idle flow
           if (roll < 0.5) this.transitionTo("wander");

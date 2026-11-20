@@ -356,7 +356,43 @@ export function resolveHorizontalCollisions(
 }
 
 // Pick a scenic, walkable waypoint anywhere on the wide map (meadow, hills, water, stumps!)
-export function pickScenicWaypoint(): { x: number; z: number } {
+export function pickScenicWaypoint(bias?: "water" | "bed" | "food" | "bench"): { x: number; z: number } {
+  // If specific need bias is given, strongly prioritize that area of the living meadow
+  if (bias === "water") {
+    // 80% chance to target the clear water stream/brook for a refreshing splash or wash
+    if (Math.random() < 0.8) {
+      const brookX = -2.5 + Math.random() * 3.5;
+      const t = (brookX + 5.5) / 7.7;
+      const brookZ = -4.9 + t * 3.7 + Math.sin(t * Math.PI) * 0.35;
+      if (!isInsideObstacle(brookX, brookZ, 0.3)) {
+        return { x: brookX, z: brookZ };
+      }
+    }
+  } else if (bias === "bed") {
+    // Grassy knoll right beside the cozy sleeping leaf bed
+    const bedX = -2.35 + (Math.random() - 0.5) * 0.5;
+    const bedZ = 1.15 + (Math.random() - 0.5) * 0.5;
+    if (!isInsideObstacle(bedX, bedZ, 0.3)) {
+      return { x: bedX, z: bedZ };
+    }
+  } else if (bias === "bench") {
+    // Grassy area in front of the eastern park bench
+    const benchX = 3.15 + (Math.random() - 0.5) * 0.6;
+    const benchZ = 1.25 + (Math.random() - 0.5) * 0.5;
+    if (!isInsideObstacle(benchX, benchZ, 0.3)) {
+      return { x: benchX, z: benchZ };
+    }
+  } else if (bias === "food") {
+    // Sunny foreground meadow where berries & picnics happen
+    for (let attempt = 0; attempt < 10; attempt++) {
+      const fx = -1.4 + Math.random() * 2.8;
+      const fz = 0.5 + Math.random() * 1.0;
+      if (!isInsideObstacle(fx, fz, 0.35)) {
+        return { x: fx, z: fz };
+      }
+    }
+  }
+
   // 35% chance to specifically visit an elevated platform or stump
   const roll = Math.random();
   if (roll < 0.35) {

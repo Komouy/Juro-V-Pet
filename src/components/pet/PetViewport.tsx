@@ -1566,6 +1566,11 @@ export const PetViewport: React.FC = () => {
               dragVisual.payload.kind === "toy" &&
               dragVisual.payload.toy.id === "bubble-blower"
             }
+            isDraggingFood={
+              dragVisual !== null &&
+              dragVisual.moved &&
+              dragVisual.payload.kind === "food"
+            }
           />
 
           {/* Wide Diorama Orbit Controls — centered on Juro */}

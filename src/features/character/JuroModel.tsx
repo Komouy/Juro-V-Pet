@@ -81,6 +81,7 @@ export interface JuroModelProps {
   onBenchArrival?: () => void;
   isSittingOnBench?: boolean;
   isBlowingBubbles?: boolean;
+  isDraggingFood?: boolean;
   isRaining?: boolean;
   isDizzyRef?: React.RefObject<boolean>;
   level?: number;
@@ -100,6 +101,7 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
   onBenchArrival,
   isSittingOnBench = false,
   isBlowingBubbles = false,
+  isDraggingFood = false,
   isRaining = false,
   isDizzyRef,
   level = 1,
@@ -197,6 +199,8 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
   const leftCheekMatRef = useRef<THREE.MeshBasicMaterial>(null);
   const rightCheekMatRef = useRef<THREE.MeshBasicMaterial>(null);
   const dirtyShakeTimer = useRef({ nextShake: 5 + Math.random() * 4, timer: 0 });
+  const tummyRumbleTimer = useRef({ nextRumble: 10 + Math.random() * 5, timer: 0 });
+  const sleepyYawnTimer = useRef({ nextYawn: 12 + Math.random() * 6, timer: 0 });
 
   // Interactive Bath 3D effects (GPU-instanced for smooth mobile performance)
   const soapFoamInstRef = useRef<THREE.InstancedMesh>(null);
@@ -598,6 +602,9 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
     }
 
     const currentState = fsm.currentState;
+    const isSleepingNow = currentState === "sleep";
+    const isEatingNow = currentState === "eating";
+    const isPlayingToyNow = currentToyBeingPlayed !== null;
     const prefersReduced =
       typeof window !== "undefined" &&
       window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
@@ -1155,7 +1162,7 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
         blockedTimerRef.current += delta;
         if (blockedTimerRef.current > 0.4 && !(isHeadingToBedRef?.current ?? false)) {
           blockedTimerRef.current = 0;
-          fsm.pickNewWanderTarget(spring.position);
+          fsm.pickNewWanderTarget(spring.position, liveAttributes);
         }
       }
     } else {
@@ -1200,6 +1207,67 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
         scale.x += breathing;
         scale.z += breathing;
         scale.y -= breathing;
+      }
+
+      // Need-based physical behaviors:
+      // 1. Tummy Rumble Pulse (Hunger < 45)
+      if (!isSleepingNow && !isEatingNow && !isPlayingToyNow && liveAttributes.hunger < 45) {
+        tummyRumbleTimer.current.timer += delta;
+        if (tummyRumbleTimer.current.timer > tummyRumbleTimer.current.nextRumble) {
+          const rumbleElapsed = tummyRumbleTimer.current.timer - tummyRumbleTimer.current.nextRumble;
+          if (rumbleElapsed < 0.55) {
+            const rumbleWave = Math.sin(rumbleElapsed * 36) * (1 - rumbleElapsed / 0.55);
+            scale.x *= (1 + rumbleWave * 0.12);
+            scale.y *= (1 - rumbleWave * 0.08);
+            scale.z *= (1 + rumbleWave * 0.12);
+            if (rumbleElapsed < delta * 1.5) {
+              soundEffects.playSquish();
+            }
+          } else {
+            tummyRumbleTimer.current.timer = 0;
+            tummyRumbleTimer.current.nextRumble = 10 + Math.random() * 5;
+          }
+        }
+      }
+
+      // 2. Deep Yawn Stretch (Sleepy & Idle)
+      if (isSleepy && !isSleepingNow && !isEatingNow && !isPlayingToyNow && currentState === "idle") {
+        sleepyYawnTimer.current.timer += delta;
+        if (sleepyYawnTimer.current.timer > sleepyYawnTimer.current.nextYawn) {
+          const yawnElapsed = sleepyYawnTimer.current.timer - sleepyYawnTimer.current.nextYawn;
+          if (yawnElapsed < 1.6) {
+            const yawnPhase = Math.sin((yawnElapsed / 1.6) * Math.PI);
+            scale.y *= (1 + yawnPhase * 0.22);
+            scale.x *= (1 - yawnPhase * 0.10);
+            scale.z *= (1 - yawnPhase * 0.10);
+            if (yawnElapsed < delta * 1.5) {
+              soundEffects.playTired();
+            }
+          } else {
+            sleepyYawnTimer.current.timer = 0;
+            sleepyYawnTimer.current.nextYawn = 13 + Math.random() * 7;
+          }
+        }
+      }
+
+      // 3. Tactile Direct Petting Reaction
+      if (isPettingActive && !isSleepingNow) {
+        const purrSquash = Math.sin(t * 14) * 0.035;
+        scale.x *= (1.06 + purrSquash);
+        scale.y *= (0.94 - purrSquash);
+        groupRef.current.rotation.z += Math.sin(t * 8) * 0.03;
+      }
+
+      // 4. Sniffing Ground Posture while Wandering Hungry
+      if (liveAttributes.hunger < 45 && (currentState === "wander" || currentState === "curious") && !isSleepingNow) {
+        groupRef.current.rotation.x = Math.sin(t * 4) * 0.04 + 0.08;
+      }
+
+      // 5. Food Dragging Posture (Anticipation)
+      if (isDraggingFood && !isSleepingNow) {
+        groupRef.current.rotation.x = -0.09;
+        scale.y *= 1.05;
+        scale.x *= 0.96;
       }
 
       // Scale entire character cleanly to pocket-sized currentPetScale
@@ -1796,6 +1864,10 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
         } else if (isBlowingBubbles) {
           lookX = THREE.MathUtils.clamp(state.pointer.x * 0.08, -0.06, 0.06);
           lookY = THREE.MathUtils.clamp(state.pointer.y * 0.06 + 0.04, -0.02, 0.08); // Eyes follow the bubbles on screen!
+        } else if (isDraggingFood) {
+          // Eyes eagerly locked on food being dragged by player across the screen!
+          lookX = THREE.MathUtils.clamp(state.pointer.x * 0.08, -0.065, 0.065);
+          lookY = THREE.MathUtils.clamp(state.pointer.y * 0.06 + 0.045, -0.02, 0.08);
         } else if (isEating) {
           lookX = 0;
           lookY = -0.05;
@@ -1931,6 +2003,10 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
             mouthGroupRef.current.scale.set(1.2, 1.15, 1);
           }
           mouthGroupRef.current.position.set(0, -0.01, 1.035);
+        } else if (isDraggingFood) {
+          // Open mouth anticipating delicious food!
+          mouthGroupRef.current.scale.set(1.22, 1.35, 1);
+          mouthGroupRef.current.position.set(0, -0.015, 1.035);
         } else if (isHappyFace || isBlowingBubbles || isPlayingBubbles) {
           mouthGroupRef.current.scale.set(1.18 + Math.sin(t * 8) * 0.08, 1.16, 1);
           mouthGroupRef.current.position.set(0, -0.01, 1.035);
@@ -2067,8 +2143,10 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
     if (bodyMeshRef.current) {
       const mat = bodyMeshRef.current.material as THREE.MeshPhysicalMaterial;
       if (mat) {
-        mat.roughness = isDirty ? 0.36 : 0.14;
-        mat.clearcoat = isDirty ? 0.35 : 1.0;
+        // Dynamic jelly luster based on cleanliness (clean = crystal clear gloss, dirty = matte dusty finish)
+        const cleanRatio = Math.max(0, Math.min(1, liveAttributes.cleanliness / 100));
+        mat.roughness = THREE.MathUtils.lerp(0.42, 0.10, cleanRatio);
+        mat.clearcoat = THREE.MathUtils.lerp(0.22, 1.0, cleanRatio);
       }
     }
 
