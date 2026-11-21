@@ -11,11 +11,18 @@ import { usePetStore } from "./petStore";
 import { useGameStore } from "./gameStore";
 import { useUIStore } from "./uiStore";
 import { soundEffects } from "../engine/audio/soundEffects";
-import { addPetMemory } from "../services/petMemoryService";
+import {
+  addPetMemory,
+  getPetMemories,
+  syncAndMergeMemories,
+  onPetMemoriesChanged,
+} from "../services/petMemoryService";
 import { notificationService } from "../services/notificationService";
 
 const PROFILE_STORAGE_KEY = "juro_caregiver_profile";
 const ROOM_STORAGE_KEY = "juro_caregiver_room";
+
+let isSyncingFromRemote = false;
 
 function getStoredProfile(): CaregiverProfile | null {
   if (typeof window === "undefined" || typeof localStorage === "undefined") return null;
@@ -118,11 +125,15 @@ export const useCaregiverStore = create<CaregiverState>((set, get) => {
         currentState: pet.currentState,
         activeSkin: game.activeSkin,
         unlockedSkins: game.unlockedSkins,
+        activeHat: game.activeHat,
+        unlockedHats: game.unlockedHats,
+        deepestFloor: game.deepestFloor,
         coins: game.coins,
         crystals: game.crystals,
         pickaxeLevel: game.pickaxeLevel,
         foodInventory: game.foodInventory,
         ownedToys: game.ownedToys,
+        memories: getPetMemories(),
         lastUpdated: Date.now(),
       };
 
@@ -181,15 +192,34 @@ export const useCaregiverStore = create<CaregiverState>((set, get) => {
             lastUpdated: room.juro.lastUpdated || Date.now(),
           });
 
-          useGameStore.setState((prev) => ({
-            activeSkin: room.juro.activeSkin || prev.activeSkin,
-            unlockedSkins: room.juro.unlockedSkins || prev.unlockedSkins,
-            coins: room.juro.coins ?? prev.coins,
-            crystals: room.juro.crystals || prev.crystals,
-            foodInventory: room.juro.foodInventory || prev.foodInventory,
-            ownedToys: room.juro.ownedToys || prev.ownedToys,
-            pickaxeLevel: room.juro.pickaxeLevel ?? prev.pickaxeLevel,
-          }));
+          useGameStore.setState((prev) => {
+            const mergedHats = Array.from(
+              new Set([...(prev.unlockedHats || []), ...(room.juro.unlockedHats || [])])
+            );
+            const mergedSkins = Array.from(
+              new Set([...(prev.unlockedSkins || []), ...(room.juro.unlockedSkins || [])])
+            );
+            const mergedToys = Array.from(
+              new Set([...(prev.ownedToys || []), ...(room.juro.ownedToys || [])])
+            );
+
+            return {
+              activeSkin: room.juro.activeSkin || prev.activeSkin,
+              unlockedSkins: mergedSkins,
+              activeHat: room.juro.activeHat !== undefined ? room.juro.activeHat : prev.activeHat,
+              unlockedHats: mergedHats,
+              deepestFloor: Math.max(prev.deepestFloor ?? 1, room.juro.deepestFloor ?? 1),
+              coins: room.juro.coins ?? prev.coins,
+              crystals: room.juro.crystals || prev.crystals,
+              foodInventory: room.juro.foodInventory || prev.foodInventory,
+              ownedToys: mergedToys,
+              pickaxeLevel: Math.max(prev.pickaxeLevel ?? 1, room.juro.pickaxeLevel ?? 1),
+            };
+          });
+
+          if (room.juro.memories && Array.isArray(room.juro.memories)) {
+            syncAndMergeMemories(room.juro.memories);
+          }
         }
 
         const logs = room.activityLogs ? Object.values(room.activityLogs) : [];
@@ -278,7 +308,11 @@ export const useCaregiverStore = create<CaregiverState>((set, get) => {
             ownedToys: game.ownedToys,
             activeSkin: game.activeSkin,
             unlockedSkins: game.unlockedSkins,
+            activeHat: game.activeHat,
+            unlockedHats: game.unlockedHats,
+            deepestFloor: game.deepestFloor,
             pickaxeLevel: game.pickaxeLevel,
+            memories: getPetMemories(),
           }
         );
       }
@@ -305,7 +339,11 @@ export const useCaregiverStore = create<CaregiverState>((set, get) => {
         ownedToys: game.ownedToys,
         activeSkin: game.activeSkin,
         unlockedSkins: game.unlockedSkins,
+        activeHat: game.activeHat,
+        unlockedHats: game.unlockedHats,
+        deepestFloor: game.deepestFloor,
         pickaxeLevel: game.pickaxeLevel,
+        memories: getPetMemories(),
       });
     },
 
@@ -398,45 +436,72 @@ export const useCaregiverStore = create<CaregiverState>((set, get) => {
 
       juroSyncService.subscribeToRoom(activeRoomCode, myProfile.id, {
         onJuroStateSync: (incoming) => {
-          // Snapshot pertama dari cloud selalu disinkronkan ke lokal agar tidak tertinggal data lama.
-          // Snapshot berikutnya hanya disinkronkan jika diubah oleh perawat pasangan.
-          const shouldSync =
-            !hasSyncedInitialState ||
-            (incoming.updatedByCaregiverId && incoming.updatedByCaregiverId !== myProfile.id);
+          const currentPet = usePetStore.getState();
+          const localLastUpdated = currentPet.lastUpdated || 0;
+          const incomingLastUpdated = incoming.lastUpdated || 0;
 
+          // Snapshot pertama dari cloud atau perubahan oleh perawat pasangan
+          const isFromPartner = !!(
+            incoming.updatedByCaregiverId && incoming.updatedByCaregiverId !== myProfile.id
+          );
+          const isNewer = incomingLastUpdated >= localLastUpdated;
+
+          const shouldSync = !hasSyncedInitialState || isFromPartner || isNewer;
           hasSyncedInitialState = true;
 
           if (shouldSync) {
-            const currentPet = usePetStore.getState();
+            isSyncingFromRemote = true;
+            try {
+              // Sinkronisasi status tidur / bangun Juro secara visual
+              if (incoming.currentState === "sleep" && currentPet.currentState !== "sleep") {
+                currentPet.sleep();
+              } else if (incoming.currentState !== "sleep" && currentPet.currentState === "sleep") {
+                currentPet.wakeUp();
+              }
 
-            // Sinkronisasi status tidur / bangun Juro secara visual
-            if (incoming.currentState === "sleep" && currentPet.currentState !== "sleep") {
-              currentPet.sleep();
-            } else if (incoming.currentState !== "sleep" && currentPet.currentState === "sleep") {
-              currentPet.wakeUp();
+              usePetStore.setState({
+                hunger: incoming.hunger,
+                energy: incoming.energy,
+                cleanliness: incoming.cleanliness,
+                happiness: incoming.happiness,
+                affection: incoming.affection,
+                level: incoming.level,
+                xp: incoming.xp,
+                xpToNextLevel: incoming.xpToNextLevel,
+                lastUpdated: incoming.lastUpdated || Date.now(),
+              });
+
+              useGameStore.setState((prev) => {
+                const mergedHats = Array.from(
+                  new Set([...(prev.unlockedHats || []), ...(incoming.unlockedHats || [])])
+                );
+                const mergedSkins = Array.from(
+                  new Set([...(prev.unlockedSkins || []), ...(incoming.unlockedSkins || [])])
+                );
+                const mergedToys = Array.from(
+                  new Set([...(prev.ownedToys || []), ...(incoming.ownedToys || [])])
+                );
+
+                return {
+                  coins: incoming.coins ?? prev.coins,
+                  activeSkin: incoming.activeSkin || prev.activeSkin,
+                  unlockedSkins: mergedSkins,
+                  activeHat: incoming.activeHat !== undefined ? incoming.activeHat : prev.activeHat,
+                  unlockedHats: mergedHats,
+                  crystals: incoming.crystals || prev.crystals,
+                  foodInventory: incoming.foodInventory || prev.foodInventory,
+                  ownedToys: mergedToys,
+                  pickaxeLevel: Math.max(prev.pickaxeLevel ?? 1, incoming.pickaxeLevel ?? 1),
+                  deepestFloor: Math.max(prev.deepestFloor ?? 1, incoming.deepestFloor ?? 1),
+                };
+              });
+
+              if (incoming.memories && Array.isArray(incoming.memories)) {
+                syncAndMergeMemories(incoming.memories);
+              }
+            } finally {
+              isSyncingFromRemote = false;
             }
-
-            usePetStore.setState({
-              hunger: incoming.hunger,
-              energy: incoming.energy,
-              cleanliness: incoming.cleanliness,
-              happiness: incoming.happiness,
-              affection: incoming.affection,
-              level: incoming.level,
-              xp: incoming.xp,
-              xpToNextLevel: incoming.xpToNextLevel,
-              lastUpdated: incoming.lastUpdated || Date.now(),
-            });
-
-            useGameStore.setState((prev) => ({
-              coins: incoming.coins ?? prev.coins,
-              activeSkin: incoming.activeSkin || prev.activeSkin,
-              unlockedSkins: incoming.unlockedSkins || prev.unlockedSkins,
-              crystals: incoming.crystals || prev.crystals,
-              foodInventory: incoming.foodInventory || prev.foodInventory,
-              ownedToys: incoming.ownedToys || prev.ownedToys,
-              pickaxeLevel: incoming.pickaxeLevel ?? prev.pickaxeLevel,
-            }));
           }
         },
 
@@ -488,4 +553,13 @@ export const useCaregiverStore = create<CaregiverState>((set, get) => {
       });
     },
   };
+});
+
+// Sinkronisasi otomatis ke cloud saat memori Juro diperbarui secara lokal
+onPetMemoriesChanged(() => {
+  if (isSyncingFromRemote) return;
+  const store = useCaregiverStore.getState();
+  if (store.activeRoomCode) {
+    store.syncCurrentState();
+  }
 });

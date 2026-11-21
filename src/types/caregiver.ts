@@ -1,4 +1,5 @@
 import type { CrystalId } from "../data/economyCatalog";
+import type { PetMemoryItem } from "../services/petMemoryService";
 
 /**
  * Peran perawat dalam sistem 1 Juro 2 Perawat
@@ -70,11 +71,15 @@ export interface SharedJuroState {
   currentState: string;
   activeSkin: string;
   unlockedSkins?: string[];
+  activeHat?: string;
+  unlockedHats?: string[];
   coins: number;
   crystals?: Record<CrystalId, number>;
   pickaxeLevel?: number;
+  deepestFloor?: number;
   foodInventory?: Record<string, number>;
   ownedToys?: string[];
+  memories?: PetMemoryItem[];
   lastUpdated: number;
   updatedByCaregiverId?: string;
 }

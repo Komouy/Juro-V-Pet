@@ -2,6 +2,7 @@ import Dexie, { type EntityTable } from "dexie";
 import type { ActivityLog } from "../stores/gameStore";
 import type { CrystalId } from "../data/economyCatalog";
 import type { MineTile } from "../engine/mining/mineGenerator";
+import type { PetMemoryItem } from "./petMemoryService";
 
 export interface PetSaveRecord {
   id: string; // "current"
@@ -22,7 +23,8 @@ export interface GameSaveRecord {
   id: string; // "current"
   coins: number;
   logs: ActivityLog[];
-  unlockedCases: string[];
+  unlockedCases?: string[];
+  unlockedSkins?: string[];
   activeSkin?: string;
   unlockedHats?: string[];
   activeHat?: string;
@@ -36,6 +38,7 @@ export interface GameSaveRecord {
   mineFloor?: number;
   mineTiles?: MineTile[];
   mineResetCooldownUntil?: number;
+  memories?: PetMemoryItem[];
 }
 
 export interface PreferencesSaveRecord {

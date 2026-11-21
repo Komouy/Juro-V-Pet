@@ -142,4 +142,55 @@ describe("PersistenceService", () => {
     expect(useGameStore.getState().mineFloor).toBe(2);
     expect(useGameStore.getState().mineTiles[0].dug).toBe(true);
   });
+
+  it("persists and restores hat accessories and pet memories correctly", async () => {
+    const customBackup = {
+      version: 1,
+      pet: {
+        id: "current",
+        name: "JuroHatTest",
+        level: 2,
+        xp: 50,
+        xpToNextLevel: 200,
+        hunger: 80,
+        energy: 80,
+        happiness: 80,
+        cleanliness: 80,
+        affection: 80,
+        lastUpdated: Date.now(),
+      },
+      game: {
+        id: "current",
+        coins: 200,
+        logs: [],
+        unlockedHats: ["hat-straw", "hat-chef"],
+        activeHat: "hat-chef",
+        unlockedSkins: ["classic-orange", "mint-lime"],
+        activeSkin: "mint-lime",
+        memories: [
+          {
+            id: "mem-1",
+            text: "Dhavi menyukai pudding manis.",
+            createdAt: Date.now(),
+            category: "custom" as const,
+          },
+        ],
+      },
+      preferences: {
+        id: "current",
+        theme: "light",
+        soundEnabled: true,
+      },
+    };
+
+    const success = await persistenceService.importSaveFile(JSON.stringify(customBackup));
+    expect(success).toBe(true);
+
+    const game = useGameStore.getState();
+    expect(game.unlockedHats).toContain("hat-straw");
+    expect(game.unlockedHats).toContain("hat-chef");
+    expect(game.activeHat).toBe("hat-chef");
+    expect(game.unlockedSkins).toContain("mint-lime");
+    expect(game.activeSkin).toBe("mint-lime");
+  });
 });

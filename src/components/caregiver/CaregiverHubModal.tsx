@@ -39,6 +39,7 @@ function getActionIcon(type: CareActionType) {
       return <Heart size={13} className="text-pink-500" />;
     case "shop":
     case "skin":
+    case "accessory":
       return <ShoppingBag size={13} className="text-amber-500" />;
     default:
       return <HeartHandshake size={13} className="text-emerald-500" />;

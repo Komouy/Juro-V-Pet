@@ -19,6 +19,26 @@ export interface PetMemoryItem {
   category?: "profile" | "preference" | "milestone" | "custom";
 }
 
+type MemoryChangeListener = (memories: PetMemoryItem[]) => void;
+const memoryListeners: Set<MemoryChangeListener> = new Set();
+
+export function onPetMemoriesChanged(listener: MemoryChangeListener): () => void {
+  memoryListeners.add(listener);
+  return () => {
+    memoryListeners.delete(listener);
+  };
+}
+
+function notifyMemoryListeners(memories: PetMemoryItem[]): void {
+  for (const listener of memoryListeners) {
+    try {
+      listener(memories);
+    } catch {
+      // Safe execution
+    }
+  }
+}
+
 const CHAT_HISTORY_STORAGE_KEY = "juro_chat_history_v1";
 const MEMORIES_STORAGE_KEY = "juro_memories_v1";
 const MAX_STORED_MESSAGES = 40;
@@ -160,7 +180,44 @@ export function addPetMemory(
 
   const updated = [newMemory, ...current].slice(0, 30);
   writeStorage(MEMORIES_STORAGE_KEY, updated);
+  notifyMemoryListeners(updated);
   return newMemory;
+}
+
+/**
+ * Directly overwrite and persist memories list
+ */
+export function setPetMemories(memories: PetMemoryItem[]): void {
+  const safeMemories = Array.isArray(memories) ? memories.slice(0, 30) : [];
+  writeStorage(MEMORIES_STORAGE_KEY, safeMemories);
+  notifyMemoryListeners(safeMemories);
+}
+
+/**
+ * Merge incoming memories from partner or cloud without duplicate facts
+ */
+export function syncAndMergeMemories(incoming: PetMemoryItem[]): PetMemoryItem[] {
+  if (!Array.isArray(incoming) || incoming.length === 0) return getPetMemories();
+
+  const current = getPetMemories();
+  const seenTexts = new Set<string>();
+  const merged: PetMemoryItem[] = [];
+
+  // Combine current and incoming, prioritizing newest
+  const combined = [...incoming, ...current].sort((a, b) => b.createdAt - a.createdAt);
+
+  for (const item of combined) {
+    if (!item || typeof item.text !== "string") continue;
+    const key = item.text.trim().toLowerCase();
+    if (!key || seenTexts.has(key)) continue;
+    seenTexts.add(key);
+    merged.push(item);
+    if (merged.length >= 30) break;
+  }
+
+  writeStorage(MEMORIES_STORAGE_KEY, merged);
+  notifyMemoryListeners(merged);
+  return merged;
 }
 
 /**
@@ -170,6 +227,7 @@ export function removePetMemory(id: string): void {
   const current = getPetMemories();
   const updated = current.filter((m) => m.id !== id);
   writeStorage(MEMORIES_STORAGE_KEY, updated);
+  notifyMemoryListeners(updated);
 }
 
 /**
@@ -178,6 +236,7 @@ export function removePetMemory(id: string): void {
 export function clearPetMemories(): void {
   try {
     localStorage.removeItem(MEMORIES_STORAGE_KEY);
+    notifyMemoryListeners([]);
   } catch {
     // Ignored
   }

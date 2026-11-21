@@ -20,6 +20,11 @@ import {
   generateMineFloor,
   isValidMineBoard,
 } from "../engine/mining/mineGenerator";
+import {
+  getPetMemories,
+  setPetMemories,
+  syncAndMergeMemories,
+} from "./petMemoryService";
 
 function safeNum(value: unknown, fallback: number, min = 0, max = Infinity): number {
   if (typeof value !== "number" || !Number.isFinite(value)) return fallback;
@@ -77,6 +82,11 @@ function sanitizeUnlockedHats(raw: unknown): string[] {
 class PersistenceService {
   private saveTimeout: ReturnType<typeof setTimeout> | null = null;
   private isInitialized = false;
+  private isHydrated = false;
+
+  public isReady(): boolean {
+    return this.isHydrated;
+  }
 
   // Initialize and load saved state from IndexedDB
   async initialize() {
@@ -108,7 +118,8 @@ class PersistenceService {
       // 2. Load Game State (with safe migration defaults for economy/inventory/skin fields)
       const savedGame = await db.game.get("current");
       if (savedGame) {
-        const unlockedSkins = sanitizeUnlockedSkins(savedGame.unlockedCases);
+        const rawSkins = savedGame.unlockedSkins ?? savedGame.unlockedCases;
+        const unlockedSkins = sanitizeUnlockedSkins(rawSkins);
         const activeSkin =
           savedGame.activeSkin && unlockedSkins.includes(savedGame.activeSkin)
             ? savedGame.activeSkin
@@ -148,6 +159,11 @@ class PersistenceService {
           mineResetCooldownUntil: safeNum(savedGame.mineResetCooldownUntil, 0, 0),
         });
 
+        // Restore pet memories from database if available
+        if (Array.isArray(savedGame.memories) && savedGame.memories.length > 0) {
+          syncAndMergeMemories(savedGame.memories);
+        }
+
         // Recalculate offline mining stamina regeneration
         useGameStore.getState().syncMiningStamina(now);
       }
@@ -166,15 +182,22 @@ class PersistenceService {
         }
       }
 
+      // Mark hydration barrier as ready - only now can auto-save safely persist changes
+      this.isHydrated = true;
+
       // Setup Auto-save watchers
       this.attachAutoSaveListeners();
     } catch {
-      // IndexedDB fallback safety
+      // IndexedDB fallback safety - ensure barrier still unlocks
+      this.isHydrated = true;
     }
   }
 
   // Save current state to IndexedDB immediately
   async saveNow() {
+    // Critical barrier: Never overwrite persistent storage if state has not been hydrated yet
+    if (!this.isHydrated) return;
+
     try {
       const pet = usePetStore.getState();
       const game = useGameStore.getState();
@@ -200,6 +223,7 @@ class PersistenceService {
         coins: game.coins,
         logs: game.logs,
         unlockedCases: game.unlockedSkins,
+        unlockedSkins: game.unlockedSkins,
         activeSkin: game.activeSkin,
         unlockedHats: game.unlockedHats,
         activeHat: game.activeHat,
@@ -213,6 +237,7 @@ class PersistenceService {
         mineFloor: game.mineFloor,
         mineTiles: game.mineTiles,
         mineResetCooldownUntil: game.mineResetCooldownUntil,
+        memories: getPetMemories(),
       };
 
       const prefRecord: PreferencesSaveRecord = {
@@ -233,6 +258,8 @@ class PersistenceService {
 
   // Debounced auto-save (triggers 1 second after user actions settle)
   triggerDebouncedSave() {
+    if (!this.isHydrated) return;
+
     if (this.saveTimeout) {
       clearTimeout(this.saveTimeout);
     }
@@ -262,6 +289,7 @@ class PersistenceService {
 
   // Export full save file as JSON
   async exportSaveFile(): Promise<string> {
+    this.isHydrated = true;
     await this.saveNow();
     const pet = await db.pets.get("current");
     const game = await db.game.get("current");
@@ -281,6 +309,7 @@ class PersistenceService {
   // Import and restore save file from JSON
   async importSaveFile(jsonString: string): Promise<boolean> {
     try {
+      this.isHydrated = true;
       const data = JSON.parse(jsonString);
       if (!data || !data.pet) return false;
 
@@ -314,7 +343,8 @@ class PersistenceService {
       }
 
       if (data.game) {
-        const unlockedSkins = sanitizeUnlockedSkins(data.game.unlockedCases);
+        const rawSkins = data.game.unlockedSkins ?? data.game.unlockedCases;
+        const unlockedSkins = sanitizeUnlockedSkins(rawSkins);
         const activeSkin =
           typeof data.game.activeSkin === "string" && unlockedSkins.includes(data.game.activeSkin)
             ? data.game.activeSkin
@@ -338,6 +368,7 @@ class PersistenceService {
           coins: Math.round(safeNum(data.game.coins, 50, 0)),
           logs: Array.isArray(data.game.logs) ? data.game.logs : [],
           unlockedCases: unlockedSkins,
+          unlockedSkins,
           activeSkin,
           unlockedHats,
           activeHat,
@@ -353,9 +384,13 @@ class PersistenceService {
           mineFloor,
           mineTiles,
           mineResetCooldownUntil: safeNum(data.game.mineResetCooldownUntil, 0, 0),
+          memories: Array.isArray(data.game.memories) ? data.game.memories : getPetMemories(),
         };
 
         await db.game.put(sanitizedGame);
+        if (Array.isArray(data.game.memories)) {
+          setPetMemories(data.game.memories);
+        }
         useGameStore.setState({
           coins: sanitizedGame.coins,
           logs: sanitizedGame.logs,

@@ -442,6 +442,7 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
   const { camera, size } = useThree();
 
   // 1. Sculpted Chubby Jelly Body Geometry with Smooth Vertex Colors
+  const hasHat = Boolean(activeHat && activeHat !== "hat-none");
   const outerBodyGeometry = useMemo(() => {
     const geo = new THREE.SphereGeometry(1.0, 64, 48);
     const pos = geo.attributes.position;
@@ -470,8 +471,8 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
         v.z *= 1 + flat * 0.05;
       }
 
-      // Gentle soft dumpling wave on top-right crown
-      if (v.y > 0.48) {
+      // Gentle soft dumpling wave on top-right crown (only when not wearing hat, ensuring flush fit under hats)
+      if (!hasHat && v.y > 0.48) {
         const topH = (v.y - 0.48) / 0.46;
         const smoothTop = topH * topH;
         const crestWave =
@@ -511,7 +512,7 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
     geo.setAttribute("color", new THREE.BufferAttribute(colors, 3));
     geo.computeVertexNormals();
     return geo;
-  }, [skinPalette.centerColor, skinPalette.midColor, skinPalette.edgeColor]);
+  }, [skinPalette.centerColor, skinPalette.midColor, skinPalette.edgeColor, hasHat]);
 
   // Dispose custom sculpted body geometry on unmount or skin change (prevents WebGL GPU memory leak)
   useEffect(() => {
@@ -2548,22 +2549,24 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
           />
         </mesh>
 
-        {/* Top-Right Soft Glossy Jelly Swirl Fold (Tucked smoothly into crown) */}
-        <mesh
-          position={[0.24, 0.72, 0.02]}
-          rotation={[0.22, 0.35, -0.2]}
-          scale={[1.0, 0.72, 1.0]}
-        >
-          <torusGeometry args={[0.3, 0.088, 16, 32, Math.PI * 0.85]} />
-          <meshPhysicalMaterial
-            color={skinPalette.limbColor}
-            roughness={0.1}
-            clearcoat={1.0}
-            clearcoatRoughness={0.05}
-            emissive={skinPalette.emissiveColor}
-            emissiveIntensity={0.12}
-          />
-        </mesh>
+        {/* Top-Right Soft Glossy Jelly Swirl Fold (Disembunyikan rapi saat memakai topi agar topi menempel pas di kepala) */}
+        {(!activeHat || activeHat === "hat-none") && (
+          <mesh
+            position={[0.24, 0.72, 0.02]}
+            rotation={[0.22, 0.35, -0.2]}
+            scale={[1.0, 0.72, 1.0]}
+          >
+            <torusGeometry args={[0.3, 0.088, 16, 32, Math.PI * 0.85]} />
+            <meshPhysicalMaterial
+              color={skinPalette.limbColor}
+              roughness={0.1}
+              clearcoat={1.0}
+              clearcoatRoughness={0.05}
+              emissive={skinPalette.emissiveColor}
+              emissiveIntensity={0.12}
+            />
+          </mesh>
+        )}
 
         {/* Left Jelly Droplet Arm */}
         <mesh position={[-1.16, -0.22, 0.04]} rotation={[0, 0, 0.35]} scale={[1.22, 0.85, 0.85]}>
@@ -3161,45 +3164,45 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
           </mesh>
         </group>
 
-        {/* === 3D WEARABLE HATS (PROPORTIONALLY SCALED FOR JURO'S CHUBBY HEAD) === */}
+        {/* === 3D WEARABLE HATS (PROPORTIONALLY SCALED & SNUGLY FITTED TO JURO'S HEAD) === */}
         {/* 1. Topi Baling-baling (hat-propeller) */}
         {activeHat === "hat-propeller" && (
-          <group position={[0, 0.91, 0.02]} rotation={[-0.08, 0, 0]}>
-            {/* Base Red Cap Dome */}
-            <mesh position={[0, 0, 0]} scale={[1.05, 0.65, 1.02]}>
+          <group position={[0, 0.77, 0.03]} rotation={[-0.06, 0, 0]}>
+            {/* Base Red Cap Dome: hollow hemisphere perfectly encapsulating head */}
+            <mesh position={[0, 0, 0]} scale={[1.22, 0.72, 1.16]}>
               <sphereGeometry args={[0.62, 32, 20, 0, Math.PI * 2, 0, Math.PI * 0.5]} />
               <meshStandardMaterial color="#DC2626" roughness={0.55} />
             </mesh>
             {/* Green Quarter Panel */}
-            <mesh position={[0, 0.003, 0]} scale={[1.054, 0.654, 1.024]}>
+            <mesh position={[0, 0.003, 0]} scale={[1.224, 0.724, 1.164]}>
               <sphereGeometry args={[0.62, 20, 16, 0, Math.PI * 0.52, 0, Math.PI * 0.5]} />
               <meshStandardMaterial color="#16A34A" roughness={0.55} />
             </mesh>
             {/* Yellow Quarter Panel */}
-            <mesh position={[0, 0.003, 0]} scale={[1.054, 0.654, 1.024]}>
+            <mesh position={[0, 0.003, 0]} scale={[1.224, 0.724, 1.164]}>
               <sphereGeometry args={[0.62, 20, 16, Math.PI * 0.95, Math.PI * 0.55, 0, Math.PI * 0.5]} />
               <meshStandardMaterial color="#EAB308" roughness={0.55} />
             </mesh>
             {/* Blue Visor / Cap Brim */}
-            <mesh position={[0, 0.02, 0.44]} rotation={[0.22, 0, 0]}>
-              <boxGeometry args={[0.74, 0.035, 0.38]} />
+            <mesh position={[0, 0.02, 0.52]} rotation={[0.22, 0, 0]}>
+              <boxGeometry args={[0.82, 0.035, 0.44]} />
               <meshStandardMaterial color="#2563EB" roughness={0.5} />
             </mesh>
             {/* Stalk & Beads on Top */}
-            <mesh position={[0, 0.40, 0]}>
-              <sphereGeometry args={[0.06, 14, 14]} />
+            <mesh position={[0, 0.45, 0]}>
+              <sphereGeometry args={[0.065, 14, 14]} />
               <meshStandardMaterial color="#1D4ED8" roughness={0.4} />
             </mesh>
-            <mesh position={[0, 0.50, 0]}>
-              <sphereGeometry args={[0.055, 14, 14]} />
+            <mesh position={[0, 0.55, 0]}>
+              <sphereGeometry args={[0.06, 14, 14]} />
               <meshStandardMaterial color="#FACC15" roughness={0.4} />
             </mesh>
-            <mesh position={[0, 0.58, 0]}>
+            <mesh position={[0, 0.63, 0]}>
               <cylinderGeometry args={[0.012, 0.012, 0.12, 10]} />
               <meshStandardMaterial color="#18181B" roughness={0.3} metalness={0.7} />
             </mesh>
             {/* Animated Spinning Propeller */}
-            <group ref={propellerRef} position={[0, 0.65, 0]}>
+            <group ref={propellerRef} position={[0, 0.70, 0]}>
               {/* Hub */}
               <mesh>
                 <sphereGeometry args={[0.065, 14, 14]} />
@@ -3220,31 +3223,31 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
 
         {/* 2. Topi Koki (hat-chef) */}
         {activeHat === "hat-chef" && (
-          <group position={[0, 0.90, 0.02]} rotation={[-0.06, 0, 0]}>
+          <group position={[0, 0.76, 0.02]} rotation={[-0.05, 0, 0]}>
             {/* White Headband Cylinder */}
-            <mesh position={[0, 0.11, 0]}>
-              <cylinderGeometry args={[0.58, 0.62, 0.22, 32]} />
+            <mesh position={[0, 0.10, 0]} scale={[1.16, 1.0, 1.08]}>
+              <cylinderGeometry args={[0.62, 0.66, 0.20, 32]} />
               <meshStandardMaterial color="#F1F5F9" roughness={0.7} />
             </mesh>
             {/* Main Puffy Billowing Toque Body */}
-            <mesh position={[0, 0.38, 0]} scale={[1.28, 0.78, 1.24]}>
-              <sphereGeometry args={[0.55, 24, 20]} />
+            <mesh position={[0, 0.38, 0]} scale={[1.36, 0.85, 1.30]}>
+              <sphereGeometry args={[0.58, 24, 20]} />
               <meshStandardMaterial color="#FFFFFF" roughness={0.85} />
             </mesh>
             {/* Pleat Puff Folds around Crown */}
-            <mesh position={[0.34, 0.46, 0.12]} scale={[0.85, 0.75, 0.85]}>
+            <mesh position={[0.36, 0.46, 0.12]} scale={[0.9, 0.8, 0.9]}>
               <sphereGeometry args={[0.28, 16, 16]} />
               <meshStandardMaterial color="#FFFFFF" roughness={0.85} />
             </mesh>
-            <mesh position={[-0.34, 0.46, 0.12]} scale={[0.85, 0.75, 0.85]}>
+            <mesh position={[-0.36, 0.46, 0.12]} scale={[0.9, 0.8, 0.9]}>
               <sphereGeometry args={[0.28, 16, 16]} />
               <meshStandardMaterial color="#FFFFFF" roughness={0.85} />
             </mesh>
-            <mesh position={[0, 0.50, 0.32]} scale={[0.85, 0.75, 0.85]}>
+            <mesh position={[0, 0.50, 0.34]} scale={[0.9, 0.8, 0.9]}>
               <sphereGeometry args={[0.28, 16, 16]} />
               <meshStandardMaterial color="#FFFFFF" roughness={0.85} />
             </mesh>
-            <mesh position={[0, 0.48, -0.28]} scale={[0.85, 0.75, 0.85]}>
+            <mesh position={[0, 0.48, -0.30]} scale={[0.9, 0.8, 0.9]}>
               <sphereGeometry args={[0.28, 16, 16]} />
               <meshStandardMaterial color="#FFFFFF" roughness={0.85} />
             </mesh>
@@ -3253,29 +3256,34 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
 
         {/* 3. Topi Jerami (hat-straw) */}
         {activeHat === "hat-straw" && (
-          <group position={[0, 0.94, 0.02]} rotation={[-0.05, 0, -0.04]}>
-            {/* Wide Straw Brim */}
-            <mesh position={[0, 0, 0]}>
-              <cylinderGeometry args={[0.92, 0.92, 0.035, 40]} />
-              <meshStandardMaterial color="#E6D5AC" roughness={0.9} />
+          <group position={[0, 0.78, 0.02]} rotation={[-0.06, 0, -0.04]}>
+            {/* Wide Straw Brim: ring with hole so Juro's head goes inside crown */}
+            <mesh position={[0, 0, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+              <ringGeometry args={[0.63, 1.10, 40]} />
+              <meshStandardMaterial color="#E6D5AC" roughness={0.9} side={THREE.DoubleSide} />
+            </mesh>
+            {/* Brim Outer Edge Torus for soft retro thickness */}
+            <mesh position={[0, 0, 0]} rotation={[Math.PI / 2, 0, 0]}>
+              <torusGeometry args={[1.08, 0.024, 12, 40]} />
+              <meshStandardMaterial color="#D4B982" roughness={0.9} />
             </mesh>
             {/* Cylindrical Straw Crown */}
-            <mesh position={[0, 0.14, 0]}>
-              <cylinderGeometry args={[0.56, 0.56, 0.28, 36]} />
+            <mesh position={[0, 0.15, 0]}>
+              <cylinderGeometry args={[0.64, 0.66, 0.30, 36]} />
               <meshStandardMaterial color="#D4B982" roughness={0.85} />
             </mesh>
             {/* Straw Crown Flat Top */}
-            <mesh position={[0, 0.28, 0]}>
-              <cylinderGeometry args={[0.56, 0.56, 0.015, 36]} />
+            <mesh position={[0, 0.30, 0]}>
+              <cylinderGeometry args={[0.64, 0.64, 0.015, 36]} />
               <meshStandardMaterial color="#E6D5AC" roughness={0.9} />
             </mesh>
             {/* Black Ribbon Band Around Crown */}
             <mesh position={[0, 0.06, 0]}>
-              <cylinderGeometry args={[0.57, 0.57, 0.09, 36]} />
+              <cylinderGeometry args={[0.66, 0.67, 0.10, 36]} />
               <meshStandardMaterial color="#18181B" roughness={0.5} />
             </mesh>
             {/* Black Ribbon Knot on Side */}
-            <group position={[0.57, 0.06, 0.16]} rotation={[0, 0.3, 0]}>
+            <group position={[0.66, 0.06, 0.16]} rotation={[0, 0.3, 0]}>
               <mesh position={[0, 0, 0]}>
                 <boxGeometry args={[0.06, 0.07, 0.06]} />
                 <meshStandardMaterial color="#18181B" roughness={0.5} />
@@ -3294,25 +3302,30 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
 
         {/* 4. Topi Pesulap (hat-top) */}
         {activeHat === "hat-top" && (
-          <group position={[0, 0.93, 0.02]} rotation={[-0.06, 0, 0.05]}>
-            {/* Wide Black Silk Brim */}
-            <mesh position={[0, 0, 0]}>
-              <cylinderGeometry args={[0.85, 0.85, 0.035, 40]} />
+          <group position={[0, 0.78, 0.02]} rotation={[-0.06, 0, 0.04]}>
+            {/* Wide Black Silk Brim: ring with hole so Juro's head fits inside crown */}
+            <mesh position={[0, 0, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+              <ringGeometry args={[0.60, 1.02, 40]} />
+              <meshStandardMaterial color="#18181B" roughness={0.4} metalness={0.15} side={THREE.DoubleSide} />
+            </mesh>
+            {/* Brim Outer Edge Torus */}
+            <mesh position={[0, 0, 0]} rotation={[Math.PI / 2, 0, 0]}>
+              <torusGeometry args={[1.00, 0.022, 12, 40]} />
               <meshStandardMaterial color="#18181B" roughness={0.4} metalness={0.15} />
             </mesh>
             {/* Tall Flared Top Hat Crown */}
-            <mesh position={[0, 0.36, 0]}>
-              <cylinderGeometry args={[0.55, 0.46, 0.72, 36]} />
+            <mesh position={[0, 0.38, 0]}>
+              <cylinderGeometry args={[0.68, 0.62, 0.76, 36]} />
               <meshStandardMaterial color="#242428" roughness={0.35} metalness={0.2} />
             </mesh>
             {/* Flat Top Cap */}
-            <mesh position={[0, 0.725, 0]}>
-              <cylinderGeometry args={[0.55, 0.55, 0.015, 36]} />
+            <mesh position={[0, 0.765, 0]}>
+              <cylinderGeometry args={[0.68, 0.68, 0.015, 36]} />
               <meshStandardMaterial color="#18181B" roughness={0.4} metalness={0.2} />
             </mesh>
             {/* Crimson Satin Ribbon Band */}
-            <mesh position={[0, 0.075, 0]}>
-              <cylinderGeometry args={[0.48, 0.47, 0.12, 36]} />
+            <mesh position={[0, 0.08, 0]}>
+              <cylinderGeometry args={[0.635, 0.625, 0.14, 36]} />
               <meshStandardMaterial color="#DC2626" roughness={0.25} metalness={0.35} />
             </mesh>
           </group>
@@ -3320,45 +3333,45 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
 
         {/* 5. Topi Pesta (hat-party) */}
         {activeHat === "hat-party" && (
-          <group position={[0, 0.93, 0.02]} rotation={[-0.06, 0.1, -0.08]}>
-            {/* Cone Body */}
-            <mesh position={[0, 0.48, 0]}>
-              <coneGeometry args={[0.48, 0.96, 32]} />
-              <meshStandardMaterial color="#7DD3FC" roughness={0.5} />
+          <group position={[0.02, 0.82, 0.02]} rotation={[-0.08, 0.08, -0.10]}>
+            {/* Open-Ended Cone Body (hollow base so head enters naturally) */}
+            <mesh position={[0, 0.45, 0]}>
+              <coneGeometry args={[0.48, 0.90, 32, 1, true]} />
+              <meshStandardMaterial color="#7DD3FC" roughness={0.5} side={THREE.DoubleSide} />
             </mesh>
-            {/* Bottom Scalloped Rim Accent */}
-            <mesh position={[0, 0.03, 0]}>
-              <cylinderGeometry args={[0.49, 0.49, 0.05, 32]} />
+            {/* Bottom Scalloped Rim Accent: Torus ring hugging head */}
+            <mesh position={[0, 0.01, 0]} rotation={[Math.PI / 2, 0, 0]}>
+              <torusGeometry args={[0.48, 0.028, 12, 32]} />
               <meshStandardMaterial color="#F43F5E" roughness={0.6} />
             </mesh>
             {/* Middle Warm Yellow Ring Accent */}
-            <mesh position={[0, 0.07, 0]}>
-              <cylinderGeometry args={[0.47, 0.47, 0.03, 32]} />
+            <mesh position={[0, 0.06, 0]} rotation={[Math.PI / 2, 0, 0]}>
+              <torusGeometry args={[0.45, 0.018, 12, 32]} />
               <meshStandardMaterial color="#FACC15" roughness={0.6} />
             </mesh>
             {/* Top Fluffy Pom-Pom */}
-            <mesh position={[0, 0.98, 0]}>
+            <mesh position={[0, 0.93, 0]}>
               <sphereGeometry args={[0.11, 16, 16]} />
               <meshStandardMaterial color="#FB7185" roughness={0.8} />
             </mesh>
             {/* Polka Dot Accents on Cone Surface */}
-            <mesh position={[0.24, 0.35, 0.22]}>
+            <mesh position={[0.22, 0.32, 0.20]}>
               <sphereGeometry args={[0.04, 10, 10]} />
               <meshStandardMaterial color="#FACC15" roughness={0.4} />
             </mesh>
-            <mesh position={[-0.22, 0.52, 0.18]}>
+            <mesh position={[-0.20, 0.48, 0.16]}>
               <sphereGeometry args={[0.04, 10, 10]} />
               <meshStandardMaterial color="#FFFFFF" roughness={0.4} />
             </mesh>
-            <mesh position={[0.04, 0.68, 0.20]}>
+            <mesh position={[0.04, 0.64, 0.18]}>
               <sphereGeometry args={[0.036, 10, 10]} />
               <meshStandardMaterial color="#F43F5E" roughness={0.4} />
             </mesh>
-            <mesh position={[-0.18, 0.30, 0.26]}>
+            <mesh position={[-0.16, 0.28, 0.24]}>
               <sphereGeometry args={[0.04, 10, 10]} />
               <meshStandardMaterial color="#FB7185" roughness={0.4} />
             </mesh>
-            <mesh position={[0.18, 0.56, 0.15]}>
+            <mesh position={[0.16, 0.52, 0.14]}>
               <sphereGeometry args={[0.036, 10, 10]} />
               <meshStandardMaterial color="#FFFFFF" roughness={0.4} />
             </mesh>
