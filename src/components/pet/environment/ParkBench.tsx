@@ -1,7 +1,7 @@
 import React from "react";
 import { Html } from "@react-three/drei";
 import { Armchair, Footprints, X } from "lucide-react";
-import { BASE_GROUND_Y } from "../../../engine/world/mapTerrain";
+import { BASE_GROUND_Y, JURO_BENCH_POS } from "../../../engine/world/mapTerrain";
 
 export interface ParkBenchProps {
   woodColor: string;
@@ -38,7 +38,7 @@ export const ParkBench: React.FC<ParkBenchProps> = ({
 
   return (
     <group
-      position={[3.65, BASE_GROUND_Y + 0.42, 0.95]}
+      position={[JURO_BENCH_POS.x, BASE_GROUND_Y + 0.42, JURO_BENCH_POS.z]}
       rotation={[0, -0.75, 0]}
       onClick={(e) => {
         e.stopPropagation();

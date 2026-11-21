@@ -30,12 +30,11 @@ function getDynamicQuickPrompts(props: JuroChatModalProps): string[] {
     prompts.push("Juro jangan sedih ya!");
   }
 
-  const defaults = [
-    `Halo ${props.petName}!`,
-    "Lagi mikirin apa?",
-    `Aku sayang ${props.petName}!`,
-    "Kamu suka camilan apa?",
-    "Semangat terus ya!",
+  const defaults: string[] = [
+    "Lagi ngapain Juro?",
+    "Cerita dong tentang harimu!",
+    "Kamu suka main apa?",
+    "Ayo jalan-jalan di taman!",
   ];
 
   for (const d of defaults) {
@@ -74,7 +73,7 @@ export const JuroChatModal: React.FC<JuroChatModalProps> = (props) => {
         <div className="flex items-center gap-1.5">
           <MessageSquare size={13} className="text-juro-orange" />
           <span className="pixel-text text-[10px] uppercase font-bold text-charcoal dark:text-white">
-            Ngobrol Bersama {petName}
+            {petName}
           </span>
         </div>
         <button

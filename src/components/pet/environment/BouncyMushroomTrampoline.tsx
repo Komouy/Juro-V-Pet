@@ -3,9 +3,10 @@ import { useFrame } from "@react-three/fiber";
 import { Html } from "@react-three/drei";
 import { ArrowBigUp, Footprints, X } from "lucide-react";
 import * as THREE from "three";
-import { BASE_GROUND_Y } from "../../../engine/world/mapTerrain";
+import { BASE_GROUND_Y, JURO_TRAMPOLINE_POS } from "../../../engine/world/mapTerrain";
 
 export interface BouncyMushroomTrampolineProps {
+  position?: [number, number, number];
   onTrampolineClick?: () => void;
   onHoverChange?: (isHovered: boolean) => void;
   isHovered?: boolean;
@@ -17,11 +18,12 @@ export interface BouncyMushroomTrampolineProps {
 }
 
 /**
- * Bouncy Mushroom Trampoline in the South-West Meadow.
+ * Bouncy Mushroom Trampoline in the Meadow Left of the Shop.
  * Interactive landmark where Juro bounces up and down with springy squishy physics.
  * Contextual menu is strictly anchored atop the mushroom cap in 3D world space (never follows camera!).
  */
 export const BouncyMushroomTrampoline: React.FC<BouncyMushroomTrampolineProps> = ({
+  position = [JURO_TRAMPOLINE_POS.x, BASE_GROUND_Y, JURO_TRAMPOLINE_POS.z],
   onTrampolineClick,
   onHoverChange,
   isHovered = false,
@@ -65,7 +67,7 @@ export const BouncyMushroomTrampoline: React.FC<BouncyMushroomTrampolineProps> =
 
   return (
     <group
-      position={[-1.75, BASE_GROUND_Y, 1.25]}
+      position={position}
       onClick={(e) => {
         e.stopPropagation();
         onTrampolineClick?.();

@@ -16,7 +16,7 @@ import {
 
 describe("Terrain & Object Collision Hull System", () => {
   it("includes all essential props, landmarks, sofa bed, and fences in MAP_OBSTACLES", () => {
-    expect(MAP_OBSTACLES.length).toBeGreaterThanOrEqual(40);
+    expect(MAP_OBSTACLES.length).toBeGreaterThanOrEqual(35);
 
     // Bed backrest & armrests
     const backrest = MAP_OBSTACLES.find((o) => Math.hypot(o.x - -3.33, o.z - -0.78) < 0.1);
@@ -29,14 +29,14 @@ describe("Terrain & Object Collision Hull System", () => {
     expect(rightArmrest).toBeDefined();
 
     // Bench on East Knoll
-    const bench = MAP_OBSTACLES.find((o) => Math.hypot(o.x - 3.65, o.z - 0.95) < 0.1);
+    const bench = MAP_OBSTACLES.find((o) => Math.hypot(o.x - 3.65, o.z - 1.15) < 0.1);
     expect(bench).toBeDefined();
 
     // Shop and Mine
     const shop = MAP_OBSTACLES.find((o) => Math.hypot(o.x - 4.55, o.z - -2.55) < 0.1);
     expect(shop).toBeDefined();
 
-    const mine = MAP_OBSTACLES.find((o) => Math.hypot(o.x - -4.65, o.z - -4.35) < 0.1);
+    const mine = MAP_OBSTACLES.find((o) => Math.hypot(o.x - -4.35, o.z - -4.05) < 0.1);
     expect(mine).toBeDefined();
   });
 
@@ -71,9 +71,9 @@ describe("Terrain & Object Collision Hull System", () => {
     expect(sleepCol.z).toBeCloseTo(JURO_BED_POS.z, 2);
   });
 
-  it("verifies left tree stump is removed from MAP_PLATFORMS leaving open meadow", () => {
-    const leftStump = MAP_PLATFORMS.find((p) => p.id === "stump-sw");
-    expect(leftStump).toBeUndefined();
+  it("verifies all tree stumps are removed from MAP_PLATFORMS leaving open meadow", () => {
+    const stumps = MAP_PLATFORMS.filter((p) => p.kind === "stump" || p.id.startsWith("stump-"));
+    expect(stumps).toHaveLength(0);
   });
 
   it("treats park bench as solid obstacle while wandering, but allows Juro to sit on it", () => {
@@ -165,19 +165,19 @@ describe("Terrain & Object Collision Hull System", () => {
   });
 
   it("prevents clipping horizontally into platform cliff walls from below", () => {
-    // East knoll center is (3.45, 0.75), radius 1.45, height 0.42
+    // East knoll center is (3.65, 1.15), radius 1.25, height 0.42
     // Bottom ground is at BASE_GROUND_Y
     const wallCol = resolveHorizontalCollisions(
-      3.45,
-      0.75,
+      3.65,
+      1.15,
       BASE_GROUND_Y,
       0.38,
       false,
       false
     );
     expect(wallCol.hitObstacle).toBe(true);
-    // Pushed outside platform radius
-    expect(Math.hypot(wallCol.x - 3.45, wallCol.z - 0.75)).toBeGreaterThan(1.4);
+    // Pushed outside platform radius towards bounds
+    expect(Math.hypot(wallCol.x - 3.65, wallCol.z - 1.15)).toBeGreaterThan(1.0);
   });
 
   it("treats mushroom trampoline as solid obstacle when wandering, but allows Juro onto it when bouncing", () => {

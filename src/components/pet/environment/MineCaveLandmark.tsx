@@ -29,8 +29,8 @@ export const MineCaveLandmark: React.FC<MineCaveLandmarkProps> = ({
   isLanternLit,
   isHovered,
   mineSignTex,
-  position = [-4.65, BASE_GROUND_Y, -4.35],
-  rotation = [0, 0.92, 0],
+  position = [-4.35, BASE_GROUND_Y, -4.05],
+  rotation = [0, 1.12, 0],
   onPointerDown,
   onClick,
   onHoverChange,
@@ -97,22 +97,6 @@ export const MineCaveLandmark: React.FC<MineCaveLandmarkProps> = ({
           emissive="#F59E0B"
           emissiveIntensity={isLanternLit || isHovered ? 1.5 : 0.85}
         />
-      </mesh>
-
-      {/* Mini Mine-Cart Wooden Sleepers & Steel Rails Leading Out to the Bridge Path */}
-      {[0.64, 0.84, 1.04].map((zOff, idx) => (
-        <mesh key={idx} position={[0, 0.02, zOff]}>
-          <boxGeometry args={[0.54, 0.03, 0.06]} />
-          <meshLambertMaterial color={woodDarkColor} />
-        </mesh>
-      ))}
-      <mesh position={[-0.18, 0.04, 0.84]}>
-        <boxGeometry args={[0.04, 0.025, 0.66]} />
-        <meshLambertMaterial color="#94A3B8" />
-      </mesh>
-      <mesh position={[0.18, 0.04, 0.84]}>
-        <boxGeometry args={[0.04, 0.025, 0.66]} />
-        <meshLambertMaterial color="#94A3B8" />
       </mesh>
 
       {/* Glowing Miniature Crystal Clusters Embedded on Cave Entrance */}

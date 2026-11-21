@@ -170,8 +170,8 @@ describe("Economy, Mining & Shop System", () => {
     // With footbridge removed, terrain height at stream is ground level
     expect(getTerrainHeightAt(-0.36, -2.32)).toBeCloseTo(BASE_GROUND_Y, 2);
 
-    // Mine Cave at (-4.65, -4.35) blocks Juro from clipping inside
-    const hitMineCave = resolveHorizontalCollisions(-4.65, -3.6, BASE_GROUND_Y, 0.38, false);
+    // Mine Cave at (-4.35, -4.05) blocks Juro from clipping inside
+    const hitMineCave = resolveHorizontalCollisions(-4.35, -3.3, BASE_GROUND_Y, 0.38, false);
     expect(hitMineCave.hitObstacle).toBe(true);
   });
 

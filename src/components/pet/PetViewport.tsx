@@ -1469,7 +1469,7 @@ export const PetViewport: React.FC = () => {
     isHeadingToTrampolineRef.current = false;
     soundEffects.playPlop();
     // Walk to clear open meadow grass safely in front of the trampoline
-    setWalkCommand({ x: -0.75, z: 1.25, nonce: Date.now() });
+    setWalkCommand({ x: JURO_TRAMPOLINE_POS.x, z: JURO_TRAMPOLINE_POS.z + 0.65, nonce: Date.now() });
     addLog("interaction", "Juro selesai bermain trampolin dan melangkah kembali ke padang rumput.");
   }, [addLog]);
 

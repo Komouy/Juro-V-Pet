@@ -37,21 +37,21 @@ export const MAP_OBSTACLES: SolidObstacle[] = [
   { x: 4.8, z: -4.9, radius: 0.45, topY: 1.4 },
 
   // Miniature Juro Shop Building & Porch Counter
-  { x: 4.55, z: -2.55, radius: 1.12, topY: 1.5 },
-  { x: 4.35, z: -2.08, radius: 0.68, topY: 1.1 },
+  { x: 4.55, z: -2.55, radius: 0.88, topY: 1.5 },
+  { x: 4.35, z: -2.08, radius: 0.52, topY: 1.1 },
 
   // Crystal Mine Cave Portal & Side Rock Mounds at West River Headwaters
-  { x: -4.65, z: -4.35, radius: 1.15, topY: 1.6 },
-  { x: -5.35, z: -4.15, radius: 0.85, topY: 1.3 },
-  { x: -4.15, z: -4.85, radius: 0.85, topY: 1.3 },
+  { x: -4.35, z: -4.05, radius: 1.15, topY: 1.6 },
+  { x: -4.80, z: -3.50, radius: 0.85, topY: 1.3 },
+  { x: -4.10, z: -4.75, radius: 0.85, topY: 1.3 },
 
   // Wooden Park Bench atop East Knoll (3 overlapping circles along bench length)
-  { x: 3.46, z: 0.77, radius: 0.24, topY: BASE_GROUND_Y + 0.82, tag: "bench" },
-  { x: 3.65, z: 0.95, radius: 0.24, topY: BASE_GROUND_Y + 0.82, tag: "bench" },
-  { x: 3.84, z: 1.13, radius: 0.24, topY: BASE_GROUND_Y + 0.82, tag: "bench" },
+  { x: 3.46, z: 0.97, radius: 0.24, topY: BASE_GROUND_Y + 0.82, tag: "bench" },
+  { x: 3.65, z: 1.15, radius: 0.24, topY: BASE_GROUND_Y + 0.82, tag: "bench" },
+  { x: 3.84, z: 1.33, radius: 0.24, topY: BASE_GROUND_Y + 0.82, tag: "bench" },
 
-  // Bouncy Mushroom Trampoline in South-West Meadow
-  { x: -1.75, z: 1.25, radius: 0.50, topY: BASE_GROUND_Y + 0.38, tag: "trampoline" },
+  // Bouncy Mushroom Trampoline in Meadow Left of Shop
+  { x: 2.50, z: -2.80, radius: 0.50, topY: BASE_GROUND_Y + 0.38, tag: "trampoline" },
 
   // West Knoll Sofa Bed Frame (Backrest, Armrests & Nightstand)
   { x: -3.88, z: -0.52, radius: 0.24, topY: BASE_GROUND_Y + 0.85, tag: "bed-frame" }, // Nightstand & Lamp
@@ -61,7 +61,7 @@ export const MAP_OBSTACLES: SolidObstacle[] = [
 
   // Two Glowing Meadow Lantern Posts
   { x: -1.45, z: -1.65, radius: 0.18, topY: 0.5 },
-  { x: 2.25, z: 0.22, radius: 0.18, topY: 0.5 },
+  { x: 2.75, z: 0.95, radius: 0.18, topY: 0.5 },
 
   // Bushes inside & bordering valley
   { x: -5.1, z: -1.7, radius: 0.36, topY: BASE_GROUND_Y + 0.4 },
@@ -91,14 +91,10 @@ export const MAP_OBSTACLES: SolidObstacle[] = [
   { x: 4.8, z: -3.1, radius: 0.26, topY: BASE_GROUND_Y + 0.45 },
   { x: 5.5, z: -2.95, radius: 0.26, topY: BASE_GROUND_Y + 0.45 },
 
-  // Rocks, scenic boulders & river pebbles in walkable zone
-  { x: 1.38, z: -0.82, radius: 0.20, topY: BASE_GROUND_Y + 0.22 },
+  // Rocks & scenic boulders in walkable meadow zone (river water rocks removed for clear pristine stream)
   { x: 1.56, z: -0.62, radius: 0.16, topY: BASE_GROUND_Y + 0.18 },
   { x: 2.95, z: -0.45, radius: 0.22, topY: BASE_GROUND_Y + 0.24 },
   { x: 3.22, z: -0.64, radius: 0.18, topY: BASE_GROUND_Y + 0.20 },
-  { x: 3.55, z: -1.30, radius: 0.20, topY: BASE_GROUND_Y + 0.22 },
-  { x: -0.95, z: -2.00, radius: 0.19, topY: BASE_GROUND_Y + 0.22 },
-  { x: 0.45, z: -1.58, radius: 0.17, topY: BASE_GROUND_Y + 0.18 },
   { x: -4.65, z: -1.75, radius: 0.38, topY: BASE_GROUND_Y + 0.35 },
   { x: -4.32, z: -1.52, radius: 0.26, topY: BASE_GROUND_Y + 0.28 },
   { x: -2.65, z: 1.75, radius: 0.26, topY: BASE_GROUND_Y + 0.26 },
@@ -129,16 +125,16 @@ export const JURO_BED_POS = {
 // Cozy wooden park bench atop East Knoll where Juro can sit and look over the meadow
 export const JURO_BENCH_POS = {
   x: 3.65,
-  z: 0.95,
+  z: 1.15,
   seatY: BASE_GROUND_Y + 0.42 + 0.175,
   rotY: -0.75,
   platformId: "east-knoll",
 } as const;
 
-// Interactive bouncy mushroom trampoline in South-West Meadow
+// Interactive bouncy mushroom trampoline in Meadow Left of Shop
 export const JURO_TRAMPOLINE_POS = {
-  x: -1.75,
-  z: 1.25,
+  x: 2.50,
+  z: -2.80,
   surfaceY: BASE_GROUND_Y + 0.42,
   label: "Trampolin Jamur",
 } as const;
@@ -157,38 +153,20 @@ export const MAP_PLATFORMS: ElevatedPlatform[] = [
   {
     id: "east-knoll",
     kind: "terrace",
-    x: 3.45,
-    z: 0.75,
-    radius: 1.45,
+    x: 3.65,
+    z: 1.15,
+    radius: 1.25,
     height: 0.42,
     label: "Bukit Santai Timur",
   },
   {
     id: "mushroom-trampoline",
-    kind: "stump",
-    x: -1.75,
-    z: 1.25,
+    kind: "terrace",
+    x: 2.50,
+    z: -2.80,
     radius: 0.50,
     height: 0.42,
     label: "Trampolin Jamur",
-  },
-  {
-    id: "stump-se",
-    kind: "stump",
-    x: 1.55,
-    z: 1.35,
-    radius: 0.42,
-    height: 0.28,
-    label: "Tunggul Kayu Timur",
-  },
-  {
-    id: "stump-north",
-    kind: "stump",
-    x: 0.95,
-    z: -1.35,
-    radius: 0.36,
-    height: 0.24,
-    label: "Tunggul Tepi Sungai",
   },
 ];
 
@@ -201,8 +179,9 @@ const BROOK_SEGMENTS = [
   [-4.15, -3.95, 0.42],
   [-2.2, -3.0, 0.46],
   [-0.45, -2.35, 0.48],
-  [0.95, -1.95, 0.50],
-  [2.25, -1.25, 0.60],
+  [0.95, -1.85, 0.46],
+  [1.75, -1.40, 0.42],
+  [2.45, -1.05, 0.25],
 ];
 
 // Check if (x, z) is inside the lily pond or winding brook (Juro can swim/glide over water!)
@@ -215,12 +194,12 @@ export function isWaterAt(x: number, z: number): boolean {
     }
   }
 
-  // Pond oval centered at (2.45, -1.05)
-  const pdx = (x - 2.45) / 1.15;
-  const pdz = (z - -1.05) / 0.8;
+  // Small Lake (Danau Kecil) oval centered at (2.45, -1.05)
+  const pdx = (x - 2.45) / 1.35;
+  const pdz = (z - -1.05) / 0.95;
   if (pdx * pdx + pdz * pdz < 1.0) return true;
 
-  // Brook stream from mine headwaters (-4.15, -3.95) down to pond (2.25, -1.25)
+  // Brook stream from mine headwaters (-4.15, -3.95) down to the small lake (2.45, -1.05)
   for (let i = 0; i < BROOK_SEGMENTS.length - 1; i++) {
     const p1 = BROOK_SEGMENTS[i];
     const p2 = BROOK_SEGMENTS[i + 1];
@@ -279,10 +258,11 @@ export function getTerrainHeightAt(x: number, z: number): number {
     const dist = Math.hypot(x - p.x, z - p.z);
     if (dist <= p.radius * 0.96) {
       maxY = Math.max(maxY, BASE_GROUND_Y + p.height);
-    } else if (dist <= p.radius * 1.12 && p.kind === "terrace") {
-      // Smooth bevel ramp right at terrace rim
-      const slopeT = 1 - (dist - p.radius * 0.96) / (p.radius * 0.16);
-      maxY = Math.max(maxY, BASE_GROUND_Y + p.height * slopeT);
+    } else if (dist <= p.radius * 1.35 && p.kind === "terrace") {
+      // Smooth organic slope connecting the knoll plateau to the meadow
+      const t = (dist - p.radius * 0.96) / (p.radius * 0.39);
+      const slopeT = 1 - t * t * (3 - 2 * t);
+      maxY = Math.max(maxY, BASE_GROUND_Y + p.height * Math.max(0, slopeT));
     }
   }
 
@@ -447,9 +427,9 @@ export function pickScenicWaypoint(bias?: "water" | "bed" | "food" | "bench" | "
       return { x: benchX, z: benchZ };
     }
   } else if (bias === "trampoline") {
-    // Clear meadow path in front of the bouncy mushroom trampoline
-    const tx = -0.75 + (Math.random() - 0.5) * 0.4;
-    const tz = 1.25 + (Math.random() - 0.5) * 0.4;
+    // Clear meadow path in front of the bouncy mushroom trampoline left of shop
+    const tx = 2.50 + (Math.random() - 0.5) * 0.3;
+    const tz = -2.15 + (Math.random() - 0.5) * 0.3;
     if (!isInsideObstacle(tx, tz, 0.3)) {
       return { x: tx, z: tz };
     }

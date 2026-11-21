@@ -2,7 +2,7 @@ import React, { useRef, useMemo, useEffect, useState } from "react";
 import { useFrame, type ThreeEvent } from "@react-three/fiber";
 import * as THREE from "three";
 import type { TimeThemeConfig } from "../../utils/timeOfDay";
-import { BASE_GROUND_Y, MAP_PLATFORMS } from "../../engine/world/mapTerrain";
+import { BASE_GROUND_Y, MAP_PLATFORMS, JURO_TRAMPOLINE_POS } from "../../engine/world/mapTerrain";
 import { PetSofaBed } from "./environment/PetSofaBed";
 import { ParkBench } from "./environment/ParkBench";
 import { BouncyMushroomTrampoline } from "./environment/BouncyMushroomTrampoline";
@@ -58,6 +58,39 @@ interface OutdoorEnvironmentProps {
 // Reusable scratch objects at module scope (zero GC allocations per frame, 0 lint warnings)
 const _dummy = new THREE.Object3D();
 const _color = new THREE.Color();
+
+// Soft volumetric Ghibli cumulus cloud cluster
+const FluffyCloud: React.FC<{
+  position: [number, number, number];
+  scale?: number;
+  rotationY?: number;
+  cloudColor: string;
+  cloudOpacity: number;
+  puffiness?: number;
+}> = ({ position, scale = 1, rotationY = 0, cloudColor, cloudOpacity, puffiness = 1 }) => (
+  <group position={position} scale={scale} rotation={[0, rotationY, 0]}>
+    <mesh>
+      <sphereGeometry args={[0.72 * puffiness, 14, 12]} />
+      <meshBasicMaterial color={cloudColor} transparent opacity={cloudOpacity} depthWrite={false} />
+    </mesh>
+    <mesh position={[0.56 * puffiness, -0.08 * puffiness, 0]}>
+      <sphereGeometry args={[0.52 * puffiness, 12, 10]} />
+      <meshBasicMaterial color={cloudColor} transparent opacity={cloudOpacity} depthWrite={false} />
+    </mesh>
+    <mesh position={[-0.52 * puffiness, -0.1 * puffiness, 0]}>
+      <sphereGeometry args={[0.48 * puffiness, 12, 10]} />
+      <meshBasicMaterial color={cloudColor} transparent opacity={cloudOpacity} depthWrite={false} />
+    </mesh>
+    <mesh position={[0.12 * puffiness, 0.24 * puffiness, 0]}>
+      <sphereGeometry args={[0.46 * puffiness, 12, 10]} />
+      <meshBasicMaterial color={cloudColor} transparent opacity={cloudOpacity * 0.92} depthWrite={false} />
+    </mesh>
+    <mesh position={[-0.1 * puffiness, 0.05 * puffiness, -0.22 * puffiness]}>
+      <sphereGeometry args={[0.44 * puffiness, 10, 8]} />
+      <meshBasicMaterial color={cloudColor} transparent opacity={cloudOpacity * 0.88} depthWrite={false} />
+    </mesh>
+  </group>
+);
 
 export const OutdoorEnvironment: React.FC<OutdoorEnvironmentProps> = React.memo(
   ({
@@ -184,10 +217,12 @@ export const OutdoorEnvironment: React.FC<OutdoorEnvironmentProps> = React.memo(
       }
     };
 
-    // Pond & Stream shapes
-    const pondBankShape = useMemo(() => createOrganicPondShape(1.18, 0.86), []);
-    const pondWaterShape = useMemo(() => createOrganicPondShape(1.06, 0.75), []);
-    const streamBankShape = useMemo(() => createStreamShape(0.11), []);
+    // Pond & Stream shapes (Recessed Basin, Shoreline Bank & Sparkling Surface)
+    const pondBedShape = useMemo(() => createOrganicPondShape(1.36, 1.04), []);
+    const pondBankShape = useMemo(() => createOrganicPondShape(1.24, 0.94), []);
+    const pondWaterShape = useMemo(() => createOrganicPondShape(1.12, 0.84), []);
+    const streamBedShape = useMemo(() => createStreamShape(0.16), []);
+    const streamBankShape = useMemo(() => createStreamShape(0.08), []);
     const streamWaterShape = useMemo(() => createStreamShape(0), []);
 
     // 1. Stars (70 instances -> 1 draw call!)
@@ -373,7 +408,8 @@ export const OutdoorEnvironment: React.FC<OutdoorEnvironmentProps> = React.memo(
       const t = state.clock.getElapsedTime();
 
       if (cloudsGroupRef.current) {
-        cloudsGroupRef.current.position.x = Math.sin(t * 0.07) * 0.65;
+        cloudsGroupRef.current.rotation.y = t * 0.007;
+        cloudsGroupRef.current.position.y = Math.sin(t * 0.04) * 0.12;
       }
 
       // Twinkling stars at night
@@ -468,7 +504,6 @@ export const OutdoorEnvironment: React.FC<OutdoorEnvironmentProps> = React.memo(
     const isLanternLit = theme.isNight || theme.phase === "sunset";
     const woodColor = theme.isNight ? "#451A03" : "#92400E";
     const woodDarkColor = theme.isNight ? "#2D1002" : "#78350F";
-    const cliffSoilColor = theme.isNight ? "#3B2618" : "#8D6E63";
     const cloudColor = weather === "rain" ? (theme.isNight ? "#1E293B" : "#94A3B8") : theme.cloudColor;
     const cloudOpacity = weather === "rain" ? Math.min(0.98, theme.cloudOpacity + 0.12) : theme.cloudOpacity;
 
@@ -510,29 +545,7 @@ export const OutdoorEnvironment: React.FC<OutdoorEnvironmentProps> = React.memo(
         {/* Dynamic Vertical Pixel Rain & River Water Ripples */}
         <PixelRain isRaining={weather === "rain"} />
 
-        {/* 3. Layered Distant Mountains & Rolling Green Horizon Hills */}
-        <mesh position={[-3.8, -1.4, -10.5]} scale={[3.8, 2.4, 0.7]}>
-          <coneGeometry args={[1.6, 2.2, 5]} />
-          <meshBasicMaterial color={theme.hillFarColor} transparent opacity={0.55} />
-        </mesh>
-        <mesh position={[3.8, -1.35, -10.8]} scale={[4.2, 2.6, 0.7]}>
-          <coneGeometry args={[1.6, 2.2, 5]} />
-          <meshBasicMaterial color={theme.hillFarColor} transparent opacity={0.5} />
-        </mesh>
-        <mesh position={[0.2, -1.85, -8.5]} scale={[10.2, 1.85, 0.8]}>
-          <sphereGeometry args={[1.6, 28, 12]} />
-          <meshBasicMaterial color={theme.hillFarColor} />
-        </mesh>
-        <mesh position={[-5.6, -1.85, -6.8]} scale={[5.2, 1.4, 0.8]}>
-          <sphereGeometry args={[1.5, 24, 12]} />
-          <meshBasicMaterial color={theme.hillNearColor} />
-        </mesh>
-        <mesh position={[5.6, -1.85, -6.6]} scale={[5.4, 1.38, 0.8]}>
-          <sphereGeometry args={[1.5, 24, 12]} />
-          <meshBasicMaterial color={theme.hillNearColor} />
-        </mesh>
-
-        {/* 4. Instanced Forest Belt: 14 Round Trees + 12 Pine Trees + 16 Shrubs */}
+        {/* 4. Instanced Forest Belt: Trees & Shrubs Framing the Valley */}
         <instancedMesh ref={roundTreeTrunksInstRef} args={[undefined, undefined, roundTrees.length]}>
           <cylinderGeometry args={[0.065, 0.095, 0.48, 7]} />
           <meshLambertMaterial color={woodDarkColor} />
@@ -570,77 +583,93 @@ export const OutdoorEnvironment: React.FC<OutdoorEnvironmentProps> = React.memo(
           <meshLambertMaterial color={woodColor} />
         </instancedMesh>
 
-        {/* 6. Drifting Fluffy Clouds */}
-        <group ref={cloudsGroupRef} position={[0, 1.9, -6.2]}>
-          <group position={[-3.8, 0.35, 0]}>
-            <mesh><sphereGeometry args={[0.54, 12, 10]} /><meshBasicMaterial color={cloudColor} transparent opacity={cloudOpacity} /></mesh>
-            <mesh position={[0.44, -0.08, 0]}><sphereGeometry args={[0.4, 10, 8]} /><meshBasicMaterial color={cloudColor} transparent opacity={cloudOpacity} /></mesh>
-            <mesh position={[-0.44, -0.1, 0]}><sphereGeometry args={[0.36, 10, 8]} /><meshBasicMaterial color={cloudColor} transparent opacity={cloudOpacity} /></mesh>
-          </group>
-          <group position={[3.8, 0.68, -0.4]}>
-            <mesh><sphereGeometry args={[0.58, 12, 10]} /><meshBasicMaterial color={cloudColor} transparent opacity={cloudOpacity} /></mesh>
-            <mesh position={[0.5, -0.1, 0]}><sphereGeometry args={[0.44, 10, 8]} /><meshBasicMaterial color={cloudColor} transparent opacity={cloudOpacity} /></mesh>
-            <mesh position={[-0.48, -0.1, 0]}><sphereGeometry args={[0.4, 10, 8]} /><meshBasicMaterial color={cloudColor} transparent opacity={cloudOpacity} /></mesh>
-          </group>
-          <group position={[0.15, 1.15, -1.2]} scale={0.76}>
-            <mesh><sphereGeometry args={[0.48, 10, 8]} /><meshBasicMaterial color={cloudColor} transparent opacity={cloudOpacity * 0.85} /></mesh>
-            <mesh position={[0.38, -0.06, 0]}><sphereGeometry args={[0.34, 10, 8]} /><meshBasicMaterial color={cloudColor} transparent opacity={cloudOpacity * 0.85} /></mesh>
-          </group>
+        {/* 6. High Majestic Fluffy Clouds (360° Living Sky Canopy Surrounding the Valley) */}
+        <group ref={cloudsGroupRef}>
+          {/* A. North Horizon Clouds (Lowered to y=2.3-2.9 so Sun/Moon at y=7.8-8.4 is completely clear!) */}
+          <FluffyCloud position={[-11.5, 2.9, -15.0]} scale={1.25} rotationY={0.15} cloudColor={cloudColor} cloudOpacity={cloudOpacity} />
+          <FluffyCloud position={[-7.2, 2.5, -14.2]} scale={1.0} rotationY={-0.12} cloudColor={cloudColor} cloudOpacity={cloudOpacity} />
+          <FluffyCloud position={[-2.2, 2.3, -14.5]} scale={0.88} rotationY={0.08} cloudColor={cloudColor} cloudOpacity={cloudOpacity * 0.9} />
+          <FluffyCloud position={[2.0, 2.4, -14.2]} scale={0.92} rotationY={-0.1} cloudColor={cloudColor} cloudOpacity={cloudOpacity * 0.9} />
+          <FluffyCloud position={[7.0, 2.6, -14.0]} scale={1.1} rotationY={0.18} cloudColor={cloudColor} cloudOpacity={cloudOpacity} />
+          <FluffyCloud position={[11.8, 2.9, -15.0]} scale={1.3} rotationY={-0.15} cloudColor={cloudColor} cloudOpacity={cloudOpacity} />
+
+          {/* B. West Sky Clouds (Langit Barat) */}
+          <FluffyCloud position={[-15.0, 4.0, -7.5]} scale={1.2} rotationY={Math.PI / 2 + 0.2} cloudColor={cloudColor} cloudOpacity={cloudOpacity} />
+          <FluffyCloud position={[-15.8, 4.4, 0.0]} scale={1.25} rotationY={Math.PI / 2} cloudColor={cloudColor} cloudOpacity={cloudOpacity} />
+          <FluffyCloud position={[-14.5, 4.1, 7.5]} scale={1.15} rotationY={Math.PI / 2 - 0.2} cloudColor={cloudColor} cloudOpacity={cloudOpacity} />
+
+          {/* C. East Sky Clouds (Langit Timur) */}
+          <FluffyCloud position={[14.5, 4.0, -7.5]} scale={1.15} rotationY={-Math.PI / 2 - 0.2} cloudColor={cloudColor} cloudOpacity={cloudOpacity} />
+          <FluffyCloud position={[15.5, 4.4, 0.0]} scale={1.25} rotationY={-Math.PI / 2} cloudColor={cloudColor} cloudOpacity={cloudOpacity} />
+          <FluffyCloud position={[14.8, 4.1, 7.5]} scale={1.15} rotationY={-Math.PI / 2 + 0.2} cloudColor={cloudColor} cloudOpacity={cloudOpacity} />
+
+          {/* D. South / Front Sky Clouds (Langit Depan, elevated high at y=6.2-7.0, z=15 so they never block the meadow) */}
+          <FluffyCloud position={[-10.2, 6.2, 15.2]} scale={1.3} rotationY={Math.PI} cloudColor={cloudColor} cloudOpacity={cloudOpacity * 0.9} />
+          <FluffyCloud position={[-3.8, 6.8, 16.0]} scale={1.15} rotationY={Math.PI - 0.15} cloudColor={cloudColor} cloudOpacity={cloudOpacity * 0.88} />
+          <FluffyCloud position={[3.5, 6.6, 15.8]} scale={1.2} rotationY={Math.PI + 0.1} cloudColor={cloudColor} cloudOpacity={cloudOpacity * 0.88} />
+          <FluffyCloud position={[10.5, 6.4, 15.0]} scale={1.3} rotationY={Math.PI} cloudColor={cloudColor} cloudOpacity={cloudOpacity * 0.9} />
+
+          {/* E. Overhead High Wisps (Langit Atas) */}
+          <FluffyCloud position={[-4.5, 9.0, -3.5]} scale={1.05} rotationY={0.4} puffiness={0.9} cloudColor={cloudColor} cloudOpacity={cloudOpacity * 0.75} />
+          <FluffyCloud position={[5.2, 9.4, 2.5]} scale={1.1} rotationY={-0.5} puffiness={0.9} cloudColor={cloudColor} cloudOpacity={cloudOpacity * 0.75} />
+          <FluffyCloud position={[-1.2, 9.6, 4.2]} scale={0.95} rotationY={0.8} puffiness={0.85} cloudColor={cloudColor} cloudOpacity={cloudOpacity * 0.72} />
         </group>
 
-        {/* 7. Lush Grassy Valley Meadow Floor (Clickable to guide Juro!) */}
+        {/* 7. Lush Grassy Valley Meadow Floor */}
         <mesh
           position={[0, BASE_GROUND_Y, 0]}
           rotation={[-Math.PI / 2, 0, 0]}
           onPointerDown={handleGroundPointerDown}
           onClick={handleGroundClick}
         >
-          <circleGeometry args={[24, 48]} />
+          <circleGeometry args={[27, 64]} />
           <meshLambertMaterial color={theme.groundColor} />
         </mesh>
-        <mesh position={[0, BASE_GROUND_Y + 0.004, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-          <circleGeometry args={[4.4, 40]} />
-          <meshBasicMaterial color={theme.groundRimColor} opacity={0.22} transparent />
+
+        {/* Central Valley Meadow Soft Sunny Glow */}
+        <mesh position={[0, BASE_GROUND_Y + 0.002, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+          <circleGeometry args={[4.8, 48]} />
+          <meshBasicMaterial color={theme.groundRimColor} opacity={0.16} transparent />
+        </mesh>
+
+        {/* Mushroom Trampoline Fairy Clearing Ring */}
+        <mesh
+          position={[JURO_TRAMPOLINE_POS.x, BASE_GROUND_Y + 0.003, JURO_TRAMPOLINE_POS.z]}
+          rotation={[-Math.PI / 2, 0, 0]}
+        >
+          <circleGeometry args={[0.74, 24]} />
+          <meshBasicMaterial color={theme.groundRimColor} opacity={0.2} transparent />
         </mesh>
 
         {/* 8. Jumpable Elevated Platforms, Grassy Knolls, Rock Ledge & Tree Stumps (Synced to MAP_PLATFORMS!) */}
         <group onPointerDown={handleGroundPointerDown} onClick={handleGroundClick}>
           {MAP_PLATFORMS.filter((p) => p.id !== "mushroom-trampoline").map((p) => {
             if (p.kind === "terrace") {
+              const isEast = p.id === "east-knoll";
               return (
                 <group key={p.id} position={[p.x, BASE_GROUND_Y, p.z]}>
-                  {/* Earthy Cliff Side Base */}
-                  <mesh position={[0, p.height * 0.44, 0]}>
-                    <cylinderGeometry args={[p.radius * 0.98, p.radius * 1.12, p.height * 0.88, 22]} />
-                    <meshLambertMaterial color={cliffSoilColor} />
-                  </mesh>
-                  {/* Lush Grassy Top Cap */}
-                  <mesh position={[0, p.height - 0.045, 0]}>
-                    <cylinderGeometry args={[p.radius * 1.0, p.radius * 1.03, 0.09, 22]} />
+                  {/* Gentle Natural Mound Slope (Seamlessly Green with Meadow) */}
+                  <mesh position={[0, p.height * 0.48, 0]}>
+                    <cylinderGeometry
+                      args={[
+                        p.radius * 0.98,
+                        isEast ? p.radius * 1.15 : p.radius * 1.34,
+                        p.height * 0.96,
+                        36,
+                      ]}
+                    />
                     <meshLambertMaterial color={theme.groundColor} />
                   </mesh>
-                  {/* Soft Highlight Meadow Ring on Top */}
-                  <mesh position={[0, p.height + 0.004, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-                    <circleGeometry args={[p.radius * 0.82, 20]} />
-                    <meshBasicMaterial color={theme.groundRimColor} transparent opacity={0.28} />
+
+                  {/* Upper Flat Plateau Rim for Bed / Bench */}
+                  <mesh position={[0, p.height + 0.003, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+                    <circleGeometry args={[p.radius * 0.96, 32]} />
+                    <meshBasicMaterial color={theme.groundRimColor} transparent opacity={0.22} />
                   </mesh>
                 </group>
               );
             }
-
-            // Tree stump Juro can hop right on top of!
-            return (
-              <group key={p.id} position={[p.x, BASE_GROUND_Y, p.z]}>
-                <mesh position={[0, p.height * 0.5, 0]}>
-                  <cylinderGeometry args={[p.radius * 0.92, p.radius * 1.08, p.height, 12]} />
-                  <meshLambertMaterial color={woodDarkColor} />
-                </mesh>
-                <mesh position={[0, p.height + 0.002, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-                  <circleGeometry args={[p.radius * 0.82, 12]} />
-                  <meshLambertMaterial color={theme.isNight ? "#785334" : "#E7CBA9"} />
-                </mesh>
-              </group>
-            );
+            return null;
           })}
         </group>
 
@@ -667,8 +696,9 @@ export const OutdoorEnvironment: React.FC<OutdoorEnvironmentProps> = React.memo(
           onCloseMenu={onCloseBenchMenu}
         />
 
-        {/* Interactive Bouncy Mushroom Trampoline in South-West Meadow */}
+        {/* Interactive Bouncy Mushroom Trampoline in Meadow Left of Shop */}
         <BouncyMushroomTrampoline
+          position={[JURO_TRAMPOLINE_POS.x, BASE_GROUND_Y, JURO_TRAMPOLINE_POS.z]}
           onTrampolineClick={onTrampolineClick}
           onHoverChange={(hovered) => setHoveredLandmark(hovered ? "trampoline" : "none")}
           isHovered={hoveredLandmark === "trampoline"}
@@ -714,13 +744,18 @@ export const OutdoorEnvironment: React.FC<OutdoorEnvironmentProps> = React.memo(
           />
         )}
 
-        {/* 10. Winding Brook & Cozy Lily Pond */}
+        {/* 10. Winding Brook & Cozy Lily Pond (Recessed Basin, Shoreline Bank & Crystal Surface) */}
         <group>
+          {/* Stream Bed Depression / Earthen Basin */}
+          <mesh position={[0, -0.916, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+            <shapeGeometry args={[streamBedShape]} />
+            <meshLambertMaterial color={theme.isNight ? "#1E293B" : "#45382B"} />
+          </mesh>
           <mesh position={[0, -0.912, 0]} rotation={[-Math.PI / 2, 0, 0]}>
             <shapeGeometry args={[streamBankShape]} />
-            <meshBasicMaterial color={theme.waterRimColor} transparent opacity={0.42} />
+            <meshBasicMaterial color={theme.waterRimColor} transparent opacity={0.38} />
           </mesh>
-          <mesh position={[0, -0.909, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+          <mesh position={[0, -0.908, 0]} rotation={[-Math.PI / 2, 0, 0]}>
             <shapeGeometry args={[streamWaterShape]} />
             <meshStandardMaterial
               color={theme.waterColor}
@@ -731,11 +766,16 @@ export const OutdoorEnvironment: React.FC<OutdoorEnvironmentProps> = React.memo(
             />
           </mesh>
 
+          {/* Pond Bed Depression / Earthen Basin */}
+          <mesh position={[2.45, -0.915, -1.05]} rotation={[-Math.PI / 2, 0, 0]}>
+            <shapeGeometry args={[pondBedShape]} />
+            <meshLambertMaterial color={theme.isNight ? "#1E293B" : "#45382B"} />
+          </mesh>
           <mesh position={[2.45, -0.911, -1.05]} rotation={[-Math.PI / 2, 0, 0]}>
             <shapeGeometry args={[pondBankShape]} />
-            <meshBasicMaterial color={theme.waterRimColor} transparent opacity={0.48} />
+            <meshBasicMaterial color={theme.waterRimColor} transparent opacity={0.42} />
           </mesh>
-          <mesh position={[2.45, -0.907, -1.05]} rotation={[-Math.PI / 2, 0, 0]}>
+          <mesh position={[2.45, -0.906, -1.05]} rotation={[-Math.PI / 2, 0, 0]}>
             <shapeGeometry args={[pondWaterShape]} />
             <meshStandardMaterial
               color={theme.waterColor}
@@ -782,7 +822,7 @@ export const OutdoorEnvironment: React.FC<OutdoorEnvironmentProps> = React.memo(
         {/* 11. Two Cozy Glowing Meadow Lantern Posts (North Brook & East Path) */}
         {[
           { pos: [-1.45, BASE_GROUND_Y, -1.65] as [number, number, number], rotY: 0.45 },
-          { pos: [2.25, BASE_GROUND_Y, 0.22] as [number, number, number], rotY: -2.2 },
+          { pos: [2.75, BASE_GROUND_Y, 0.95] as [number, number, number], rotY: -2.2 },
         ].map((lamp, idx) => (
           <group key={idx} position={lamp.pos} rotation={[0, lamp.rotY, 0]}>
             <mesh position={[0, 0.38, 0]}>

@@ -45,45 +45,47 @@ export function seeded(seed: number): number {
   return x - Math.floor(x);
 }
 
-// Smooth organic pond shape
+// Smooth organic small lake (danau kecil) shape
 export function createOrganicPondShape(scaleX: number, scaleY: number): THREE.Shape {
   const shape = new THREE.Shape();
-  shape.moveTo(-1.05 * scaleX, 0.05 * scaleY);
+  shape.moveTo(-1.18 * scaleX, 0.05 * scaleY);
   shape.bezierCurveTo(
-    -1.08 * scaleX,
-    0.72 * scaleY,
-    -0.25 * scaleX,
-    0.92 * scaleY,
+    -1.18 * scaleX,
+    0.75 * scaleY,
+    -0.35 * scaleX,
+    1.02 * scaleY,
     0.45 * scaleX,
-    0.72 * scaleY
+    0.85 * scaleY
   );
   shape.bezierCurveTo(
-    1.15 * scaleX,
-    0.52 * scaleY,
-    1.22 * scaleX,
-    -0.32 * scaleY,
-    0.68 * scaleX,
-    -0.72 * scaleY
+    1.28 * scaleX,
+    0.68 * scaleY,
+    1.35 * scaleX,
+    -0.35 * scaleY,
+    0.78 * scaleX,
+    -0.85 * scaleY
   );
   shape.bezierCurveTo(
     0.15 * scaleX,
-    -1.02 * scaleY,
-    -0.95 * scaleX,
-    -0.72 * scaleY,
-    -1.05 * scaleX,
+    -1.08 * scaleY,
+    -0.98 * scaleX,
+    -0.82 * scaleY,
+    -1.18 * scaleX,
     0.05 * scaleY
   );
   return shape;
 }
 
 // Smooth winding brook ribbon shape (sy maps to -worldZ when rotated -PI/2 on X)
+// Flows naturally and gracefully enters into the small lake
 export function createStreamShape(halfWidthPad = 0): THREE.Shape {
   const centerPoints: [number, number, number][] = [
     [-4.15, 3.95, 0.36],
     [-2.2, 3.0, 0.42],
     [-0.45, 2.35, 0.44],
-    [0.95, 1.95, 0.46],
-    [2.25, 1.25, 0.56],
+    [0.95, 1.85, 0.42],
+    [1.75, 1.40, 0.38],
+    [2.35, 1.10, 0.28],
   ];
 
   const upperEdge: THREE.Vector2[] = [];
@@ -98,7 +100,7 @@ export function createStreamShape(halfWidthPad = 0): THREE.Shape {
     const len = Math.hypot(dx, dy) || 1;
     const nx = -dy / len;
     const ny = dx / len;
-    const width = hw + halfWidthPad;
+    const width = hw + halfWidthPad * (i === centerPoints.length - 1 ? 0.35 : 1);
     upperEdge.push(new THREE.Vector2(x + nx * width, y + ny * width));
     lowerEdge.push(new THREE.Vector2(x - nx * width, y - ny * width));
   }
@@ -111,10 +113,14 @@ export function createStreamShape(halfWidthPad = 0): THREE.Shape {
     shape.quadraticCurveTo(prev.x, prev.y, (prev.x + curr.x) / 2, (prev.y + curr.y) / 2);
   }
   const lastUpper = upperEdge[upperEdge.length - 1];
-  shape.lineTo(lastUpper.x, lastUpper.y);
-
   const lastLower = lowerEdge[lowerEdge.length - 1];
-  shape.lineTo(lastLower.x, lastLower.y);
+
+  // Smooth rounded estuary mouth entering seamlessly into the lake body
+  const midX = (lastUpper.x + lastLower.x) / 2 + 0.15;
+  const midY = (lastUpper.y + lastLower.y) / 2 - 0.08;
+  shape.quadraticCurveTo(lastUpper.x, lastUpper.y, midX, midY);
+  shape.quadraticCurveTo(midX, midY, lastLower.x, lastLower.y);
+
   for (let i = lowerEdge.length - 2; i >= 0; i--) {
     const prev = lowerEdge[i + 1];
     const curr = lowerEdge[i];
@@ -127,15 +133,17 @@ export function createStreamShape(halfWidthPad = 0): THREE.Shape {
 
 export function generateStarsData() {
   const list: { pos: [number, number, number]; size: number; phase: number }[] = [];
-  for (let i = 0; i < 70; i++) {
+  // 360-degree celestial star dome surrounding the diorama from all angles (North, South, East, West, Overhead)
+  for (let i = 0; i < 180; i++) {
+    const angle = seeded(i * 11 + 1) * Math.PI * 2;
+    const radius = 13.5 + seeded(i * 11 + 2) * 13.5; // radius 13.5 to 27.0
+    const elevation = 2.2 + seeded(i * 11 + 3) * 13.5; // height 2.2 to 15.7
+    const x = Math.cos(angle) * radius;
+    const z = Math.sin(angle) * radius;
     list.push({
-      pos: [
-        (seeded(i * 3 + 1) - 0.5) * 28,
-        0.7 + seeded(i * 3 + 2) * 5.6,
-        -8.2 - seeded(i * 3 + 3) * 1.8,
-      ],
-      size: 0.022 + seeded(i * 5 + 4) * 0.032,
-      phase: seeded(i * 7 + 5) * Math.PI * 2,
+      pos: [x, elevation, z],
+      size: 0.024 + seeded(i * 11 + 4) * 0.038,
+      phase: seeded(i * 11 + 5) * Math.PI * 2,
     });
   }
   return list;
@@ -165,7 +173,7 @@ export function generateRoundTreesData() {
     { pos: [6.2, -0.82, -1.6], scale: 1.0 },
     { pos: [5.6, -0.82, 0.85], scale: 0.95 },
     { pos: [4.9, -0.84, 2.35], scale: 0.82 },
-    { pos: [4.2, -0.48, 1.35], scale: 0.76 },
+    { pos: [4.85, -0.82, 1.55], scale: 0.85 },
     // Western & South-Western Horizon Tree Belt (Framing West Knoll & Horizon Hills)
     { pos: [-6.8, -0.82, -0.6], scale: 0.98 },
     { pos: [-6.4, -0.82, 0.95], scale: 1.02 },
@@ -176,17 +184,26 @@ export function generateRoundTreesData() {
     { pos: [-7.5, -0.82, 1.2], scale: 1.05 },
   ];
 
-  for (let i = 0; i < 65; i++) {
+  // Dense multi-layered woodland canopy spanning the entire terrain out to radius 24.8
+  for (let i = 0; i < 350; i++) {
     const angle = seeded(i * 19 + 1) * Math.PI * 2;
-    const radius = 5.4 + seeded(i * 19 + 2) * 7.6;
-    const x = Math.cos(angle) * radius * 1.15;
-    const z = Math.sin(angle) * radius * 0.85;
-    if (Math.abs(x) < 4.9 && z > -3.8 && z < 3.6) continue;
-    if (Math.abs(x) < 4.2 && z > 2.4) continue;
-    if (isWaterAt(x, z) || isNearWater(x, z, 0.75)) continue;
-    if (Math.hypot(x - 4.55, z - -2.55) < 1.9) continue;
-    if (Math.hypot(x - -4.65, z - -4.35) < 2.1) continue;
-    const scale = 0.42 + seeded(i * 19 + 3) * 0.46;
+    const radius = 4.8 + seeded(i * 19 + 2) * 20.0;
+    const x = Math.cos(angle) * radius * 1.08;
+    const z = Math.sin(angle) * radius * 0.92;
+
+    // Keep central playable valley completely clear & walkable
+    if (Math.abs(x) < 4.4 && z > -3.3 && z < 2.5) continue;
+    if (Math.abs(x) < 3.2 && z >= 2.5 && z < 3.8) continue;
+    // Water stream & lake clearances
+    if (isWaterAt(x, z) || isNearWater(x, z, 0.72)) continue;
+    // Landmark clearances
+    if (Math.hypot(x - 4.55, z - -2.55) < 2.0) continue; // Shop
+    if (Math.hypot(x - -4.35, z - -4.05) < 2.35) continue; // Mine
+    if (Math.hypot(x - 3.65, z - 1.15) < 1.65) continue; // East knoll bench
+    if (Math.hypot(x - -3.24, z - -0.52) < 1.55) continue; // West knoll bed
+    if (Math.hypot(x - 2.50, z - -2.80) < 1.45) continue; // Trampoline left of shop
+
+    const scale = 0.52 + seeded(i * 19 + 3) * 0.58;
     list.push({ pos: [x, -0.86, z], scale });
   }
   return list;
@@ -215,17 +232,26 @@ export function generatePineTreesData() {
     { pos: [-7.6, -0.84, -1.2], scale: 1.02 },
   ];
 
-  for (let i = 0; i < 60; i++) {
+  // Deep evergreen pine forest enclosing mountains, ridges and outer perimeter
+  for (let i = 0; i < 350; i++) {
     const angle = seeded(i * 23 + 7) * Math.PI * 2;
-    const radius = 5.6 + seeded(i * 23 + 8) * 8.0;
-    const x = Math.cos(angle) * radius * 1.18;
-    const z = Math.sin(angle) * radius * 0.88;
-    if (Math.abs(x) < 5.0 && z > -4.0 && z < 3.6) continue;
-    if (Math.abs(x) < 4.4 && z > 2.4) continue;
-    if (isWaterAt(x, z) || isNearWater(x, z, 0.75)) continue;
-    if (Math.hypot(x - 4.55, z - -2.55) < 1.9) continue;
-    if (Math.hypot(x - -4.65, z - -4.35) < 2.1) continue;
-    const scale = 0.44 + seeded(i * 23 + 9) * 0.48;
+    const radius = 5.0 + seeded(i * 23 + 8) * 19.8;
+    const x = Math.cos(angle) * radius * 1.1;
+    const z = Math.sin(angle) * radius * 0.92;
+
+    // Keep central playable valley completely clear & walkable
+    if (Math.abs(x) < 4.4 && z > -3.3 && z < 2.5) continue;
+    if (Math.abs(x) < 3.2 && z >= 2.5 && z < 3.8) continue;
+    // Water stream & lake clearances
+    if (isWaterAt(x, z) || isNearWater(x, z, 0.72)) continue;
+    // Landmark clearances
+    if (Math.hypot(x - 4.55, z - -2.55) < 2.0) continue; // Shop
+    if (Math.hypot(x - -4.35, z - -4.05) < 2.35) continue; // Mine
+    if (Math.hypot(x - 3.65, z - 1.15) < 1.65) continue; // East knoll bench
+    if (Math.hypot(x - -3.24, z - -0.52) < 1.55) continue; // West knoll bed
+    if (Math.hypot(x - 2.50, z - -2.80) < 1.45) continue; // Trampoline left of shop
+
+    const scale = 0.54 + seeded(i * 23 + 9) * 0.65;
     list.push({ pos: [x, -0.86, z], scale });
   }
   return list;
@@ -242,11 +268,11 @@ export function generateBushesData() {
     { pos: [4.2, -0.78, -3.3], scale: [0.38, 0.28, 0.34] },
     { pos: [5.2, -0.78, -1.4], scale: [0.36, 0.26, 0.32] },
     { pos: [5.0, -0.78, 0.45], scale: [0.34, 0.25, 0.3] },
-    { pos: [4.1, -0.38, 1.85], scale: [0.28, 0.2, 0.26] },
+    { pos: [4.65, -0.78, 1.85], scale: [0.32, 0.24, 0.28] },
     { pos: [-3.9, -0.78, 2.35], scale: [0.34, 0.25, 0.3] },
     { pos: [3.8, -0.78, 2.55], scale: [0.32, 0.24, 0.28] },
     { pos: [-1.48, -0.78, -4.05], scale: [0.32, 0.24, 0.3] },
-    { pos: [5.5, -0.78, -2.65], scale: [0.34, 0.26, 0.32] },
+    { pos: [6.15, -0.78, -2.4], scale: [0.34, 0.26, 0.32] },
     { pos: [-5.6, -0.78, -3.4], scale: [0.38, 0.28, 0.34] },
     // Western & South-Western Horizon Foothill Bushes
     { pos: [-5.6, -0.78, -0.3], scale: [0.36, 0.26, 0.32] },
@@ -255,17 +281,20 @@ export function generateBushesData() {
     { pos: [-3.2, -0.78, 4.1], scale: [0.34, 0.25, 0.3] },
   ];
 
-  for (let i = 0; i < 48; i++) {
+  for (let i = 0; i < 160; i++) {
     const angle = seeded(i * 29 + 3) * Math.PI * 2;
-    const radius = 4.6 + seeded(i * 29 + 4) * 7.8;
-    const x = Math.cos(angle) * radius * 1.15;
-    const z = Math.sin(angle) * radius * 0.85;
-    if (Math.abs(x) < 4.5 && z > -3.5 && z < 3.0) continue;
-    if (Math.abs(x) < 3.5 && z > 2.4) continue;
-    if (isWaterAt(x, z) || isNearWater(x, z, 0.5)) continue;
-    if (Math.hypot(x - 4.55, z - -2.55) < 1.65) continue;
-    if (Math.hypot(x - -4.65, z - -4.35) < 1.95) continue;
-    const s = 0.2 + seeded(i * 29 + 5) * 0.2;
+    const radius = 4.5 + seeded(i * 29 + 4) * 19.5;
+    const x = Math.cos(angle) * radius * 1.08;
+    const z = Math.sin(angle) * radius * 0.92;
+    if (Math.abs(x) < 4.4 && z > -3.3 && z < 2.5) continue;
+    if (Math.abs(x) < 3.2 && z >= 2.5 && z < 3.8) continue;
+    if (isWaterAt(x, z) || isNearWater(x, z, 0.55)) continue;
+    if (Math.hypot(x - 4.55, z - -2.55) < 1.95) continue; // Shop
+    if (Math.hypot(x - -4.35, z - -4.05) < 2.15) continue; // Mine
+    if (Math.hypot(x - 3.65, z - 1.15) < 1.55) continue; // East knoll bench
+    if (Math.hypot(x - -3.24, z - -0.52) < 1.45) continue; // West knoll bed
+    if (Math.hypot(x - 2.50, z - -2.80) < 1.35) continue; // Trampoline left of shop
+    const s = 0.22 + seeded(i * 29 + 5) * 0.25;
     list.push({ pos: [x, -0.82, z], scale: [s * 1.15, s * 0.82, s] });
   }
   return list;
@@ -294,7 +323,7 @@ export function generateGrassBladesData() {
     [-0.48, -1.68, BASE_GROUND_Y], [-2.45, -2.15, BASE_GROUND_Y], [0.78, -1.15, BASE_GROUND_Y],
     [-3.45, 1.45, BASE_GROUND_Y], [2.45, 1.75, BASE_GROUND_Y], [-4.15, 0.95, BASE_GROUND_Y],
     [4.65, 0.15, BASE_GROUND_Y], [-2.05, 2.05, BASE_GROUND_Y], [0.45, 1.95, BASE_GROUND_Y],
-    [-3.15, -2.35, BASE_GROUND_Y], [3.25, -2.45, BASE_GROUND_Y], [-4.55, -2.2, BASE_GROUND_Y],
+    [-3.15, -2.35, BASE_GROUND_Y], [1.45, -2.55, BASE_GROUND_Y], [-4.55, -2.2, BASE_GROUND_Y],
     [1.55, -2.85, BASE_GROUND_Y], [-0.95, -3.25, BASE_GROUND_Y], [4.95, -1.15, BASE_GROUND_Y],
     [-4.85, -0.35, BASE_GROUND_Y], [1.95, 1.95, BASE_GROUND_Y], [-0.35, 2.15, BASE_GROUND_Y],
     [0.85, 0.65, BASE_GROUND_Y], [-0.95, -0.55, BASE_GROUND_Y], [-2.85, 1.95, BASE_GROUND_Y],
@@ -347,14 +376,16 @@ export function generateOuterGrassBladesData() {
     rotY: number;
   }[] = [];
 
-  for (let ci = 0; ci < 130; ci++) {
+  // Rich forest floor grass tufts carpeting slopes and glades out to the tree line
+  for (let ci = 0; ci < 360; ci++) {
     const angle = seeded(ci * 31 + 1) * Math.PI * 2;
-    const radius = 2.6 + seeded(ci * 31 + 2) * 9.8;
-    const cx = Math.cos(angle) * radius * 1.15;
-    const cz = Math.sin(angle) * radius * 0.85;
+    const radius = 2.4 + seeded(ci * 31 + 2) * 22.0;
+    const cx = Math.cos(angle) * radius * 1.08;
+    const cz = Math.sin(angle) * radius * 0.92;
     if (isWaterAt(cx, cz) || isNearWater(cx, cz, 0.35)) continue;
-    if (Math.hypot(cx - 4.55, cz - -2.55) < 1.45) continue;
-    if (Math.hypot(cx - -4.65, cz - -4.35) < 1.85) continue;
+    if (Math.hypot(cx - 4.55, cz - -2.55) < 1.65) continue;
+    if (Math.hypot(cx - -4.35, cz - -4.05) < 2.05) continue;
+    if (Math.hypot(cx - 3.65, cz - 1.15) < 1.45) continue;
     let onPlatform = false;
     for (let p = 0; p < MAP_PLATFORMS.length; p++) {
       const pl = MAP_PLATFORMS[p];
@@ -391,7 +422,7 @@ export function generateReedsData() {
     [-1.55, -2.55], [-1.45, -2.62], [-1.62, -2.48],
     [-2.85, -3.18], [-2.75, -3.26],
     [0.65, -2.48], [0.74, -2.55], [0.58, -2.42],
-    [-3.95, -3.75], [-3.85, -3.82],
+    [-2.45, -3.35], [-2.35, -3.42],
   ];
   return spots.map(([x, z], i) => ({
     x,
@@ -403,14 +434,10 @@ export function generateReedsData() {
 }
 
 export function generateRocksData() {
-  return [
-    { pos: [1.38, -0.9, -0.82] as [number, number, number], scale: [0.16, 0.08, 0.13] as [number, number, number], rotY: 0.4, shade: 0 },
+  const rocks = [
     { pos: [1.56, -0.9, -0.62] as [number, number, number], scale: [0.11, 0.06, 0.1] as [number, number, number], rotY: 1.2, shade: 1 },
     { pos: [2.95, -0.9, -0.45] as [number, number, number], scale: [0.18, 0.09, 0.14] as [number, number, number], rotY: -0.5, shade: 0 },
     { pos: [3.22, -0.9, -0.64] as [number, number, number], scale: [0.12, 0.065, 0.11] as [number, number, number], rotY: 0.8, shade: 2 },
-    { pos: [3.55, -0.9, -1.3] as [number, number, number], scale: [0.16, 0.08, 0.13] as [number, number, number], rotY: 2.1, shade: 1 },
-    { pos: [-0.95, -0.9, -2.0] as [number, number, number], scale: [0.15, 0.075, 0.12] as [number, number, number], rotY: 0.6, shade: 0 },
-    { pos: [0.45, -0.9, -1.58] as [number, number, number], scale: [0.13, 0.065, 0.1] as [number, number, number], rotY: -1.1, shade: 2 },
     { pos: [-4.65, -0.84, -1.75] as [number, number, number], scale: [0.38, 0.24, 0.3] as [number, number, number], rotY: 0.3, shade: 2 },
     { pos: [-4.32, -0.87, -1.52] as [number, number, number], scale: [0.2, 0.13, 0.18] as [number, number, number], rotY: 1.4, shade: 1 },
     { pos: [-2.65, -0.89, 1.75] as [number, number, number], scale: [0.24, 0.12, 0.19] as [number, number, number], rotY: 0.2, shade: 1 },
@@ -422,34 +449,43 @@ export function generateRocksData() {
     { pos: [2.05, -0.88, 0.85] as [number, number, number], scale: [0.2, 0.1, 0.15] as [number, number, number], rotY: -0.9, shade: 1 },
     { pos: [-2.1, -0.88, -1.6] as [number, number, number], scale: [0.22, 0.12, 0.18] as [number, number, number], rotY: 0.5, shade: 0 },
   ];
+  return rocks.filter((r) => !isWaterAt(r.pos[0], r.pos[2]));
 }
 
 export function generateSteppingStonesData() {
-  return [
-    { pos: [-0.85, -0.908, 1.48] as [number, number, number], scale: [0.26, 0.03, 0.18] as [number, number, number], rotY: 0.2 },
-    { pos: [-0.55, -0.908, 1.02] as [number, number, number], scale: [0.22, 0.03, 0.16] as [number, number, number], rotY: -0.15 },
-    { pos: [-0.36, -0.908, -1.16] as [number, number, number], scale: [0.24, 0.03, 0.17] as [number, number, number], rotY: 0.05 },
-    { pos: [-0.36, -0.908, -1.56] as [number, number, number], scale: [0.26, 0.03, 0.18] as [number, number, number], rotY: -0.05 },
-    { pos: [-2.9, -0.908, -2.35] as [number, number, number], scale: [0.24, 0.03, 0.17] as [number, number, number], rotY: 0.25 },
-    { pos: [-1.15, -0.908, -0.35] as [number, number, number], scale: [0.22, 0.03, 0.16] as [number, number, number], rotY: 0.4 },
-    { pos: [-1.58, -0.908, -0.48] as [number, number, number], scale: [0.24, 0.03, 0.17] as [number, number, number], rotY: 0.2 },
-    { pos: [1.25, -0.908, 0.42] as [number, number, number], scale: [0.22, 0.03, 0.16] as [number, number, number], rotY: -0.3 },
-    { pos: [1.72, -0.908, 0.58] as [number, number, number], scale: [0.24, 0.03, 0.17] as [number, number, number], rotY: -0.15 },
+  const stones = [
+    // 1. Gentle stones leading near South-West Mushroom Trampoline
+    { pos: [-0.65, -0.908, 0.58] as [number, number, number], scale: [0.22, 0.03, 0.16] as [number, number, number], rotY: 0.35 },
+    { pos: [-1.02, -0.908, 0.85] as [number, number, number], scale: [0.24, 0.03, 0.18] as [number, number, number], rotY: -0.2 },
+
+    // 2. Gentle stones in West meadow
+    { pos: [-0.95, -0.908, -0.2] as [number, number, number], scale: [0.22, 0.03, 0.16] as [number, number, number], rotY: 0.4 },
+    { pos: [-1.45, -0.908, -0.32] as [number, number, number], scale: [0.24, 0.03, 0.17] as [number, number, number], rotY: 0.15 },
+
+    // 3. Gentle stones in East meadow
+    { pos: [0.85, -0.908, 0.22] as [number, number, number], scale: [0.22, 0.03, 0.16] as [number, number, number], rotY: -0.3 },
+    { pos: [1.38, -0.908, 0.36] as [number, number, number], scale: [0.24, 0.03, 0.17] as [number, number, number], rotY: 0.2 },
+
+    // 4. North-East Path leading towards Toko (Shop Porch) on dry land
+    { pos: [1.35, -0.908, -0.65] as [number, number, number], scale: [0.22, 0.03, 0.16] as [number, number, number], rotY: -0.25 },
+    { pos: [2.75, -0.908, -1.60] as [number, number, number], scale: [0.23, 0.03, 0.16] as [number, number, number], rotY: -0.35 },
+    { pos: [3.85, -0.908, -2.22] as [number, number, number], scale: [0.26, 0.03, 0.18] as [number, number, number], rotY: 0.2 },
   ];
+  return stones.filter((s) => !isWaterAt(s.pos[0], s.pos[2]));
 }
 
 export function generateMushroomsData() {
   return [
     { pos: [-4.15, -0.91, -1.4] as [number, number, number], scale: 1.0, capColor: "#EF4444" },
     { pos: [-3.98, -0.91, -1.28] as [number, number, number], scale: 0.68, capColor: "#F97316" },
-    { pos: [3.65, -0.91, -2.18] as [number, number, number], scale: 0.95, capColor: "#EF4444" },
-    { pos: [3.82, -0.91, -2.08] as [number, number, number], scale: 0.65, capColor: "#FB923C" },
+    { pos: [3.85, -0.91, -2.05] as [number, number, number], scale: 0.95, capColor: "#EF4444" },
+    { pos: [3.98, -0.91, -1.95] as [number, number, number], scale: 0.65, capColor: "#FB923C" },
     { pos: [-2.45, -0.91, 1.55] as [number, number, number], scale: 0.78, capColor: "#EF4444" },
     { pos: [2.05, -0.91, 1.78] as [number, number, number], scale: 0.75, capColor: "#F59E0B" },
     { pos: [-1.18, -0.91, -1.92] as [number, number, number], scale: 0.8, capColor: "#EF4444" },
     { pos: [-3.65, -0.46, -1.05] as [number, number, number], scale: 0.72, capColor: "#EF4444" },
-    { pos: [3.95, -0.5, 1.1] as [number, number, number], scale: 0.76, capColor: "#F97316" },
-    { pos: [-1.85, -0.91, 1.52] as [number, number, number], scale: 0.68, capColor: "#EF4444" },
+    { pos: [4.25, -0.82, 0.85] as [number, number, number], scale: 0.76, capColor: "#F97316" },
+    { pos: [-2.25, -0.91, 1.65] as [number, number, number], scale: 0.68, capColor: "#EF4444" },
   ];
 }
 
