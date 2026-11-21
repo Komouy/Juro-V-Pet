@@ -20,6 +20,7 @@ import { useUIStore } from "../stores/uiStore";
 import { useCaregiverStore } from "../stores/caregiverStore";
 import {
   CRYSTAL_CATALOG,
+  HAT_CATALOG,
   PICKAXE_TIERS,
   SHOP_FOODS,
   SHOP_TOYS,
@@ -50,11 +51,15 @@ export const ShopPage: React.FC = () => {
     ownedToys,
     unlockedSkins,
     activeSkin,
+    unlockedHats,
+    activeHat,
     pickaxeLevel,
     buyFood,
     buyToy,
     unlockSkin,
     equipSkin,
+    unlockHat,
+    equipHat,
     sellCrystal,
     sellAllCrystals,
     upgradePickaxe,
@@ -152,6 +157,34 @@ export const ShopPage: React.FC = () => {
     }
   };
 
+  const handleEquipHat = (hatId: string, name: string) => {
+    if (equipHat(hatId)) {
+      soundEffects.playEquip();
+      const logText =
+        hatId === "hat-none" ? "Melepas topi Juro." : `Memakaikan ${name} pada Juro.`;
+      addLog("interaction", logText);
+      showToast(hatId === "hat-none" ? "Topi dilepas" : `Topi: ${name}`, "info");
+      useCaregiverStore.getState().recordAction("accessory", logText, {});
+    }
+  };
+
+  const handleUnlockHat = (hatId: string, name: string, price: number) => {
+    if (unlockHat(hatId)) {
+      soundEffects.playUnlock();
+      triggerWalletPulse();
+      addLog("interaction", `Membeli ${name} di Toko (-${price} koin).`);
+      showToast(`Terbuka: ${name}`, "success");
+      useCaregiverStore.getState().recordAction(
+        "shop",
+        `Membeli ${name} di Toko (-${price} koin).`,
+        { coins: -price }
+      );
+    } else {
+      soundEffects.playError();
+      showToast("Koin belum cukup", "warn");
+    }
+  };
+
   const handleSellCrystal = (id: CrystalId, name: string, qty: number) => {
     const earned = sellCrystal(id, qty);
     if (earned > 0) {
@@ -245,7 +278,7 @@ export const ShopPage: React.FC = () => {
           options={[
             { value: "food", label: "Makanan" },
             { value: "toy", label: "Mainan" },
-            { value: "skins", label: "Warna" },
+            { value: "skins", label: "Aksesoris" },
             {
               value: "sell",
               label: "Kristal",
@@ -372,108 +405,220 @@ export const ShopPage: React.FC = () => {
           </div>
         )}
 
-        {/* TAB 3: WARNA JURO */}
+        {/* TAB 3: AKSESORIS JURO (TOPI & WARNA DIGABUNG DALAM 1 HALAMAN) */}
         {activeTab === "skins" && (
-          <div className="space-y-3.5">
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5">
-              {SKIN_CATALOG.map((skin) => {
-                const isUnlocked = unlockedSkins.includes(skin.id);
-                const isSelected = activeSkin === skin.id;
+          <div className="space-y-6">
+            {/* Bagian 1: Koleksi Topi (Bagian Atas) */}
+            <div className="space-y-3">
+              <div className="flex items-center justify-between border-b-2 border-charcoal/15 dark:border-neutral-700 pb-2">
+                <div className="flex items-center gap-2">
+                  <ShoppingBag size={15} strokeWidth={2.5} className="text-juro-orange" />
+                  <h2 className="pixel-text text-xs text-charcoal dark:text-white uppercase tracking-wider font-bold">
+                    Koleksi Topi
+                  </h2>
+                </div>
+                <span className="pixel-text text-[9px] text-muted dark:text-neutral-400">
+                  {unlockedHats.length} / {HAT_CATALOG.length} Dimiliki
+                </span>
+              </div>
 
-                const crystalInfo = skin.crystalCost
-                  ? getCrystalById(skin.crystalCost.crystalId)
-                  : null;
-                const crystalShortName = crystalInfo
-                  ? crystalInfo.name.replace("Kristal ", "")
-                  : "";
-                const requiredQty = skin.crystalCost?.amount ?? 0;
-                const ownedQty = skin.crystalCost
-                  ? crystals[skin.crystalCost.crystalId] ?? 0
-                  : 0;
-                const canUnlock = !isUnlocked && ownedQty >= requiredQty;
-                const costLabel = skin.crystalCost
-                  ? `${requiredQty} ${crystalShortName}`
-                  : "Gratis";
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5">
+                {HAT_CATALOG.map((hat) => {
+                  const isUnlocked = unlockedHats.includes(hat.id);
+                  const isSelected = (activeHat ?? "hat-none") === hat.id;
+                  const canBuy = coins >= hat.price;
 
-                return (
-                  <Card
-                    key={skin.id}
-                    shadowOffset="sm"
-                    className={`p-3.5 flex flex-col justify-between gap-3.5 transition-all ${
-                      isSelected ? "border-juro-orange ring-2 ring-juro-orange/25" : ""
-                    }`}
-                  >
-                    <div className="flex items-start gap-3.5">
-                      {/* Mini Pixel-Framed Juro Jelly Preview */}
-                      <div className="relative w-14 h-14 bg-warm-white dark:bg-neutral-900 border-2 border-charcoal dark:border-neutral-600 shadow-[2px_2px_0px_#171717] dark:shadow-[2px_2px_0px_#000000] flex items-center justify-center shrink-0">
-                        <div
-                          className="relative w-10 h-9 rounded-t-full rounded-b-[14px] border-2 border-charcoal overflow-hidden flex items-center justify-center"
-                          style={{
-                            background: `radial-gradient(circle at 35% 28%, ${skin.colorB} 0%, ${skin.colorA} 72%)`,
-                          }}
-                        >
-                          <span className="absolute top-1 left-2 w-2 h-1.5 bg-white/75 rounded-full" />
-                          <span className="flex items-center gap-2 mt-1">
-                            <span className="w-1.5 h-1.5 bg-charcoal rounded-full relative">
-                              <span className="absolute top-[1px] left-[1px] w-[2px] h-[2px] bg-white rounded-full" />
+                  return (
+                    <Card
+                      key={hat.id}
+                      shadowOffset="sm"
+                      className={`p-3.5 flex flex-col justify-between gap-3.5 transition-all ${
+                        isSelected ? "border-juro-orange ring-2 ring-juro-orange/25" : ""
+                      }`}
+                    >
+                      <div className="flex items-start gap-3.5">
+                        {/* Mini Pixel-Framed Hat Preview */}
+                        <div className="relative w-14 h-14 bg-warm-white dark:bg-neutral-900 border-2 border-charcoal dark:border-neutral-600 shadow-[2px_2px_0px_#171717] dark:shadow-[2px_2px_0px_#000000] flex items-center justify-center shrink-0">
+                          <ItemIllustration id={hat.illustrationId} size={40} />
+                          {isSelected && (
+                            <span className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-juro-orange text-white border-2 border-charcoal flex items-center justify-center">
+                              <Check size={10} strokeWidth={3} />
                             </span>
-                            <span className="w-1.5 h-1.5 bg-charcoal rounded-full relative">
-                              <span className="absolute top-[1px] left-[1px] w-[2px] h-[2px] bg-white rounded-full" />
-                            </span>
-                          </span>
-                        </div>
-                        {isSelected && (
-                          <span className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-juro-orange text-white border-2 border-charcoal flex items-center justify-center">
-                            <Check size={10} strokeWidth={3} />
-                          </span>
-                        )}
-                      </div>
-
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center justify-between gap-2">
-                          <h3 className="pixel-text text-[11px] text-charcoal dark:text-white font-bold truncate">
-                            {skin.name}
-                          </h3>
-                          {isSelected ? (
-                            <Badge label="Aktif" variant="orange" size="sm" />
-                          ) : isUnlocked ? (
-                            <Badge label="Milik" variant="good" size="sm" />
-                          ) : (
-                            <Badge label={costLabel} variant="charcoal" size="sm" />
                           )}
                         </div>
-                        <p className="pixel-text text-[8px] sm:text-[9px] text-muted dark:text-neutral-400 mt-1.5 leading-relaxed">
-                          {skin.flavorDesc}
-                        </p>
-                      </div>
-                    </div>
 
-                    <div className="pt-2.5 border-t border-charcoal/10 dark:border-neutral-700">
-                      {isUnlocked ? (
-                        <Button
-                          label={isSelected ? "Dipakai" : "Pakai Warna"}
-                          icon={isSelected ? Check : Palette}
-                          size="sm"
-                          variant={isSelected ? "secondary" : "primary"}
-                          disabled={isSelected}
-                          onClick={() => handleEquipSkin(skin.id, skin.name)}
-                          className="w-full"
-                        />
-                      ) : (
-                        <Button
-                          label={`Buka (${costLabel})`}
-                          icon={Gem}
-                          size="sm"
-                          variant={canUnlock ? "primary" : "secondary"}
-                          disabled={!canUnlock}
-                          onClick={() => handleUnlockSkin(skin.id, skin.name, costLabel)}
-                          className="w-full"
-                        />
-                      )}
-                    </div>
-                  </Card>
-                );
-              })}
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center justify-between gap-2">
+                            <h3 className="pixel-text text-[11px] text-charcoal dark:text-white font-bold truncate">
+                              {hat.name}
+                            </h3>
+                            {isSelected ? (
+                              <Badge label="Aktif" variant="orange" size="sm" />
+                            ) : isUnlocked ? (
+                              <Badge label="Milik" variant="good" size="sm" />
+                            ) : (
+                              <Badge
+                                label={hat.price > 0 ? `${hat.price} Koin` : "Gratis"}
+                                variant="charcoal"
+                                size="sm"
+                              />
+                            )}
+                          </div>
+                          <p className="pixel-text text-[8px] sm:text-[9px] text-muted dark:text-neutral-400 mt-1.5 leading-relaxed">
+                            {hat.flavorDesc}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="pt-2.5 border-t border-charcoal/10 dark:border-neutral-700">
+                        {isUnlocked ? (
+                          <Button
+                            label={
+                              isSelected
+                                ? "Dipakai"
+                                : hat.id === "hat-none"
+                                ? "Lepas Topi"
+                                : "Pakai Topi"
+                            }
+                            icon={isSelected ? Check : ShoppingBag}
+                            size="sm"
+                            variant={isSelected ? "secondary" : "primary"}
+                            disabled={isSelected}
+                            onClick={() => handleEquipHat(hat.id, hat.name)}
+                            className="w-full"
+                          />
+                        ) : (
+                          <Button
+                            label={`Beli (${hat.price} Koin)`}
+                            icon={ShoppingBag}
+                            size="sm"
+                            variant={canBuy ? "primary" : "secondary"}
+                            disabled={!canBuy}
+                            onClick={() => handleUnlockHat(hat.id, hat.name, hat.price)}
+                            className="w-full"
+                          />
+                        )}
+                      </div>
+                    </Card>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Bagian 2: Warna Tubuh Jeli (Bagian Bawah) */}
+            <div className="space-y-3 pt-2">
+              <div className="flex items-center justify-between border-b-2 border-charcoal/15 dark:border-neutral-700 pb-2">
+                <div className="flex items-center gap-2">
+                  <Palette size={15} strokeWidth={2.5} className="text-juro-orange" />
+                  <h2 className="pixel-text text-xs text-charcoal dark:text-white uppercase tracking-wider font-bold">
+                    Warna Tubuh Jeli
+                  </h2>
+                </div>
+                <span className="pixel-text text-[9px] text-muted dark:text-neutral-400">
+                  {unlockedSkins.length} / {SKIN_CATALOG.length} Dimiliki
+                </span>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5">
+                {SKIN_CATALOG.map((skin) => {
+                  const isUnlocked = unlockedSkins.includes(skin.id);
+                  const isSelected = activeSkin === skin.id;
+
+                  const crystalInfo = skin.crystalCost
+                    ? getCrystalById(skin.crystalCost.crystalId)
+                    : null;
+                  const crystalShortName = crystalInfo
+                    ? crystalInfo.name.replace("Kristal ", "")
+                    : "";
+                  const requiredQty = skin.crystalCost?.amount ?? 0;
+                  const ownedQty = skin.crystalCost
+                    ? crystals[skin.crystalCost.crystalId] ?? 0
+                    : 0;
+                  const canUnlock = !isUnlocked && ownedQty >= requiredQty;
+                  const costLabel = skin.crystalCost
+                    ? `${requiredQty} ${crystalShortName}`
+                    : "Gratis";
+
+                  return (
+                    <Card
+                      key={skin.id}
+                      shadowOffset="sm"
+                      className={`p-3.5 flex flex-col justify-between gap-3.5 transition-all ${
+                        isSelected ? "border-juro-orange ring-2 ring-juro-orange/25" : ""
+                      }`}
+                    >
+                      <div className="flex items-start gap-3.5">
+                        {/* Mini Pixel-Framed Juro Jelly Preview */}
+                        <div className="relative w-14 h-14 bg-warm-white dark:bg-neutral-900 border-2 border-charcoal dark:border-neutral-600 shadow-[2px_2px_0px_#171717] dark:shadow-[2px_2px_0px_#000000] flex items-center justify-center shrink-0">
+                          <div
+                            className="relative w-10 h-9 rounded-t-full rounded-b-[14px] border-2 border-charcoal overflow-hidden flex items-center justify-center"
+                            style={{
+                              background: `radial-gradient(circle at 35% 28%, ${skin.colorB} 0%, ${skin.colorA} 72%)`,
+                            }}
+                          >
+                            <span className="absolute top-1 left-2 w-2 h-1.5 bg-white/75 rounded-full" />
+                            <span className="flex items-center gap-2 mt-1">
+                              <span className="w-1.5 h-1.5 bg-charcoal rounded-full relative">
+                                <span className="absolute top-[1px] left-[1px] w-[2px] h-[2px] bg-white rounded-full" />
+                              </span>
+                              <span className="w-1.5 h-1.5 bg-charcoal rounded-full relative">
+                                <span className="absolute top-[1px] left-[1px] w-[2px] h-[2px] bg-white rounded-full" />
+                              </span>
+                            </span>
+                          </div>
+                          {isSelected && (
+                            <span className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-juro-orange text-white border-2 border-charcoal flex items-center justify-center">
+                              <Check size={10} strokeWidth={3} />
+                            </span>
+                          )}
+                        </div>
+
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center justify-between gap-2">
+                            <h3 className="pixel-text text-[11px] text-charcoal dark:text-white font-bold truncate">
+                              {skin.name}
+                            </h3>
+                            {isSelected ? (
+                              <Badge label="Aktif" variant="orange" size="sm" />
+                            ) : isUnlocked ? (
+                              <Badge label="Milik" variant="good" size="sm" />
+                            ) : (
+                              <Badge label={costLabel} variant="charcoal" size="sm" />
+                            )}
+                          </div>
+                          <p className="pixel-text text-[8px] sm:text-[9px] text-muted dark:text-neutral-400 mt-1.5 leading-relaxed">
+                            {skin.flavorDesc}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="pt-2.5 border-t border-charcoal/10 dark:border-neutral-700">
+                        {isUnlocked ? (
+                          <Button
+                            label={isSelected ? "Dipakai" : "Pakai Warna"}
+                            icon={isSelected ? Check : Palette}
+                            size="sm"
+                            variant={isSelected ? "secondary" : "primary"}
+                            disabled={isSelected}
+                            onClick={() => handleEquipSkin(skin.id, skin.name)}
+                            className="w-full"
+                          />
+                        ) : (
+                          <Button
+                            label={`Buka (${costLabel})`}
+                            icon={Gem}
+                            size="sm"
+                            variant={canUnlock ? "primary" : "secondary"}
+                            disabled={!canUnlock}
+                            onClick={() => handleUnlockSkin(skin.id, skin.name, costLabel)}
+                            className="w-full"
+                          />
+                        )}
+                      </div>
+                    </Card>
+                  );
+                })}
+              </div>
             </div>
           </div>
         )}

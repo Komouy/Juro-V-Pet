@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Utensils, Gamepad2, Sun, Moon, Droplets, HandHeart, MessageSquare, Send } from "lucide-react";
+import { Utensils, Gamepad2, Sun, Moon, Droplets, MessageSquare, Send } from "lucide-react";
 import { soundEffects } from "../../../engine/audio/soundEffects";
 
 export interface JuroContextMenuProps {
@@ -9,7 +9,7 @@ export interface JuroContextMenuProps {
   isNearTop: boolean;
   currentState: string;
   totalFoodStock: number;
-  onAction: (action: "food" | "toy" | "sleep" | "bath" | "pet") => void;
+  onAction: (action: "food" | "toy" | "sleep" | "bath") => void;
   onSendMessage?: (message: string) => void;
   isChatLoading?: boolean;
   menuRef?: React.RefObject<HTMLDivElement | null>;
@@ -99,7 +99,7 @@ export const JuroContextMenu: React.FC<JuroContextMenuProps> = ({
           </button>
         </form>
 
-        {/* 5 Bottom Action Buttons: Makan | Main | Bangun/Tidur | Mandi | Elus */}
+        {/* 4 Bottom Action Buttons: Makan | Main | Bangun/Tidur | Mandi */}
         <div className="flex items-center justify-center gap-1 sm:gap-1.5">
           {/* 1. Makan */}
           <button
@@ -154,16 +154,6 @@ export const JuroContextMenu: React.FC<JuroContextMenuProps> = ({
           >
             <Droplets size={14} strokeWidth={2.5} className="text-sky-500 shrink-0" />
             <span className="leading-none">Mandi</span>
-          </button>
-
-          {/* 5. Elus */}
-          <button
-            type="button"
-            onClick={() => onAction("pet")}
-            className="relative flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-2 min-h-[42px] sm:min-h-0 bg-white dark:bg-neutral-800 text-charcoal dark:text-white border-2 border-charcoal dark:border-neutral-600 shadow-[2px_2px_0px_#171717] dark:shadow-[2px_2px_0px_#000000] hover:border-rose-500 hover:text-rose-500 active:translate-x-[1px] active:translate-y-[1px] active:shadow-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-500 pixel-text text-[8.5px] sm:text-[9.5px] uppercase font-bold tracking-tight sm:tracking-wider transition-all cursor-pointer select-none min-w-[50px] sm:min-w-0"
-          >
-            <HandHeart size={14} strokeWidth={2.5} className="text-rose-500 shrink-0" />
-            <span className="leading-none">Elus</span>
           </button>
         </div>
       </div>

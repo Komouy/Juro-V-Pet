@@ -408,7 +408,7 @@ export function pickScenicWaypoint(bias?: "water" | "bed" | "food" | "bench" | "
       const brookX = -2.5 + Math.random() * 3.5;
       const t = (brookX + 4.15) / 6.4;
       const brookZ = -3.95 + t * 2.7 + Math.sin(t * Math.PI) * 0.35;
-      if (!isInsideObstacle(brookX, brookZ, 0.3)) {
+      if (!isInsideObstacle(brookX, brookZ, 0.45)) {
         return { x: brookX, z: brookZ };
       }
     }
@@ -416,21 +416,21 @@ export function pickScenicWaypoint(bias?: "water" | "bed" | "food" | "bench" | "
     // Grassy area beside West Knoll sofa bed
     const bedX = -2.6 + (Math.random() - 0.5) * 0.4;
     const bedZ = -0.15 + (Math.random() - 0.5) * 0.4;
-    if (!isInsideObstacle(bedX, bedZ, 0.3)) {
+    if (!isInsideObstacle(bedX, bedZ, 0.45)) {
       return { x: bedX, z: bedZ };
     }
   } else if (bias === "bench") {
     // Grassy area in front of the eastern park bench
     const benchX = 3.15 + (Math.random() - 0.5) * 0.6;
     const benchZ = 1.25 + (Math.random() - 0.5) * 0.5;
-    if (!isInsideObstacle(benchX, benchZ, 0.3)) {
+    if (!isInsideObstacle(benchX, benchZ, 0.45)) {
       return { x: benchX, z: benchZ };
     }
   } else if (bias === "trampoline") {
     // Clear meadow path in front of the bouncy mushroom trampoline left of shop
     const tx = 2.50 + (Math.random() - 0.5) * 0.3;
     const tz = -2.15 + (Math.random() - 0.5) * 0.3;
-    if (!isInsideObstacle(tx, tz, 0.3)) {
+    if (!isInsideObstacle(tx, tz, 0.45)) {
       return { x: tx, z: tz };
     }
   } else if (bias === "food") {
@@ -438,7 +438,7 @@ export function pickScenicWaypoint(bias?: "water" | "bed" | "food" | "bench" | "
     for (let attempt = 0; attempt < 10; attempt++) {
       const fx = -1.4 + Math.random() * 2.8;
       const fz = 0.5 + Math.random() * 1.0;
-      if (!isInsideObstacle(fx, fz, 0.35)) {
+      if (!isInsideObstacle(fx, fz, 0.45)) {
         return { x: fx, z: fz };
       }
     }
@@ -454,7 +454,7 @@ export function pickScenicWaypoint(bias?: "water" | "bed" | "food" | "bench" | "
       const r = Math.random() * platform.radius * 0.55;
       const px = platform.x + Math.cos(angle) * r;
       const pz = platform.z + Math.sin(angle) * r;
-      if (!isInsideObstacle(px, pz, 0.42)) {
+      if (!isInsideObstacle(px, pz, 0.45)) {
         return { x: px, z: pz };
       }
     }
@@ -462,7 +462,7 @@ export function pickScenicWaypoint(bias?: "water" | "bed" | "food" | "bench" | "
     if (platform.id === "west-knoll") {
       return { x: -2.6, z: -0.15 };
     }
-    if (!isInsideObstacle(platform.x, platform.z, 0.2)) {
+    if (!isInsideObstacle(platform.x, platform.z, 0.45)) {
       return { x: platform.x, z: platform.z };
     }
   }
@@ -472,7 +472,7 @@ export function pickScenicWaypoint(bias?: "water" | "bed" | "food" | "bench" | "
     const brookX = -2.5 + Math.random() * 3.5;
     const t = (brookX + 5.5) / 7.7;
     const brookZ = -4.9 + t * 3.7 + Math.sin(t * Math.PI) * 0.35;
-    if (!isInsideObstacle(brookX, brookZ, 0.3)) {
+    if (!isInsideObstacle(brookX, brookZ, 0.45)) {
       return { x: brookX, z: brookZ };
     }
   }

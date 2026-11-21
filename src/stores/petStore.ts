@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import type { PetMood, PetBehaviorState, PetAttributes, FoodItem, ToyItem } from "../types/pet";
 import { soundEffects } from "../engine/audio/soundEffects";
+import { isBedtimeHour } from "../utils/timeOfDay";
 
 export const DEFAULT_FOODS: FoodItem[] = [
   {
@@ -94,6 +95,7 @@ interface PetState {
   sleep: () => void;
   wakeUp: () => void;
   recoverSleepEnergy: (amount?: number) => void;
+  decayNightSleep: (amount?: number) => void;
   clean: () => void;
   strokePet: () => void;
   setLastPosition: (pos: { x: number; y: number; z: number }) => void;
@@ -273,6 +275,17 @@ export const usePetStore = create<PetState>((set, get) => ({
     });
   },
 
+  decayNightSleep: (amount = 2) => {
+    if (!Number.isFinite(amount) || amount <= 0) return;
+    set((s) => {
+      if (s.currentState === "sleep" || s.energy <= 0) return s;
+      return {
+        energy: Math.max(0, s.energy - amount),
+        lastUpdated: Date.now(),
+      };
+    });
+  },
+
   clean: () => {
     const now = Date.now();
     const canRewardXp = now - get().lastCleanRewardAt >= 10_000;
@@ -316,12 +329,21 @@ export const usePetStore = create<PetState>((set, get) => ({
 
     const decay = Math.min(hoursAway * 2, 40);
 
-    set((s) => ({
-      hunger: Math.max(15, s.hunger - decay),
-      energy: Math.max(15, s.energy - decay * 0.5),
-      happiness: Math.max(25, s.happiness - decay * 0.3),
-      cleanliness: Math.max(20, s.cleanliness - decay * 0.7),
-      lastUpdated: now,
-    }));
+    set((s) => {
+      const isNightNow = isBedtimeHour(new Date());
+      const nextEnergy = s.currentState === "sleep"
+        ? Math.min(100, s.energy + hoursAway * 35)
+        : isNightNow
+        ? Math.max(15, s.energy - decay)
+        : Math.max(20, s.energy - decay * 0.15);
+
+      return {
+        hunger: Math.max(15, s.hunger - decay),
+        energy: nextEnergy,
+        happiness: Math.max(25, s.happiness - decay * 0.3),
+        cleanliness: Math.max(20, s.cleanliness - decay * 0.7),
+        lastUpdated: now,
+      };
+    });
   },
 }));

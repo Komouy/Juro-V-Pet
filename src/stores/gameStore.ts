@@ -4,7 +4,9 @@ import {
   DEFAULT_CRYSTALS,
   DEFAULT_FOOD_INVENTORY,
   DEFAULT_OWNED_TOYS,
+  DEFAULT_UNLOCKED_HATS,
   DEFAULT_UNLOCKED_SKINS,
+  HAT_CATALOG,
   PICKAXE_TIERS,
   SHOP_FOODS,
   SHOP_TOYS,
@@ -62,6 +64,8 @@ interface GameState {
   ownedToys: string[];
   unlockedSkins: string[];
   activeSkin: string;
+  unlockedHats: string[];
+  activeHat: string;
   pickaxeLevel: number;
   deepestFloor: number;
 
@@ -92,9 +96,11 @@ interface GameState {
   buyToy: (toyId: string) => boolean;
   upgradePickaxe: () => boolean;
 
-  // Collection Skins actions
+  // Collection Skins & Hats actions
   unlockSkin: (skinId: string) => boolean;
   equipSkin: (skinId: string) => boolean;
+  unlockHat: (hatId: string) => boolean;
+  equipHat: (hatId: string) => boolean;
 }
 
 export const useGameStore = create<GameState>((set, get) => ({
@@ -112,6 +118,8 @@ export const useGameStore = create<GameState>((set, get) => ({
   ownedToys: [...DEFAULT_OWNED_TOYS],
   unlockedSkins: [...DEFAULT_UNLOCKED_SKINS],
   activeSkin: "classic-orange",
+  unlockedHats: [...DEFAULT_UNLOCKED_HATS],
+  activeHat: "hat-none",
   pickaxeLevel: 1,
   deepestFloor: 1,
   miningStamina: MAX_MINING_STAMINA,
@@ -455,6 +463,47 @@ export const useGameStore = create<GameState>((set, get) => ({
     const state = get();
     if (!state.unlockedSkins.includes(skinId)) return false;
     set({ activeSkin: skinId });
+    return true;
+  },
+
+  unlockHat: (hatId) => {
+    const hat = HAT_CATALOG.find((h) => h.id === hatId);
+    if (!hat) return false;
+
+    const state = get();
+    if (state.unlockedHats.includes(hatId)) return false;
+
+    if (state.coins < hat.price) return false;
+
+    if (hat.crystalCost) {
+      const { crystalId, amount } = hat.crystalCost;
+      const owned = state.crystals[crystalId] ?? 0;
+      if (owned < amount) return false;
+
+      set((s) => ({
+        coins: s.coins - hat.price,
+        crystals: {
+          ...s.crystals,
+          [crystalId]: Math.max(0, (s.crystals[crystalId] ?? 0) - amount),
+        },
+        unlockedHats: [...s.unlockedHats, hatId],
+        activeHat: hatId,
+      }));
+      return true;
+    }
+
+    set((s) => ({
+      coins: s.coins - hat.price,
+      unlockedHats: [...s.unlockedHats, hatId],
+      activeHat: hatId,
+    }));
+    return true;
+  },
+
+  equipHat: (hatId) => {
+    const state = get();
+    if (!state.unlockedHats.includes(hatId)) return false;
+    set({ activeHat: hatId });
     return true;
   },
 }));

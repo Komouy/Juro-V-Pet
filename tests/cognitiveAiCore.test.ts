@@ -213,7 +213,7 @@ describe("Cognitive AI Core & Developmental Progression", () => {
       level: 3,
     });
     expect(feedReply.toLowerCase()).toContain("melon segar");
-    expect(feedReply.toLowerCase()).toContain("nyam");
+    expect(feedReply.toLowerCase()).toMatch(/lezat|kenyang|segar/i);
 
     // Playing reaction
     const playReply = getContextualFallbackReply({

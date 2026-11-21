@@ -47,7 +47,7 @@ describe("Gemini AI Chat Service", () => {
       expect(prompt).toContain("idle");
       expect(prompt).toContain("Cuaca cerah");
       expect(prompt).toContain("MAKSIMAL 1 SAMPAI 2 KALIMAT PENDEK");
-      expect(prompt).toContain("Bloop!");
+      expect(prompt).toContain("DILARANG KERAS menyisipkan emoji");
     });
 
     it("handles rainy and night weather conditions in context", () => {

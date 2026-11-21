@@ -40,8 +40,8 @@ const BGM_TRACKS: Record<BgmTrack, TrackDef> = {
     ],
     waveform: "triangle",
     bassWaveform: "sine",
-    melVol: 0.045,
-    bassVol: 0.065,
+    melVol: 0.22,
+    bassVol: 0.26,
   },
 
   // 2. Nighttime / Bedtime Lullaby: Gentle, dreamy music box
@@ -59,8 +59,8 @@ const BGM_TRACKS: Record<BgmTrack, TrackDef> = {
     ],
     waveform: "sine",
     bassWaveform: "sine",
-    melVol: 0.038,
-    bassVol: 0.05,
+    melVol: 0.18,
+    bassVol: 0.22,
   },
 
   // 3. Shop Market Theme: Bouncy, upbeat retro shopkeeper melody
@@ -78,8 +78,8 @@ const BGM_TRACKS: Record<BgmTrack, TrackDef> = {
     ],
     waveform: "triangle",
     bassWaveform: "triangle",
-    melVol: 0.05,
-    bassVol: 0.065,
+    melVol: 0.24,
+    bassVol: 0.28,
   },
 
   // 4. Subterranean Mine Theme: Deep resonant cave ambiance & crystal chimes
@@ -97,8 +97,8 @@ const BGM_TRACKS: Record<BgmTrack, TrackDef> = {
     ],
     waveform: "sine",
     bassWaveform: "triangle",
-    melVol: 0.04,
-    bassVol: 0.07,
+    melVol: 0.20,
+    bassVol: 0.28,
   },
 
   // 5. Cozy Theme (Collection, Evolution, Settings): Relaxed, warm lofi chiptune
@@ -116,8 +116,8 @@ const BGM_TRACKS: Record<BgmTrack, TrackDef> = {
     ],
     waveform: "triangle",
     bassWaveform: "sine",
-    melVol: 0.042,
-    bassVol: 0.06,
+    melVol: 0.22,
+    bassVol: 0.26,
   },
 };
 
@@ -175,10 +175,14 @@ class SoundSystem {
     if (!this.bgmGain) {
       this.bgmGain = ctx.createGain();
       const enabled = this.isEnabled();
-      this.bgmGain.gain.setValueAtTime(enabled ? 0.35 : 0.0, ctx.currentTime);
+      this.bgmGain.gain.setValueAtTime(enabled ? 0.75 : 0.0, ctx.currentTime);
       this.bgmGain.connect(this.getMasterGain());
     }
     return this.bgmGain;
+  }
+
+  private getSfxDestination(): AudioNode {
+    return this.getMasterGain();
   }
 
   // === PROCEDURAL RETRO BGM SEQUENCER ===
@@ -236,6 +240,9 @@ class SoundSystem {
     const track = BGM_TRACKS[this.currentTrack];
     if (!track) return;
 
+    if (this.bgmNextNoteTime < this.ctx.currentTime) {
+      this.bgmNextNoteTime = this.ctx.currentTime + 0.05;
+    }
     const lookahead = 0.30;
     while (this.bgmNextNoteTime < this.ctx.currentTime + lookahead) {
       const stepIdx = this.bgmStep % track.melody.length;
@@ -308,12 +315,12 @@ class SoundSystem {
       osc.frequency.setValueAtTime(280, ctx.currentTime);
       osc.frequency.exponentialRampToValueAtTime(140, ctx.currentTime + 0.12);
 
-      gain.gain.setValueAtTime(0.2, ctx.currentTime);
+      gain.gain.setValueAtTime(0.55, ctx.currentTime);
       gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.14);
 
       osc.connect(filter);
       filter.connect(gain);
-      gain.connect(ctx.destination);
+      gain.connect(this.getSfxDestination());
 
       osc.start();
       osc.stop(ctx.currentTime + 0.15);
@@ -340,11 +347,11 @@ class SoundSystem {
       osc.frequency.exponentialRampToValueAtTime(220, now + 0.22);
       osc.frequency.exponentialRampToValueAtTime(300, now + 0.32);
 
-      gain.gain.setValueAtTime(0.25, now);
+      gain.gain.setValueAtTime(0.65, now);
       gain.gain.exponentialRampToValueAtTime(0.001, now + 0.36);
 
       osc.connect(gain);
-      gain.connect(ctx.destination);
+      gain.connect(this.getSfxDestination());
 
       osc.start();
       osc.stop(now + 0.38);
@@ -368,11 +375,11 @@ class SoundSystem {
       osc.frequency.setValueAtTime(220, now);
       osc.frequency.exponentialRampToValueAtTime(380, now + 0.09);
 
-      gain.gain.setValueAtTime(0.16, now);
+      gain.gain.setValueAtTime(0.48, now);
       gain.gain.exponentialRampToValueAtTime(0.001, now + 0.12);
 
       osc.connect(gain);
-      gain.connect(ctx.destination);
+      gain.connect(this.getSfxDestination());
 
       osc.start(now);
       osc.stop(now + 0.13);
@@ -396,11 +403,11 @@ class SoundSystem {
       osc.frequency.setValueAtTime(310, now);
       osc.frequency.exponentialRampToValueAtTime(110, now + 0.07);
 
-      gain.gain.setValueAtTime(0.15, now);
+      gain.gain.setValueAtTime(0.45, now);
       gain.gain.exponentialRampToValueAtTime(0.001, now + 0.085);
 
       osc.connect(gain);
-      gain.connect(ctx.destination);
+      gain.connect(this.getSfxDestination());
 
       osc.start(now);
       osc.stop(now + 0.09);
@@ -425,11 +432,11 @@ class SoundSystem {
         osc.frequency.setValueAtTime(440 + idx * 80, now + delay);
         osc.frequency.exponentialRampToValueAtTime(300 + idx * 60, now + delay + 0.07);
 
-        gain.gain.setValueAtTime(0.22, now + delay);
+        gain.gain.setValueAtTime(0.55, now + delay);
         gain.gain.exponentialRampToValueAtTime(0.001, now + delay + 0.07);
 
         osc.connect(gain);
-        gain.connect(ctx.destination);
+        gain.connect(this.getSfxDestination());
 
         osc.start(now + delay);
         osc.stop(now + delay + 0.08);
@@ -456,11 +463,11 @@ class SoundSystem {
         osc.type = "sine";
         osc.frequency.setValueAtTime(freq, now + i * 0.06);
 
-        gain.gain.setValueAtTime(0.15, now + i * 0.06);
+        gain.gain.setValueAtTime(0.48, now + i * 0.06);
         gain.gain.exponentialRampToValueAtTime(0.001, now + i * 0.06 + 0.12);
 
         osc.connect(gain);
-        gain.connect(ctx.destination);
+        gain.connect(this.getSfxDestination());
 
         osc.start(now + i * 0.06);
         osc.stop(now + i * 0.06 + 0.14);
@@ -486,11 +493,11 @@ class SoundSystem {
       osc.frequency.exponentialRampToValueAtTime(940, now + 0.06);
       osc.frequency.exponentialRampToValueAtTime(780, now + 0.11);
 
-      gain.gain.setValueAtTime(0.16, now);
+      gain.gain.setValueAtTime(0.48, now);
       gain.gain.exponentialRampToValueAtTime(0.001, now + 0.13);
 
       osc.connect(gain);
-      gain.connect(ctx.destination);
+      gain.connect(this.getSfxDestination());
 
       osc.start(now);
       osc.stop(now + 0.14);
@@ -516,11 +523,11 @@ class SoundSystem {
         osc.type = "sine";
         osc.frequency.setValueAtTime(freq, now + i * 0.14);
 
-        gain.gain.setValueAtTime(0.14, now + i * 0.14);
+        gain.gain.setValueAtTime(0.45, now + i * 0.14);
         gain.gain.exponentialRampToValueAtTime(0.001, now + i * 0.14 + 0.28);
 
         osc.connect(gain);
-        gain.connect(ctx.destination);
+        gain.connect(this.getSfxDestination());
 
         osc.start(now + i * 0.14);
         osc.stop(now + i * 0.14 + 0.3);
@@ -547,11 +554,11 @@ class SoundSystem {
         osc.type = "triangle";
         osc.frequency.setValueAtTime(freq, now + i * 0.075);
 
-        gain.gain.setValueAtTime(0.16, now + i * 0.075);
+        gain.gain.setValueAtTime(0.52, now + i * 0.075);
         gain.gain.exponentialRampToValueAtTime(0.001, now + i * 0.075 + 0.18);
 
         osc.connect(gain);
-        gain.connect(ctx.destination);
+        gain.connect(this.getSfxDestination());
 
         osc.start(now + i * 0.075);
         osc.stop(now + i * 0.075 + 0.2);
@@ -583,13 +590,13 @@ class SoundSystem {
       lfo.frequency.setValueAtTime(16, now);
       lfoGain.gain.setValueAtTime(68, now);
 
-      gain.gain.setValueAtTime(0.14, now);
+      gain.gain.setValueAtTime(0.45, now);
       gain.gain.exponentialRampToValueAtTime(0.001, now + 0.45);
 
       lfo.connect(lfoGain);
       lfoGain.connect(osc.frequency);
       osc.connect(gain);
-      gain.connect(ctx.destination);
+      gain.connect(this.getSfxDestination());
 
       lfo.start(now);
       osc.start(now);
@@ -618,11 +625,11 @@ class SoundSystem {
       osc.frequency.setValueAtTime(baseFreq, now);
       osc.frequency.exponentialRampToValueAtTime(baseFreq * 1.5, now + 0.045);
 
-      gain.gain.setValueAtTime(0.12, now);
+      gain.gain.setValueAtTime(0.40, now);
       gain.gain.exponentialRampToValueAtTime(0.001, now + 0.055);
 
       osc.connect(gain);
-      gain.connect(ctx.destination);
+      gain.connect(this.getSfxDestination());
 
       osc.start(now);
       osc.stop(now + 0.06);
@@ -651,12 +658,12 @@ class SoundSystem {
       osc.frequency.setValueAtTime(520, now);
       osc.frequency.exponentialRampToValueAtTime(190, now + 0.18);
 
-      gain.gain.setValueAtTime(0.14, now);
+      gain.gain.setValueAtTime(0.45, now);
       gain.gain.exponentialRampToValueAtTime(0.001, now + 0.2);
 
       osc.connect(filter);
       filter.connect(gain);
-      gain.connect(ctx.destination);
+      gain.connect(this.getSfxDestination());
 
       osc.start(now);
       osc.stop(now + 0.22);
@@ -682,11 +689,11 @@ class SoundSystem {
         osc.type = "sine";
         osc.frequency.setValueAtTime(freq, now + i * 0.05);
 
-        gain.gain.setValueAtTime(0.15, now + i * 0.05);
+        gain.gain.setValueAtTime(0.48, now + i * 0.05);
         gain.gain.exponentialRampToValueAtTime(0.001, now + i * 0.05 + 0.22);
 
         osc.connect(gain);
-        gain.connect(ctx.destination);
+        gain.connect(this.getSfxDestination());
 
         osc.start(now + i * 0.05);
         osc.stop(now + i * 0.05 + 0.24);
@@ -714,11 +721,11 @@ class SoundSystem {
         osc.type = "sine";
         osc.frequency.setValueAtTime(freq, now + i * 0.08);
 
-        gain.gain.setValueAtTime(0.12, now + i * 0.08);
+        gain.gain.setValueAtTime(0.45, now + i * 0.08);
         gain.gain.exponentialRampToValueAtTime(0.001, now + i * 0.08 + 0.28);
 
         osc.connect(gain);
-        gain.connect(ctx.destination);
+        gain.connect(this.getSfxDestination());
 
         osc.start(now + i * 0.08);
         osc.stop(now + i * 0.08 + 0.3);
@@ -744,11 +751,11 @@ class SoundSystem {
       osc.frequency.setValueAtTime(baseFreq, now);
       osc.frequency.exponentialRampToValueAtTime(320, now + 0.08);
 
-      gain.gain.setValueAtTime(0.06, now);
+      gain.gain.setValueAtTime(0.25, now);
       gain.gain.exponentialRampToValueAtTime(0.001, now + 0.09);
 
       osc.connect(gain);
-      gain.connect(ctx.destination);
+      gain.connect(this.getSfxDestination());
 
       osc.start(now);
       osc.stop(now + 0.1);
@@ -774,11 +781,11 @@ class SoundSystem {
       osc.frequency.setValueAtTime(640, now);
       osc.frequency.exponentialRampToValueAtTime(380, now + 0.045);
 
-      gain.gain.setValueAtTime(0.12, now);
+      gain.gain.setValueAtTime(0.40, now);
       gain.gain.exponentialRampToValueAtTime(0.001, now + 0.05);
 
       osc.connect(gain);
-      gain.connect(ctx.destination);
+      gain.connect(this.getSfxDestination());
 
       osc.start(now);
       osc.stop(now + 0.055);
@@ -801,11 +808,11 @@ class SoundSystem {
       osc.type = "sine";
       osc.frequency.setValueAtTime(920, now);
 
-      gain.gain.setValueAtTime(0.035, now);
+      gain.gain.setValueAtTime(0.50, now);
       gain.gain.exponentialRampToValueAtTime(0.001, now + 0.025);
 
       osc.connect(gain);
-      gain.connect(ctx.destination);
+      gain.connect(this.getSfxDestination());
 
       osc.start(now);
       osc.stop(now + 0.03);
@@ -829,11 +836,11 @@ class SoundSystem {
       osc.frequency.setValueAtTime(380, now);
       osc.frequency.exponentialRampToValueAtTime(740, now + 0.055);
 
-      gain.gain.setValueAtTime(0.18, now);
+      gain.gain.setValueAtTime(0.52, now);
       gain.gain.exponentialRampToValueAtTime(0.001, now + 0.07);
 
       osc.connect(gain);
-      gain.connect(ctx.destination);
+      gain.connect(this.getSfxDestination());
 
       osc.start(now);
       osc.stop(now + 0.075);
@@ -857,11 +864,11 @@ class SoundSystem {
       osc.frequency.setValueAtTime(620, now);
       osc.frequency.exponentialRampToValueAtTime(260, now + 0.05);
 
-      gain.gain.setValueAtTime(0.14, now);
+      gain.gain.setValueAtTime(0.45, now);
       gain.gain.exponentialRampToValueAtTime(0.001, now + 0.06);
 
       osc.connect(gain);
-      gain.connect(ctx.destination);
+      gain.connect(this.getSfxDestination());
 
       osc.start(now);
       osc.stop(now + 0.065);
@@ -885,11 +892,11 @@ class SoundSystem {
       osc.frequency.setValueAtTime(780, now);
       osc.frequency.exponentialRampToValueAtTime(540, now + 0.03);
 
-      gain.gain.setValueAtTime(0.09, now);
+      gain.gain.setValueAtTime(0.35, now);
       gain.gain.exponentialRampToValueAtTime(0.001, now + 0.035);
 
       osc.connect(gain);
-      gain.connect(ctx.destination);
+      gain.connect(this.getSfxDestination());
 
       osc.start(now);
       osc.stop(now + 0.04);
@@ -916,11 +923,11 @@ class SoundSystem {
         osc.type = "sine";
         osc.frequency.setValueAtTime(freq, now + idx * 0.04);
 
-        gain.gain.setValueAtTime(0.12, now + idx * 0.04);
+        gain.gain.setValueAtTime(0.40, now + idx * 0.04);
         gain.gain.exponentialRampToValueAtTime(0.001, now + idx * 0.04 + 0.05);
 
         osc.connect(gain);
-        gain.connect(ctx.destination);
+        gain.connect(this.getSfxDestination());
 
         osc.start(now + idx * 0.04);
         osc.stop(now + idx * 0.04 + 0.06);
@@ -945,11 +952,11 @@ class SoundSystem {
       osc.frequency.setValueAtTime(460, now);
       osc.frequency.exponentialRampToValueAtTime(680, now + 0.05);
 
-      gain.gain.setValueAtTime(0.16, now);
+      gain.gain.setValueAtTime(0.48, now);
       gain.gain.exponentialRampToValueAtTime(0.001, now + 0.065);
 
       osc.connect(gain);
-      gain.connect(ctx.destination);
+      gain.connect(this.getSfxDestination());
 
       osc.start(now);
       osc.stop(now + 0.07);
@@ -973,11 +980,11 @@ class SoundSystem {
       osc.frequency.setValueAtTime(320, now);
       osc.frequency.exponentialRampToValueAtTime(180, now + 0.06);
 
-      gain.gain.setValueAtTime(0.14, now);
+      gain.gain.setValueAtTime(0.45, now);
       gain.gain.exponentialRampToValueAtTime(0.001, now + 0.075);
 
       osc.connect(gain);
-      gain.connect(ctx.destination);
+      gain.connect(this.getSfxDestination());
 
       osc.start(now);
       osc.stop(now + 0.08);
@@ -1001,11 +1008,11 @@ class SoundSystem {
       osc.frequency.setValueAtTime(940, now);
       osc.frequency.exponentialRampToValueAtTime(620, now + 0.04);
 
-      gain.gain.setValueAtTime(0.08, now);
+      gain.gain.setValueAtTime(0.30, now);
       gain.gain.exponentialRampToValueAtTime(0.001, now + 0.045);
 
       osc.connect(gain);
-      gain.connect(ctx.destination);
+      gain.connect(this.getSfxDestination());
 
       osc.start(now);
       osc.stop(now + 0.05);
@@ -1031,11 +1038,11 @@ class SoundSystem {
       osc.frequency.setValueAtTime(240, now);
       osc.frequency.exponentialRampToValueAtTime(95, now + 0.07);
 
-      gain.gain.setValueAtTime(0.14, now);
+      gain.gain.setValueAtTime(0.45, now);
       gain.gain.exponentialRampToValueAtTime(0.001, now + 0.08);
 
       osc.connect(gain);
-      gain.connect(ctx.destination);
+      gain.connect(this.getSfxDestination());
 
       osc.start(now);
       osc.stop(now + 0.09);
@@ -1060,11 +1067,11 @@ class SoundSystem {
         osc.type = "sine";
         osc.frequency.setValueAtTime(freq, now + i * 0.045);
 
-        gain.gain.setValueAtTime(0.16, now + i * 0.045);
+        gain.gain.setValueAtTime(0.65, now + i * 0.045);
         gain.gain.exponentialRampToValueAtTime(0.001, now + i * 0.045 + 0.16);
 
         osc.connect(gain);
-        gain.connect(ctx.destination);
+        gain.connect(this.getSfxDestination());
 
         osc.start(now + i * 0.045);
         osc.stop(now + i * 0.045 + 0.18);
@@ -1089,11 +1096,11 @@ class SoundSystem {
         osc.type = "sine";
         osc.frequency.setValueAtTime(freq, now + idx * 0.065);
 
-        gain.gain.setValueAtTime(0.16, now + idx * 0.065);
+        gain.gain.setValueAtTime(0.60, now + idx * 0.065);
         gain.gain.exponentialRampToValueAtTime(0.001, now + idx * 0.065 + 0.18);
 
         osc.connect(gain);
-        gain.connect(ctx.destination);
+        gain.connect(this.getSfxDestination());
 
         osc.start(now + idx * 0.065);
         osc.stop(now + idx * 0.065 + 0.2);
@@ -1118,11 +1125,11 @@ class SoundSystem {
         osc.type = "sawtooth";
         osc.frequency.setValueAtTime(150, now + delay);
 
-        gain.gain.setValueAtTime(0.14, now + delay);
+        gain.gain.setValueAtTime(0.48, now + delay);
         gain.gain.exponentialRampToValueAtTime(0.001, now + delay + 0.07);
 
         osc.connect(gain);
-        gain.connect(ctx.destination);
+        gain.connect(this.getSfxDestination());
 
         osc.start(now + delay);
         osc.stop(now + delay + 0.08);
@@ -1149,11 +1156,11 @@ class SoundSystem {
         osc.type = "triangle";
         osc.frequency.setValueAtTime(freq, now + i * 0.06);
 
-        gain.gain.setValueAtTime(0.18, now + i * 0.06);
+        gain.gain.setValueAtTime(0.65, now + i * 0.06);
         gain.gain.exponentialRampToValueAtTime(0.001, now + i * 0.06 + 0.18);
 
         osc.connect(gain);
-        gain.connect(ctx.destination);
+        gain.connect(this.getSfxDestination());
 
         osc.start(now + i * 0.06);
         osc.stop(now + i * 0.06 + 0.2);
@@ -1178,11 +1185,11 @@ class SoundSystem {
         osc.type = "sine";
         osc.frequency.setValueAtTime(freq, now + i * 0.045);
 
-        gain.gain.setValueAtTime(0.15, now + i * 0.045);
+        gain.gain.setValueAtTime(0.50, now + i * 0.045);
         gain.gain.exponentialRampToValueAtTime(0.001, now + i * 0.045 + 0.1);
 
         osc.connect(gain);
-        gain.connect(ctx.destination);
+        gain.connect(this.getSfxDestination());
 
         osc.start(now + i * 0.045);
         osc.stop(now + i * 0.045 + 0.12);
@@ -1207,11 +1214,11 @@ class SoundSystem {
       osc.frequency.setValueAtTime(220, now);
       osc.frequency.exponentialRampToValueAtTime(95, now + 0.22);
 
-      gain.gain.setValueAtTime(0.16, now);
+      gain.gain.setValueAtTime(0.48, now);
       gain.gain.exponentialRampToValueAtTime(0.001, now + 0.24);
 
       osc.connect(gain);
-      gain.connect(ctx.destination);
+      gain.connect(this.getSfxDestination());
 
       osc.start(now);
       osc.stop(now + 0.26);
@@ -1237,11 +1244,11 @@ class SoundSystem {
         osc.type = "triangle";
         osc.frequency.setValueAtTime(freq, now + i * 0.08);
 
-        gain.gain.setValueAtTime(0.14, now + i * 0.08);
+        gain.gain.setValueAtTime(0.45, now + i * 0.08);
         gain.gain.exponentialRampToValueAtTime(0.001, now + i * 0.08 + 0.16);
 
         osc.connect(gain);
-        gain.connect(ctx.destination);
+        gain.connect(this.getSfxDestination());
 
         osc.start(now + i * 0.08);
         osc.stop(now + i * 0.08 + 0.18);
@@ -1269,11 +1276,11 @@ class SoundSystem {
         osc.frequency.setValueAtTime(freq, now + i * 0.08);
 
         const dur = i === fanfare.length - 1 ? 0.35 : 0.14;
-        gain.gain.setValueAtTime(0.18, now + i * 0.08);
+        gain.gain.setValueAtTime(0.70, now + i * 0.08);
         gain.gain.exponentialRampToValueAtTime(0.001, now + i * 0.08 + dur);
 
         osc.connect(gain);
-        gain.connect(ctx.destination);
+        gain.connect(this.getSfxDestination());
 
         osc.start(now + i * 0.08);
         osc.stop(now + i * 0.08 + dur + 0.02);
@@ -1300,11 +1307,11 @@ class SoundSystem {
         osc.type = "sine";
         osc.frequency.setValueAtTime(freq, now);
 
-        gain.gain.setValueAtTime(0.11, now);
+        gain.gain.setValueAtTime(0.55, now);
         gain.gain.exponentialRampToValueAtTime(0.001, now + 0.22);
 
         osc.connect(gain);
-        gain.connect(ctx.destination);
+        gain.connect(this.getSfxDestination());
 
         osc.start(now);
         osc.stop(now + 0.24);
@@ -1331,11 +1338,11 @@ class SoundSystem {
         osc.type = "sawtooth";
         osc.frequency.setValueAtTime(freq, now + i * 0.1);
 
-        gain.gain.setValueAtTime(0.12, now + i * 0.1);
+        gain.gain.setValueAtTime(0.45, now + i * 0.1);
         gain.gain.exponentialRampToValueAtTime(0.001, now + i * 0.1 + 0.15);
 
         osc.connect(gain);
-        gain.connect(ctx.destination);
+        gain.connect(this.getSfxDestination());
 
         osc.start(now + i * 0.1);
         osc.stop(now + i * 0.1 + 0.17);
@@ -1368,12 +1375,12 @@ class SoundSystem {
       osc.frequency.linearRampToValueAtTime(175, now + 0.85);
 
       gain.gain.setValueAtTime(0.001, now);
-      gain.gain.linearRampToValueAtTime(0.12, now + 0.35);
+      gain.gain.linearRampToValueAtTime(0.40, now + 0.35);
       gain.gain.exponentialRampToValueAtTime(0.001, now + 0.9);
 
       osc.connect(filter);
       filter.connect(gain);
-      gain.connect(ctx.destination);
+      gain.connect(this.getSfxDestination());
 
       osc.start(now);
       osc.stop(now + 0.92);
@@ -1396,11 +1403,11 @@ class SoundSystem {
         osc.frequency.setValueAtTime(820 + idx * 160 + Math.random() * 60, now + delay);
         osc.frequency.exponentialRampToValueAtTime(320, now + delay + 0.04);
 
-        gain.gain.setValueAtTime(0.09, now + delay);
+        gain.gain.setValueAtTime(0.35, now + delay);
         gain.gain.exponentialRampToValueAtTime(0.001, now + delay + 0.045);
 
         osc.connect(gain);
-        gain.connect(ctx.destination);
+        gain.connect(this.getSfxDestination());
 
         osc.start(now + delay);
         osc.stop(now + delay + 0.05);
@@ -1425,11 +1432,11 @@ class SoundSystem {
       osc.frequency.linearRampToValueAtTime(85, now + 0.1);
       osc.frequency.linearRampToValueAtTime(60, now + 0.22);
 
-      gain.gain.setValueAtTime(0.14, now);
+      gain.gain.setValueAtTime(0.45, now);
       gain.gain.exponentialRampToValueAtTime(0.001, now + 0.24);
 
       osc.connect(gain);
-      gain.connect(ctx.destination);
+      gain.connect(this.getSfxDestination());
 
       osc.start(now);
       osc.stop(now + 0.25);
@@ -1452,11 +1459,11 @@ class SoundSystem {
       osc.frequency.setValueAtTime(540, now);
       osc.frequency.exponentialRampToValueAtTime(260, now + 0.06);
 
-      gain.gain.setValueAtTime(0.18, now);
+      gain.gain.setValueAtTime(0.52, now);
       gain.gain.exponentialRampToValueAtTime(0.001, now + 0.07);
 
       osc.connect(gain);
-      gain.connect(ctx.destination);
+      gain.connect(this.getSfxDestination());
 
       osc.start(now);
       osc.stop(now + 0.08);
@@ -1479,11 +1486,11 @@ class SoundSystem {
       osc.frequency.setValueAtTime(600 + Math.random() * 120, now);
       osc.frequency.exponentialRampToValueAtTime(200, now + 0.025);
 
-      gain.gain.setValueAtTime(0.06, now);
+      gain.gain.setValueAtTime(0.25, now);
       gain.gain.exponentialRampToValueAtTime(0.001, now + 0.03);
 
       osc.connect(gain);
-      gain.connect(ctx.destination);
+      gain.connect(this.getSfxDestination());
 
       osc.start(now);
       osc.stop(now + 0.035);

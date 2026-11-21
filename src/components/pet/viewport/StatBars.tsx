@@ -1,5 +1,5 @@
 import React from "react";
-import { Utensils, Zap, Heart, Droplets, HandHeart } from "lucide-react";
+import { Utensils, Moon, Heart, Droplets } from "lucide-react";
 import { soundEffects } from "../../../engine/audio/soundEffects";
 
 export interface StatBarsProps {
@@ -9,7 +9,7 @@ export interface StatBarsProps {
   energy: number;
   happiness: number;
   cleanliness: number;
-  affection: number;
+  affection?: number;
   currentState: string;
   showStatDetails: boolean;
   onToggleStatDetails: () => void;
@@ -22,17 +22,15 @@ export const StatBars: React.FC<StatBarsProps> = ({
   energy,
   happiness,
   cleanliness,
-  affection,
   currentState,
   showStatDetails,
   onToggleStatDetails,
 }) => {
   const compactStats = [
     { key: "hunger", label: "Lapar", value: Math.round(hunger), icon: Utensils, barColor: "bg-juro-orange", iconColor: "text-juro-orange" },
-    { key: "energy", label: "Energi", value: Math.round(energy), icon: Zap, barColor: "bg-amber-400", iconColor: "text-amber-500" },
+    { key: "energy", label: "Tidur", value: Math.round(energy), icon: Moon, barColor: "bg-indigo-400", iconColor: "text-indigo-400" },
     { key: "happiness", label: "Senang", value: Math.round(happiness), icon: Heart, barColor: "bg-rose-400", iconColor: "text-rose-500" },
     { key: "cleanliness", label: "Bersih", value: Math.round(cleanliness), icon: Droplets, barColor: "bg-sky-400", iconColor: "text-sky-500" },
-    { key: "affection", label: "Sayang", value: Math.round(affection), icon: HandHeart, barColor: "bg-purple-400", iconColor: "text-purple-500" },
   ];
 
   const stateLabel =
@@ -47,7 +45,7 @@ export const StatBars: React.FC<StatBarsProps> = ({
   return (
     <div className="absolute top-3 left-3 z-20 pointer-events-none">
       <div className="relative pointer-events-auto">
-        {/* Ultra-Minimal 5-Stat Strip (Consistent Horizontal Alignment Desktop & Mobile) */}
+        {/* Ultra-Minimal 4-Stat Strip (Consistent Horizontal Alignment Desktop & Mobile) */}
         <button
           type="button"
           onClick={() => {

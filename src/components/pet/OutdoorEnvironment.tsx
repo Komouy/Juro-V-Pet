@@ -118,9 +118,9 @@ export const OutdoorEnvironment: React.FC<OutdoorEnvironmentProps> = React.memo(
       "none" | "shop" | "mine" | "bed" | "bench" | "trampoline"
     >("none");
 
-    // Signboard textures for interactive 3D Shop ("TOKO") & Mine Cave ("TAMBANG")
+    // Signboard textures for interactive 3D Shop ("WARUNG") & Mine Cave ("TAMBANG")
     const shopSignTex = useMemo(
-      () => createSignTexture("TOKO", "#FFF7ED", "#171717", "#EA580C"),
+      () => createSignTexture("WARUNG", "#FFF7ED", "#171717", "#EA580C"),
       []
     );
     const mineSignTex = useMemo(

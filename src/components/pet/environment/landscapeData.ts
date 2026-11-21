@@ -26,7 +26,8 @@ export function createSignTexture(
   ctx.strokeRect(14, 14, canvas.width - 28, canvas.height - 28);
 
   ctx.fillStyle = textColor;
-  ctx.font = 'bold 34px "Silkscreen", monospace';
+  const fontSize = label.length > 5 ? 28 : 34;
+  ctx.font = `bold ${fontSize}px "Silkscreen", monospace`;
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
   ctx.fillText(label, canvas.width / 2, canvas.height / 2 + 2);

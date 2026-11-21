@@ -7,7 +7,9 @@ import {
   DEFAULT_CRYSTALS,
   DEFAULT_FOOD_INVENTORY,
   DEFAULT_OWNED_TOYS,
+  DEFAULT_UNLOCKED_HATS,
   DEFAULT_UNLOCKED_SKINS,
+  HAT_CATALOG,
   SHOP_FOODS,
   SHOP_TOYS,
   SKIN_CATALOG,
@@ -63,6 +65,15 @@ function sanitizeUnlockedSkins(raw: unknown): string[] {
   return Array.from(new Set([...DEFAULT_UNLOCKED_SKINS, ...filtered]));
 }
 
+function sanitizeUnlockedHats(raw: unknown): string[] {
+  const validIds = new Set(HAT_CATALOG.map((h) => h.id));
+  if (!Array.isArray(raw)) return [...DEFAULT_UNLOCKED_HATS];
+  const filtered = raw.filter(
+    (id): id is string => typeof id === "string" && validIds.has(id)
+  );
+  return Array.from(new Set([...DEFAULT_UNLOCKED_HATS, ...filtered]));
+}
+
 class PersistenceService {
   private saveTimeout: ReturnType<typeof setTimeout> | null = null;
   private isInitialized = false;
@@ -103,6 +114,12 @@ class PersistenceService {
             ? savedGame.activeSkin
             : "classic-orange";
 
+        const unlockedHats = sanitizeUnlockedHats(savedGame.unlockedHats);
+        const activeHat =
+          savedGame.activeHat && unlockedHats.includes(savedGame.activeHat)
+            ? savedGame.activeHat
+            : "hat-none";
+
         const deepestFloor = Math.round(safeNum(savedGame.deepestFloor, 1, 1));
         const mineFloor = Math.round(safeNum(savedGame.mineFloor, 1, 1, deepestFloor));
         const mineTiles = isValidMineBoard(savedGame.mineTiles)
@@ -118,6 +135,8 @@ class PersistenceService {
           ownedToys: sanitizeOwnedToys(savedGame.ownedToys),
           unlockedSkins,
           activeSkin,
+          unlockedHats,
+          activeHat,
           pickaxeLevel: Math.round(safeNum(savedGame.pickaxeLevel, 1, 1, 5)),
           deepestFloor,
           miningStamina: Math.round(
@@ -182,6 +201,8 @@ class PersistenceService {
         logs: game.logs,
         unlockedCases: game.unlockedSkins,
         activeSkin: game.activeSkin,
+        unlockedHats: game.unlockedHats,
+        activeHat: game.activeHat,
         crystals: game.crystals,
         foodInventory: game.foodInventory,
         ownedToys: game.ownedToys,
@@ -299,6 +320,12 @@ class PersistenceService {
             ? data.game.activeSkin
             : "classic-orange";
 
+        const unlockedHats = sanitizeUnlockedHats(data.game.unlockedHats);
+        const activeHat =
+          typeof data.game.activeHat === "string" && unlockedHats.includes(data.game.activeHat)
+            ? data.game.activeHat
+            : "hat-none";
+
         const deepestFloor = Math.round(safeNum(data.game.deepestFloor, 1, 1));
         const mineFloor = Math.round(safeNum(data.game.mineFloor, 1, 1, deepestFloor));
         const mineTiles = isValidMineBoard(data.game.mineTiles)
@@ -312,6 +339,8 @@ class PersistenceService {
           logs: Array.isArray(data.game.logs) ? data.game.logs : [],
           unlockedCases: unlockedSkins,
           activeSkin,
+          unlockedHats,
+          activeHat,
           crystals: sanitizeCrystals(data.game.crystals),
           foodInventory: sanitizeFoodInventory(data.game.foodInventory),
           ownedToys: sanitizeOwnedToys(data.game.ownedToys),
@@ -335,6 +364,8 @@ class PersistenceService {
           ownedToys: sanitizedGame.ownedToys!,
           unlockedSkins,
           activeSkin,
+          unlockedHats,
+          activeHat,
           pickaxeLevel: sanitizedGame.pickaxeLevel!,
           deepestFloor: sanitizedGame.deepestFloor!,
           miningStamina: sanitizedGame.miningStamina!,

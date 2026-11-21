@@ -5,7 +5,6 @@ import {
   Droplets,
   Moon,
   Sun,
-  Heart,
   MessageSquare,
 } from "lucide-react";
 import { soundEffects } from "../../../engine/audio/soundEffects";
@@ -14,7 +13,7 @@ export interface ActionDockProps {
   activeTray: "none" | "food" | "toy" | "bath";
   onSelectTray: (tray: "food" | "toy" | "bath") => void;
   onToggleSleep: () => void;
-  onPet: () => void;
+  onPet?: () => void;
   onToggleChat: () => void;
   isChatOpen: boolean;
   currentState: string;
@@ -29,7 +28,6 @@ export const ActionDock: React.FC<ActionDockProps> = ({
   activeTray,
   onSelectTray,
   onToggleSleep,
-  onPet,
   onToggleChat,
   isChatOpen,
   currentState,
@@ -163,21 +161,7 @@ export const ActionDock: React.FC<ActionDockProps> = ({
         )}
       </button>
 
-      {/* 5. Elus */}
-      <button
-        type="button"
-        onClick={onPet}
-        className="relative flex flex-col items-center justify-center min-w-[46px] sm:min-w-[54px] h-11 sm:h-12 px-1.5 bg-white dark:bg-neutral-800 text-charcoal dark:text-white border-2 border-charcoal dark:border-neutral-600 shadow-[2px_2px_0px_#171717] dark:shadow-[2px_2px_0px_#000000] hover:text-rose-500 hover:border-rose-400 active:translate-x-[1px] active:translate-y-[1px] active:shadow-none transition-all cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-400"
-        aria-label="Elus Juro Penuh Kasih"
-        title="Elus Tubuh Juro"
-      >
-        <Heart size={15} strokeWidth={2.5} className="shrink-0 text-rose-500" />
-        <span className="pixel-text text-[8px] uppercase font-bold mt-0.5 leading-none">
-          Elus
-        </span>
-      </button>
-
-      {/* 6. Bicara (AI Gemini Chat) */}
+      {/* 5. Bicara (AI Gemini Chat) */}
       <button
         type="button"
         onClick={onToggleChat}

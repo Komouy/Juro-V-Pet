@@ -18,7 +18,13 @@ export type ItemIllustrationId =
   | "crystal-emerald"
   | "crystal-amethyst"
   | "pickaxe"
-  | "mine-ladder";
+  | "mine-ladder"
+  | "hat-none"
+  | "hat-party"
+  | "hat-straw"
+  | "hat-chef"
+  | "hat-propeller"
+  | "hat-top";
 
 export interface ItemIllustrationProps {
   id: ItemIllustrationId | string;
@@ -599,6 +605,176 @@ export const ItemIllustration: React.FC<ItemIllustrationProps> = ({
                 <rect x="10" y={y} width="12" height="2" fill="#D97706" />
               </React.Fragment>
             ))}
+          </svg>
+        );
+
+      case "hat-none":
+        // Tanpa Topi (No Hat / Clear Accessory Icon)
+        return (
+          <svg viewBox="0 0 32 32" width={size} height={size} shapeRendering="crispEdges">
+            <rect x="8" y="26" width="16" height="3" fill="#171717" opacity="0.25" />
+            {/* Soft Juro mini dumpling silhouette */}
+            <rect x="9" y="13" width="14" height="12" fill="#CBD5E1" opacity="0.6" />
+            <rect x="10" y="11" width="12" height="15" fill="#CBD5E1" opacity="0.6" />
+            <rect x="12" y="9" width="8" height="18" fill="#CBD5E1" opacity="0.6" />
+            {/* Crisp Red/Charcoal Cancel Ring */}
+            <rect x="8" y="7" width="16" height="18" fill="#171717" />
+            <rect x="10" y="5" width="12" height="22" fill="#171717" />
+            <rect x="10" y="7" width="12" height="18" fill="#EF4444" />
+            <rect x="12" y="9" width="8" height="14" fill="#F8FAFC" />
+            {/* Diagonal Slash */}
+            <rect x="11" y="9" width="3" height="3" fill="#EF4444" />
+            <rect x="13" y="12" width="3" height="3" fill="#EF4444" />
+            <rect x="15" y="15" width="3" height="3" fill="#EF4444" />
+            <rect x="17" y="18" width="3" height="3" fill="#EF4444" />
+            <rect x="19" y="20" width="3" height="3" fill="#EF4444" />
+          </svg>
+        );
+
+      case "hat-party":
+        // Topi Pesta (Pastel Polka-Dot Party Cone with Fluffy Pom-Pom)
+        return (
+          <svg viewBox="0 0 32 32" width={size} height={size} shapeRendering="crispEdges">
+            <rect x="6" y="27" width="20" height="3" fill="#171717" opacity="0.3" />
+            {/* Top Pom-Pom */}
+            <rect x="14" y="2" width="4" height="4" fill="#171717" />
+            <rect x="15" y="3" width="2" height="2" fill="#FB7185" />
+            {/* Cone Outline */}
+            <rect x="13" y="6" width="6" height="4" fill="#171717" />
+            <rect x="11" y="10" width="10" height="4" fill="#171717" />
+            <rect x="9" y="14" width="14" height="4" fill="#171717" />
+            <rect x="7" y="18" width="18" height="4" fill="#171717" />
+            <rect x="5" y="22" width="22" height="5" fill="#171717" />
+            {/* Pastel Sky Blue Cone Body */}
+            <rect x="14" y="7" width="4" height="3" fill="#38BDF8" />
+            <rect x="12" y="10" width="8" height="4" fill="#38BDF8" />
+            <rect x="10" y="14" width="12" height="4" fill="#38BDF8" />
+            <rect x="8" y="18" width="16" height="4" fill="#38BDF8" />
+            <rect x="6" y="22" width="20" height="3" fill="#38BDF8" />
+            {/* Scalloped Rim Base */}
+            <rect x="6" y="25" width="20" height="1" fill="#F43F5E" />
+            <rect x="7" y="26" width="18" height="1" fill="#FBBF24" />
+            {/* Polka Dots */}
+            <rect x="15" y="11" width="2" height="2" fill="#FFFFFF" />
+            <rect x="11" y="16" width="2" height="2" fill="#FACC15" />
+            <rect x="18" y="17" width="2" height="2" fill="#FFFFFF" />
+            <rect x="9" y="21" width="2" height="2" fill="#FB7185" />
+            <rect x="15" y="20" width="2" height="2" fill="#FACC15" />
+            <rect x="21" y="21" width="2" height="2" fill="#FFFFFF" />
+          </svg>
+        );
+
+      case "hat-straw":
+        // Topi Jerami (Classic Straw Boater Hat with Black Ribbon)
+        return (
+          <svg viewBox="0 0 32 32" width={size} height={size} shapeRendering="crispEdges">
+            <rect x="3" y="26" width="26" height="3" fill="#171717" opacity="0.3" />
+            {/* Crown Outline */}
+            <rect x="8" y="10" width="16" height="10" fill="#171717" />
+            {/* Wide Brim Outline */}
+            <rect x="3" y="19" width="26" height="6" fill="#171717" />
+            {/* Straw Hat Crown Body */}
+            <rect x="9" y="11" width="14" height="8" fill="#FDE68A" />
+            <rect x="10" y="11" width="12" height="2" fill="#FEF3C7" />
+            {/* Black Ribbon Band */}
+            <rect x="8" y="17" width="16" height="3" fill="#18181B" />
+            {/* Ribbon Bow on Side */}
+            <rect x="21" y="16" width="4" height="5" fill="#18181B" />
+            <rect x="22" y="17" width="2" height="3" fill="#3F3F46" />
+            {/* Straw Brim Body */}
+            <rect x="4" y="20" width="24" height="4" fill="#FDE68A" />
+            <rect x="5" y="20" width="22" height="1" fill="#FEF3C7" />
+            <rect x="4" y="23" width="24" height="1" fill="#D97706" />
+            {/* Subtle Woven Straw Texture Lines */}
+            <rect x="11" y="14" width="2" height="1" fill="#D97706" />
+            <rect x="15" y="14" width="2" height="1" fill="#D97706" />
+            <rect x="19" y="14" width="2" height="1" fill="#D97706" />
+          </svg>
+        );
+
+      case "hat-chef":
+        // Topi Koki (Classic Pleated White Chef Toque)
+        return (
+          <svg viewBox="0 0 32 32" width={size} height={size} shapeRendering="crispEdges">
+            <rect x="7" y="26" width="18" height="3" fill="#171717" opacity="0.3" />
+            {/* Puffy Crown Outline */}
+            <rect x="5" y="7" width="22" height="13" fill="#171717" />
+            <rect x="7" y="5" width="18" height="15" fill="#171717" />
+            <rect x="9" y="4" width="14" height="17" fill="#171717" />
+            {/* Band Outline */}
+            <rect x="7" y="19" width="18" height="8" fill="#171717" />
+            {/* White Billowing Pleats */}
+            <rect x="6" y="8" width="20" height="11" fill="#F8FAFC" />
+            <rect x="8" y="6" width="16" height="13" fill="#F8FAFC" />
+            <rect x="10" y="5" width="12" height="15" fill="#FFFFFF" />
+            {/* Pleat Crease Shadows */}
+            <rect x="10" y="7" width="1" height="11" fill="#CBD5E1" />
+            <rect x="13" y="6" width="1" height="12" fill="#E2E8F0" />
+            <rect x="16" y="6" width="1" height="12" fill="#CBD5E1" />
+            <rect x="19" y="7" width="1" height="11" fill="#E2E8F0" />
+            <rect x="22" y="8" width="1" height="10" fill="#CBD5E1" />
+            {/* Tall White Headband */}
+            <rect x="8" y="20" width="16" height="6" fill="#F1F5F9" />
+            <rect x="8" y="20" width="16" height="1" fill="#FFFFFF" />
+            <rect x="8" y="25" width="16" height="1" fill="#94A3B8" />
+          </svg>
+        );
+
+      case "hat-propeller":
+        // Topi Baling (Colorful Cap with Spinning Black Propeller)
+        return (
+          <svg viewBox="0 0 32 32" width={size} height={size} shapeRendering="crispEdges">
+            <rect x="4" y="26" width="24" height="3" fill="#171717" opacity="0.3" />
+            {/* Top Propeller Blades */}
+            <rect x="6" y="5" width="20" height="3" fill="#171717" />
+            <rect x="7" y="6" width="18" height="1" fill="#334155" />
+            {/* Propeller Hub & Stalk */}
+            <rect x="14" y="3" width="4" height="4" fill="#171717" />
+            <rect x="15" y="4" width="2" height="2" fill="#64748B" />
+            <rect x="15" y="7" width="2" height="3" fill="#FACC15" />
+            {/* Cap Dome Outline */}
+            <rect x="7" y="10" width="18" height="12" fill="#171717" />
+            <rect x="9" y="9" width="14" height="13" fill="#171717" />
+            {/* Cap Visor Outline */}
+            <rect x="4" y="19" width="24" height="6" fill="#171717" />
+            {/* Multi-Color Cap Panels */}
+            {/* Red Panel (Left/Front) */}
+            <rect x="8" y="11" width="7" height="9" fill="#EF4444" />
+            <rect x="10" y="10" width="5" height="10" fill="#EF4444" />
+            {/* Green Panel (Right/Front) */}
+            <rect x="15" y="11" width="6" height="9" fill="#22C55E" />
+            <rect x="15" y="10" width="5" height="10" fill="#22C55E" />
+            {/* Yellow Panel (Side Accent) */}
+            <rect x="21" y="12" width="3" height="8" fill="#FACC15" />
+            {/* Blue Visor / Brim */}
+            <rect x="5" y="20" width="22" height="4" fill="#2563EB" />
+            <rect x="6" y="20" width="20" height="1" fill="#60A5FA" />
+            <rect x="5" y="23" width="22" height="1" fill="#1D4ED8" />
+          </svg>
+        );
+
+      case "hat-top":
+        // Topi Pesulap (Noble Black Silk Top Hat with Crimson Ribbon)
+        return (
+          <svg viewBox="0 0 32 32" width={size} height={size} shapeRendering="crispEdges">
+            <rect x="4" y="26" width="24" height="3" fill="#171717" opacity="0.3" />
+            {/* Tall Crown Outline */}
+            <rect x="8" y="5" width="16" height="17" fill="#171717" />
+            <rect x="7" y="4" width="18" height="3" fill="#171717" />
+            {/* Flared Brim Outline */}
+            <rect x="4" y="21" width="24" height="5" fill="#171717" />
+            {/* Black Silk Crown Body */}
+            <rect x="8" y="6" width="16" height="13" fill="#27272A" />
+            {/* Crown Top Flare & Specular */}
+            <rect x="8" y="5" width="16" height="2" fill="#3F3F46" />
+            <rect x="10" y="7" width="2" height="11" fill="#52525B" />
+            {/* Rich Crimson Satin Ribbon Band */}
+            <rect x="8" y="17" width="16" height="4" fill="#DC2626" />
+            <rect x="8" y="17" width="16" height="1" fill="#EF4444" />
+            <rect x="8" y="20" width="16" height="1" fill="#991B1B" />
+            {/* Curved Silk Brim */}
+            <rect x="5" y="22" width="22" height="3" fill="#18181B" />
+            <rect x="6" y="22" width="20" height="1" fill="#3F3F46" />
           </svg>
         );
 

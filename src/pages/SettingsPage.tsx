@@ -277,9 +277,7 @@ export const SettingsPage: React.FC = () => {
                   <MessageSquare size={13} className="text-juro-orange" />
                   <span>Melayang di Juro</span>
                 </span>
-                {actionMenuStyle === "floating" && (
-                  <Check size={14} className="text-juro-orange stroke-[3]" />
-                )}
+                {actionMenuStyle === "floating"}
               </div>
               <p className="pixel-text text-[8px] text-neutral-600 dark:text-neutral-400 leading-relaxed">
                 Klik tubuh jeli Juro untuk membuka balon menu aksi & kolom obrolan tepat di atas kepalanya seperti versi awal.
@@ -304,9 +302,7 @@ export const SettingsPage: React.FC = () => {
                   <LayoutGrid size={13} className="text-juro-orange" />
                   <span>Bilah Bawah</span>
                 </span>
-                {actionMenuStyle === "dock" && (
-                  <Check size={14} className="text-juro-orange stroke-[3]" />
-                )}
+                {actionMenuStyle === "dock"}
               </div>
               <p className="pixel-text text-[8px] text-neutral-600 dark:text-neutral-400 leading-relaxed">
                 Menu aksi dan tombol obrolan selalu siap di bilah bawah layar; klik langsung pada Juro untuk mengelus atau membangunkannya.

@@ -27,7 +27,7 @@ export const MineCaveLandmark: React.FC<MineCaveLandmarkProps> = ({
   woodColor,
   woodDarkColor,
   isLanternLit,
-  isHovered,
+  isHovered: _isHovered,
   mineSignTex,
   position = [-4.35, BASE_GROUND_Y, -4.05],
   rotation = [0, 1.12, 0],
@@ -39,7 +39,7 @@ export const MineCaveLandmark: React.FC<MineCaveLandmarkProps> = ({
     <group
       position={position}
       rotation={rotation}
-      scale={isHovered ? 1.045 : 1}
+      scale={1}
       onPointerDown={onPointerDown}
       onClick={onClick}
       onPointerOver={(e) => {
@@ -95,7 +95,7 @@ export const MineCaveLandmark: React.FC<MineCaveLandmarkProps> = ({
         <meshStandardMaterial
           color="#FEF08A"
           emissive="#F59E0B"
-          emissiveIntensity={isLanternLit || isHovered ? 1.5 : 0.85}
+          emissiveIntensity={isLanternLit ? 1.5 : 0.85}
         />
       </mesh>
 
@@ -106,7 +106,7 @@ export const MineCaveLandmark: React.FC<MineCaveLandmarkProps> = ({
         <meshStandardMaterial
           color="#38BDF8"
           emissive="#0284C7"
-          emissiveIntensity={isHovered ? 1.1 : 0.55}
+          emissiveIntensity={0.55}
           roughness={0.2}
         />
       </mesh>
@@ -125,7 +125,7 @@ export const MineCaveLandmark: React.FC<MineCaveLandmarkProps> = ({
         <meshStandardMaterial
           color="#10B981"
           emissive="#059669"
-          emissiveIntensity={isHovered ? 1.1 : 0.55}
+          emissiveIntensity={0.55}
           roughness={0.2}
         />
       </mesh>

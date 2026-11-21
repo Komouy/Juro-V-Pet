@@ -85,9 +85,9 @@ export const EvolutionPage: React.FC = () => {
       current: level >= 1 && level < 5,
       completed: level >= 5,
       perks: [
-        "Ukuran bayi mungil (68% – 85%)",
-        "Lompatan kecil menggemaskan",
-        "Elusan lembut & respons manja",
+        "Ukuran awal mungil (68% – 85%)",
+        "Lompatan kinetik",
+        "Respons sentuhan interaktif",
       ],
     },
     {
@@ -111,7 +111,7 @@ export const EvolutionPage: React.FC = () => {
       perks: [
         "Ukuran dewasa maksimal (120%)",
         "Mahkota emas mini 3D",
-        "Tubuh gembul berwibawa",
+        "Proporsi tubuh optimal berwibawa",
       ],
     },
   ];

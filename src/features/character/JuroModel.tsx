@@ -44,9 +44,22 @@ const _bedTargetVec = new THREE.Vector3();
 const _benchTargetVec = new THREE.Vector3();
 const _trampolineTargetVec = new THREE.Vector3();
 
-function lerpAngle(current: number, target: number, alpha: number): number {
+/**
+ * Framerate-independent exponential damping for scalar values.
+ * lambda represents decay rate (higher = snappier, lower = smoother).
+ */
+function dampExp(current: number, target: number, lambda: number, delta: number): number {
+  const alpha = 1 - Math.exp(-lambda * Math.max(0, delta));
+  return current + (target - current) * alpha;
+}
+
+/**
+ * Framerate-independent exponential damping for angles (radians).
+ */
+function dampAngleExp(current: number, target: number, lambda: number, delta: number): number {
   let diff = ((target - current + Math.PI) % (Math.PI * 2)) - Math.PI;
   if (diff < -Math.PI) diff += Math.PI * 2;
+  const alpha = 1 - Math.exp(-lambda * Math.max(0, delta));
   return current + diff * alpha;
 }
 
@@ -118,6 +131,7 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
   const leftEyeRef = useRef<THREE.Group>(null);
   const rightEyeRef = useRef<THREE.Group>(null);
   const sleepEyesRef = useRef<THREE.Group>(null);
+  const petEyesRef = useRef<THREE.Group>(null);
   const leftCatchlightRef = useRef<THREE.Mesh>(null);
   const rightCatchlightRef = useRef<THREE.Mesh>(null);
   const leftSubCatchlightRef = useRef<THREE.Mesh>(null);
@@ -132,7 +146,10 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
   const shadowRef = useRef<THREE.Mesh>(null);
   const leafUmbrellaRef = useRef<THREE.Group>(null);
   const crownRef = useRef<THREE.Group>(null);
+  const propellerRef = useRef<THREE.Group>(null);
   const currentPetScaleRef = useRef(JURO_BASE_SCALE);
+  // Smooth animation tracking refs (framerate-independent damping & organic secondary motion)
+  const currentLookRef = useRef({ x: 0, y: 0 });
   const zzzGroupRef = useRef<THREE.Group>(null);
   const zSpriteRefs = useRef<(THREE.Sprite | null)[]>([]);
 
@@ -221,7 +238,7 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
     clearToyBeingPlayed,
     setBehaviorState,
   } = usePetStore();
-  const { activeSkin } = useGameStore();
+  const { activeSkin, activeHat } = useGameStore();
   const skinPalette = getSkinById(activeSkin);
 
   // Behavior Finite State Machine
@@ -765,30 +782,25 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
         const j = jumpRef.current;
 
         if (j.active) {
-          // Parabolic jump arc onto higher terrace/stump/bridge (or hop down!)
+          // Smooth continuous jump arc onto higher terrace/stump/bridge (or hop down)
           j.elapsed += delta;
           const p = Math.min(1, j.elapsed / j.duration);
           const jx = THREE.MathUtils.lerp(j.startX, j.endX, p);
           const jz = THREE.MathUtils.lerp(j.startZ, j.endZ, p);
           const baseArcY = THREE.MathUtils.lerp(j.startY, j.endY, p);
-          const arcLift = 4 * p * (1 - p) * Math.max(0.25, j.peakY - Math.max(j.startY, j.endY));
+          const arcLift = Math.sin(p * Math.PI) * Math.max(0.25, j.peakY - Math.max(j.startY, j.endY));
           _targetVec.set(jx, baseArcY + arcLift, jz);
           spring.setTarget(_targetVec);
 
-          // Anticipation -> airborne vertical stretch -> squishy landing
-          if (p < 0.16) {
-            crawlScaleY = 0.8;
-            crawlScaleX = 1.13;
-            crawlScaleZ = 1.13;
-          } else if (p < 0.82) {
-            crawlScaleY = 1.2;
-            crawlScaleX = 0.9;
-            crawlScaleZ = 0.92;
-          } else {
-            crawlScaleY = 0.82;
-            crawlScaleX = 1.14;
-            crawlScaleZ = 1.14;
-          }
+          // Continuous squash & stretch curve (anticipation squash -> mid-air stretch -> soft landing damp)
+          const prep = p < 0.18 ? Math.sin((p / 0.18) * Math.PI) * -0.22 : 0;
+          const flight = p >= 0.12 && p <= 0.84 ? Math.sin(((p - 0.12) / 0.72) * Math.PI) * 0.22 : 0;
+          const land = p > 0.78 ? Math.sin(((p - 0.78) / 0.22) * Math.PI) * -0.18 : 0;
+
+          const jumpDeltaY = (prep + flight + land) * motionScale;
+          crawlScaleY = 1.0 + jumpDeltaY;
+          crawlScaleX = 1.0 - jumpDeltaY * 0.55;
+          crawlScaleZ = 1.0 - jumpDeltaY * 0.55;
 
           if (isSleepy) {
             // Heavily dampen bouncy squishing & stretching during sleepy hops
@@ -800,6 +812,7 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
           if (p >= 1) {
             j.active = false;
             soundEffects.playPlop();
+            spring.applyImpulse(new THREE.Vector3(0, -0.35, 0));
           }
         } else {
           const currentTarget = isHeadingToBedRef?.current
@@ -828,38 +841,33 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
           if (dist > 0.16) {
             const dirX = dx / dist;
             const dirZ = dz / dist;
+            const targetYaw = Math.atan2(dirX, dirZ);
 
-            // Smoothly face 3D direction of travel
+            // Smoothly face 3D direction of travel using framerate-independent exponential damping
             if (groupRef.current) {
-              const targetYaw = Math.atan2(dirX, dirZ);
-              groupRef.current.rotation.y = lerpAngle(
+              groupRef.current.rotation.y = dampAngleExp(
                 groupRef.current.rotation.y,
                 targetYaw,
-                isSleepy ? 0.08 : 0.16
+                isSleepy ? 5.5 : 11.0,
+                delta
               );
             }
 
-            // Authentic Slime Drag-Stretch Crawl (slower, lazier, dampened boing-boing when sleepy)
+            // Authentic Slime Drag-Stretch Crawl with continuous speed ramp & smooth volume preservation
             const crawlCycleSpeed = isSleepy ? 3.4 : 6.8;
             const cycle = t * crawlCycleSpeed;
             const wave = Math.sin(cycle);
             const boingScale = isSleepy ? 0.32 : 1.0;
             const speedMult = isSleepy ? 0.52 : 1.0;
-            let crawlSpeed: number;
-            if (wave >= 0) {
-              // Reach forward: elongate along local Z, slim & lower slightly
-              crawlScaleZ = 1 + wave * 0.24 * motionScale * boingScale;
-              crawlScaleX = 1 - wave * 0.11 * motionScale * boingScale;
-              crawlScaleY = 1 - wave * 0.12 * motionScale * boingScale;
-              crawlSpeed = 0.65 * speedMult;
-            } else {
-              // Drag trailing jelly body forward in a plump surge!
-              const pull = -wave;
-              crawlScaleZ = 1 - pull * 0.16 * motionScale * boingScale;
-              crawlScaleX = 1 + pull * 0.13 * motionScale * boingScale;
-              crawlScaleY = 1 + pull * 0.14 * motionScale * boingScale;
-              crawlSpeed = 2.25 * speedMult;
-            }
+
+            // Continuous sinusoidal speed curve (smooth ramp between 0.75 and 2.25 without sudden step jumps)
+            const speedWave = Math.sin(cycle - Math.PI * 0.5) * 0.5 + 0.5;
+            const crawlSpeed = (0.75 + speedWave * 1.5) * speedMult;
+
+            // Continuous squish-stretch deformation
+            crawlScaleZ = 1 + wave * 0.20 * motionScale * boingScale;
+            crawlScaleX = 1 - wave * 0.10 * motionScale * boingScale;
+            crawlScaleY = 1 - wave * 0.11 * motionScale * boingScale;
 
             // Check ahead for higher elevation (hill, stump, rock ledge, bridge) -> trigger jump!
             const probeDist = Math.min(dist, 0.62);
@@ -876,22 +884,16 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
             const aheadGroundY = getTerrainHeightAt(probeX, probeZ);
 
             if (aheadGroundY > currGroundY + 0.05 || aheadGroundY < currGroundY - 0.14) {
-              const isHeadingSpecial =
-                (isHeadingToBedRef?.current ?? false) ||
-                (isHeadingToBenchRef?.current ?? false) ||
-                (isHeadingToTrampolineRef?.current ?? false);
-              const safeLanding = isHeadingSpecial
-                ? { x: probeX, z: probeZ }
-                : resolveHorizontalCollisions(
-                    probeX,
-                    probeZ,
-                    aheadGroundY,
-                    JURO_COLLISION_RADIUS,
-                    true,
-                    isHeadingToBedRef?.current ?? false,
-                    isHeadingToBenchRef?.current ?? false,
-                    isHeadingToTrampolineRef?.current ?? false
-                  );
+              const safeLanding = resolveHorizontalCollisions(
+                probeX,
+                probeZ,
+                aheadGroundY,
+                JURO_COLLISION_RADIUS,
+                true,
+                isHeadingToBedRef?.current ?? false,
+                isHeadingToBenchRef?.current ?? false,
+                isHeadingToTrampolineRef?.current ?? false
+              );
               const landSurfaceY = getTerrainHeightAt(safeLanding.x, safeLanding.z);
               j.active = true;
               j.elapsed = 0;
@@ -911,22 +913,16 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
               const step = Math.min(dist, crawlSpeed * delta * motionScale);
               const rawNextX = spring.position.x + dirX * step;
               const rawNextZ = spring.position.z + dirZ * step;
-              const isHeadingSpecial =
-                (isHeadingToBedRef?.current ?? false) ||
-                (isHeadingToBenchRef?.current ?? false) ||
-                (isHeadingToTrampolineRef?.current ?? false);
-              const resolvedStep = isHeadingSpecial
-                ? { x: rawNextX, z: rawNextZ, hitObstacle: false }
-                : resolveHorizontalCollisions(
-                    rawNextX,
-                    rawNextZ,
-                    currGroundY,
-                    JURO_COLLISION_RADIUS,
-                    false,
-                    isHeadingToBedRef?.current ?? false,
-                    isHeadingToBenchRef?.current ?? false,
-                    isHeadingToTrampolineRef?.current ?? false
-                  );
+              const resolvedStep = resolveHorizontalCollisions(
+                rawNextX,
+                rawNextZ,
+                currGroundY,
+                JURO_COLLISION_RADIUS,
+                false,
+                isHeadingToBedRef?.current ?? false,
+                isHeadingToBenchRef?.current ?? false,
+                isHeadingToTrampolineRef?.current ?? false
+              );
 
               // If grazing an obstacle, add subtle tangential slide so Juro curves around rocks/trees!
               let finalX = resolvedStep.x;
@@ -955,16 +951,15 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
               spring.setTarget(_targetVec);
 
               if (groupRef.current) {
-                groupRef.current.rotation.x = THREE.MathUtils.lerp(
-                  groupRef.current.rotation.x,
-                  wave > 0 ? 0.08 * motionScale : -0.04 * motionScale,
-                  0.14
-                );
-                groupRef.current.rotation.z = THREE.MathUtils.lerp(
-                  groupRef.current.rotation.z,
-                  Math.sin(cycle * 0.5) * 0.05 * motionScale,
-                  0.12
-                );
+                // Secondary motion: dynamic pitch lean forward during surge + roll banking into turns
+                const targetPitch = (wave * 0.05 - 0.015) * motionScale;
+                const turnDiff = ((targetYaw - groupRef.current.rotation.y + Math.PI) % (Math.PI * 2)) - Math.PI;
+                const bankRoll = THREE.MathUtils.clamp(-turnDiff * 0.22, -0.15, 0.15) * motionScale;
+                const waddleRoll = Math.sin(cycle * 0.5) * 0.045 * motionScale;
+                const targetRoll = bankRoll + waddleRoll;
+
+                groupRef.current.rotation.x = dampExp(groupRef.current.rotation.x, targetPitch, 9.0, delta);
+                groupRef.current.rotation.z = dampExp(groupRef.current.rotation.z, targetRoll, 9.0, delta);
               }
             }
           } else {
@@ -979,8 +974,8 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
               z: spring.position.z,
             });
             if (groupRef.current) {
-              groupRef.current.rotation.x = THREE.MathUtils.lerp(groupRef.current.rotation.x, 0, 0.1);
-              groupRef.current.rotation.z = THREE.MathUtils.lerp(groupRef.current.rotation.z, 0, 0.1);
+              groupRef.current.rotation.x = dampExp(groupRef.current.rotation.x, 0, 7.0, delta);
+              groupRef.current.rotation.z = dampExp(groupRef.current.rotation.z, 0, 7.0, delta);
             }
           }
         }
@@ -996,15 +991,17 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
           spring.setTarget(_targetVec);
 
           if (groupRef.current) {
-            groupRef.current.rotation.z = THREE.MathUtils.lerp(
+            groupRef.current.rotation.z = dampExp(
               groupRef.current.rotation.z,
               0.12 * motionScale,
-              0.1
+              6.0,
+              delta
             );
-            groupRef.current.rotation.y = lerpAngle(
+            groupRef.current.rotation.y = dampAngleExp(
               groupRef.current.rotation.y,
               fsm.lookTarget.x * 0.45,
-              0.08
+              6.0,
+              delta
             );
           }
         } else if (currentState === "happy") {
@@ -1013,8 +1010,13 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
           spring.setTarget(_targetVec);
 
           if (groupRef.current) {
-            groupRef.current.rotation.z = Math.sin(t * 7) * 0.07 * motionScale;
-            groupRef.current.rotation.y = lerpAngle(groupRef.current.rotation.y, 0, 0.08);
+            groupRef.current.rotation.z = dampExp(
+              groupRef.current.rotation.z,
+              Math.sin(t * 7) * 0.07 * motionScale,
+              12.0,
+              delta
+            );
+            groupRef.current.rotation.y = dampAngleExp(groupRef.current.rotation.y, 0, 6.0, delta);
           }
         } else if (currentState === "play") {
           const isBounceBall = currentToyBeingPlayed?.id === "bounce-ball";
@@ -1024,7 +1026,7 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
               // Watch the ball flying across the meadow in excitement!
               const lookAngle = Math.atan2(fb.ballX - spring.position.x, fb.ballZ - spring.position.z);
               if (groupRef.current) {
-                groupRef.current.rotation.y = lerpAngle(groupRef.current.rotation.y, lookAngle, 0.2);
+                groupRef.current.rotation.y = dampAngleExp(groupRef.current.rotation.y, lookAngle, 12.0, delta);
               }
               const anticipHop = restY + Math.abs(Math.sin(t * 8)) * 0.08 * motionScale;
               _targetVec.set(spring.position.x, anticipHop, spring.position.z);
@@ -1039,7 +1041,7 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
                 const dirZ = dz / dist;
                 const targetYaw = Math.atan2(dirX, dirZ);
                 if (groupRef.current) {
-                  groupRef.current.rotation.y = lerpAngle(groupRef.current.rotation.y, targetYaw, 0.22);
+                  groupRef.current.rotation.y = dampAngleExp(groupRef.current.rotation.y, targetYaw, 14.0, delta);
                 }
 
                 const cycle = t * 7.5;
@@ -1080,7 +1082,12 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
               _targetVec.set(spring.position.x, happyHop, spring.position.z);
               spring.setTarget(_targetVec);
               if (groupRef.current) {
-                groupRef.current.rotation.z = Math.sin(t * 10) * 0.08 * motionScale;
+                groupRef.current.rotation.z = dampExp(
+                  groupRef.current.rotation.z,
+                  Math.sin(t * 10) * 0.08 * motionScale,
+                  14.0,
+                  delta
+                );
               }
             } else {
               // Returning ball to inventory
@@ -1093,8 +1100,13 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
             _targetVec.set(spring.position.x, bounceY, spring.position.z);
             spring.setTarget(_targetVec);
             if (groupRef.current) {
-              groupRef.current.rotation.z = Math.sin(t * 7) * 0.07 * motionScale;
-              groupRef.current.rotation.y = lerpAngle(groupRef.current.rotation.y, 0, 0.08);
+              groupRef.current.rotation.z = dampExp(
+                groupRef.current.rotation.z,
+                Math.sin(t * 7) * 0.07 * motionScale,
+                12.0,
+                delta
+              );
+              groupRef.current.rotation.y = dampAngleExp(groupRef.current.rotation.y, 0, 6.0, delta);
             }
           }
         } else if (isSittingOnBench) {
@@ -1104,8 +1116,8 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
             spring.position.z - JURO_BENCH_POS.z
           );
           if (distToBench > 0.04) {
-            spring.position.x = THREE.MathUtils.lerp(spring.position.x, JURO_BENCH_POS.x, 0.2);
-            spring.position.z = THREE.MathUtils.lerp(spring.position.z, JURO_BENCH_POS.z, 0.2);
+            spring.position.x = dampExp(spring.position.x, JURO_BENCH_POS.x, 10.0, delta);
+            spring.position.z = dampExp(spring.position.z, JURO_BENCH_POS.z, 10.0, delta);
           } else {
             spring.position.x = JURO_BENCH_POS.x;
             spring.position.z = JURO_BENCH_POS.z;
@@ -1124,12 +1136,13 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
           crawlScaleZ = 1.04;
 
           if (groupRef.current) {
-            groupRef.current.rotation.y = lerpAngle(groupRef.current.rotation.y, JURO_BENCH_POS.rotY, 0.08);
-            groupRef.current.rotation.x = THREE.MathUtils.lerp(groupRef.current.rotation.x, 0.03, 0.08);
-            groupRef.current.rotation.z = THREE.MathUtils.lerp(
+            groupRef.current.rotation.y = dampAngleExp(groupRef.current.rotation.y, JURO_BENCH_POS.rotY, 6.0, delta);
+            groupRef.current.rotation.x = dampExp(groupRef.current.rotation.x, 0.03, 6.0, delta);
+            groupRef.current.rotation.z = dampExp(
               groupRef.current.rotation.z,
               Math.sin(t * 1.6) * 0.015 * motionScale,
-              0.08
+              6.0,
+              delta
             );
           }
         } else if (isBouncingOnTrampoline) {
@@ -1168,12 +1181,13 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
           }
 
           if (groupRef.current) {
-            groupRef.current.rotation.y = lerpAngle(groupRef.current.rotation.y, 0, 0.08);
-            groupRef.current.rotation.x = THREE.MathUtils.lerp(groupRef.current.rotation.x, 0, 0.08);
-            groupRef.current.rotation.z = THREE.MathUtils.lerp(
+            groupRef.current.rotation.y = dampAngleExp(groupRef.current.rotation.y, 0, 6.0, delta);
+            groupRef.current.rotation.x = dampExp(groupRef.current.rotation.x, 0, 6.0, delta);
+            groupRef.current.rotation.z = dampExp(
               groupRef.current.rotation.z,
               Math.sin(t * 7.5) * 0.06 * motionScale,
-              0.08
+              8.0,
+              delta
             );
           }
         } else if (currentState === "sleep") {
@@ -1184,8 +1198,8 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
             spring.position.z - JURO_BED_POS.z
           );
           if (distToBed > 0.04) {
-            spring.position.x = THREE.MathUtils.lerp(spring.position.x, JURO_BED_POS.x, 0.2);
-            spring.position.z = THREE.MathUtils.lerp(spring.position.z, JURO_BED_POS.z, 0.2);
+            spring.position.x = dampExp(spring.position.x, JURO_BED_POS.x, 10.0, delta);
+            spring.position.z = dampExp(spring.position.z, JURO_BED_POS.z, 10.0, delta);
           } else {
             spring.position.x = JURO_BED_POS.x;
             spring.position.z = JURO_BED_POS.z;
@@ -1203,34 +1217,31 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
           spring.setTarget(_targetVec);
           if (groupRef.current) {
             const gentleSway = -0.055 + Math.sin(t * 1.1) * 0.02 * motionScale;
-            groupRef.current.rotation.z = THREE.MathUtils.lerp(
-              groupRef.current.rotation.z,
-              gentleSway,
-              0.08
-            );
-            groupRef.current.rotation.x = THREE.MathUtils.lerp(
-              groupRef.current.rotation.x,
-              0.04,
-              0.08
-            );
+            groupRef.current.rotation.z = dampExp(groupRef.current.rotation.z, gentleSway, 5.0, delta);
+            groupRef.current.rotation.x = dampExp(groupRef.current.rotation.x, 0.04, 5.0, delta);
             // Rotate Juro to align cozy with sofa backrest (angle 0.35 rad matches PetSofaBed)
-            groupRef.current.rotation.y = lerpAngle(groupRef.current.rotation.y, 0.35, 0.08);
+            groupRef.current.rotation.y = dampAngleExp(groupRef.current.rotation.y, 0.35, 5.0, delta);
           }
         } else if (currentState === "eating") {
           const chewY = restY + Math.sin(t * 14) * 0.015 * motionScale;
           _targetVec.set(spring.position.x, chewY, spring.position.z);
           spring.setTarget(_targetVec);
           if (groupRef.current) {
-            groupRef.current.rotation.x = THREE.MathUtils.lerp(groupRef.current.rotation.x, 0.08, 0.15);
-            groupRef.current.rotation.y = lerpAngle(groupRef.current.rotation.y, 0, 0.14);
+            groupRef.current.rotation.x = dampExp(groupRef.current.rotation.x, 0.08, 10.0, delta);
+            groupRef.current.rotation.y = dampAngleExp(groupRef.current.rotation.y, 0, 9.0, delta);
           }
         } else if (isBlowingBubbles) {
           const bubbleExcitedHop = restY + Math.abs(Math.sin(t * 7.5)) * 0.1 * motionScale;
           _targetVec.set(spring.position.x, bubbleExcitedHop, spring.position.z);
           spring.setTarget(_targetVec);
           if (groupRef.current) {
-            groupRef.current.rotation.z = Math.sin(t * 8) * 0.05 * motionScale;
-            groupRef.current.rotation.y = lerpAngle(groupRef.current.rotation.y, 0, 0.08);
+            groupRef.current.rotation.z = dampExp(
+              groupRef.current.rotation.z,
+              Math.sin(t * 8) * 0.05 * motionScale,
+              10.0,
+              delta
+            );
+            groupRef.current.rotation.y = dampAngleExp(groupRef.current.rotation.y, 0, 6.0, delta);
           }
         } else {
           const idleBobRate = isSleepy ? 1.0 : 1.8;
@@ -1239,9 +1250,9 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
           _targetVec.set(spring.position.x, idleY, spring.position.z);
           spring.setTarget(_targetVec);
           if (groupRef.current) {
-            groupRef.current.rotation.z = THREE.MathUtils.lerp(groupRef.current.rotation.z, 0, 0.1);
-            groupRef.current.rotation.x = THREE.MathUtils.lerp(groupRef.current.rotation.x, 0, 0.1);
-            groupRef.current.rotation.y = lerpAngle(groupRef.current.rotation.y, 0, 0.05);
+            groupRef.current.rotation.z = dampExp(groupRef.current.rotation.z, 0, 6.0, delta);
+            groupRef.current.rotation.x = dampExp(groupRef.current.rotation.x, 0, 6.0, delta);
+            groupRef.current.rotation.y = dampAngleExp(groupRef.current.rotation.y, 0, 4.0, delta);
           }
         }
       }
@@ -1322,10 +1333,14 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
         scale.y *= crawlScaleY;
         scale.z *= crawlScaleZ;
       } else {
-        const breathing = Math.sin(t * 2.8) * 0.018;
-        scale.x += breathing;
-        scale.z += breathing;
-        scale.y -= breathing;
+        // Dual-harmonic organic breathing (primary deep respiration + subtle secondary jelly ripple)
+        const breathRate = isSleepy ? 1.4 : 2.4;
+        const primaryBreath = Math.sin(t * breathRate) * (isSleepy ? 0.012 : 0.018);
+        const secondaryRipple = Math.sin(t * breathRate * 2.1) * 0.003;
+        const totalBreath = (primaryBreath + secondaryRipple) * motionScale;
+        scale.x += totalBreath;
+        scale.z += totalBreath;
+        scale.y -= totalBreath * 1.1;
       }
 
       // Need-based physical behaviors:
@@ -1369,12 +1384,12 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
         }
       }
 
-      // 3. Tactile Direct Petting Reaction
+      // 3. Tactile Direct Petting Reaction (Keep Juro plump, round & bouncy — no gepeng!)
       if (isPettingActive && !isSleepingNow) {
-        const purrSquash = Math.sin(t * 14) * 0.035;
-        scale.x *= (1.06 + purrSquash);
-        scale.y *= (0.94 - purrSquash);
-        groupRef.current.rotation.z += Math.sin(t * 8) * 0.03;
+        const purrBreath = Math.sin(t * 12) * 0.015;
+        scale.y *= (0.99 + purrBreath);
+        scale.x *= (1.01 - purrBreath * 0.5);
+        scale.z *= (1.01 - purrBreath * 0.5);
       }
 
       // 4. Sniffing Ground Posture while Wandering Hungry
@@ -1461,11 +1476,8 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
         groupRef.current.scale.y *= 0.94 + Math.sin(t * 20) * 0.025;
         groupRef.current.scale.x *= 1.04;
       } else if (isPettingActive) {
-        // Sweet affectionate purr vibration and squishy cozy loaf pose!
-        groupRef.current.rotation.z = Math.sin(t * 14) * 0.035 * motionScale;
-        groupRef.current.scale.y *= 0.93 + Math.sin(t * 12) * 0.02;
-        groupRef.current.scale.x *= 1.05;
-        groupRef.current.scale.z *= 1.05;
+        // Affectionate cozy lean toward the caress, keeping plump round dumpling silhouette!
+        groupRef.current.rotation.z = Math.sin(t * 6) * 0.05 * motionScale;
       }
 
       // Project Juro's live 3D position & scaled radius to viewport pixel coordinates
@@ -1804,7 +1816,7 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
           // Juro grooves happily on the grass facing the radio — STAYS POCKET-SIZED (multiplication by relative factor, NEVER absolute scale override!)
           const lookAngle = Math.atan2(rs.x - spring.position.x, rs.z - spring.position.z);
           if (groupRef.current) {
-            groupRef.current.rotation.y = lerpAngle(groupRef.current.rotation.y, lookAngle, 0.12);
+            groupRef.current.rotation.y = dampAngleExp(groupRef.current.rotation.y, lookAngle, 8.0, delta);
             groupRef.current.rotation.z = Math.sin(playTimer.current * 8) * 0.14;
             groupRef.current.scale.x *= 1 + Math.sin(playTimer.current * 16) * 0.04;
             groupRef.current.scale.y *= 1 - Math.sin(playTimer.current * 16) * 0.04;
@@ -1866,7 +1878,7 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
           // Juro is completely independent: on the grass looking up at the rising bubbles and hopping with joy!
           const lookAngle = Math.atan2(bs.x - spring.position.x, bs.z - spring.position.z);
           if (groupRef.current) {
-            groupRef.current.rotation.y = lerpAngle(groupRef.current.rotation.y, lookAngle, 0.12);
+            groupRef.current.rotation.y = dampAngleExp(groupRef.current.rotation.y, lookAngle, 8.0, delta);
             groupRef.current.rotation.z = Math.sin(t * 8) * 0.07 * motionScale;
             // Playful hopping under the bubbles
             const hop = Math.abs(Math.sin(playTimer.current * 7)) * 0.18 * motionScale;
@@ -1919,15 +1931,23 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
       expression = "tired";
     }
 
-    // Eyes: Awake vs Sleeping Curved Eyelids (︶ ︶)
+    // Eyes: Awake vs Sleeping Curved Eyelids (︶ ︶) with smooth sinusoidal lid motion
     blinkState.current.timer += delta;
     if (blinkState.current.timer > blinkState.current.nextBlink) {
       blinkState.current.isBlinking = true;
-      if (blinkState.current.timer > blinkState.current.nextBlink + 0.12) {
+      if (blinkState.current.timer > blinkState.current.nextBlink + 0.15) {
         blinkState.current.isBlinking = false;
         blinkState.current.timer = 0;
         blinkState.current.nextBlink = 2.2 + Math.random() * 3.5;
       }
+    }
+
+    let naturalBlink = 1;
+    if (blinkState.current.isBlinking) {
+      const bProgress = (blinkState.current.timer - blinkState.current.nextBlink) / 0.15;
+      const bClamped = THREE.MathUtils.clamp(bProgress, 0, 1);
+      // Smooth sinusoidal dip from 1 down to 0.12 and back up to 1
+      naturalBlink = 1 - Math.sin(bClamped * Math.PI) * 0.88;
     }
 
     const liveBathState = bathStateRef?.current;
@@ -1963,50 +1983,57 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
       ? 0.26
       : isChewing
       ? 0.22
-      : blinkState.current.isBlinking
-      ? 0.14
-      : 1;
+      : naturalBlink;
 
     if (leftEyeRef.current && rightEyeRef.current) {
-      leftEyeRef.current.visible = !isSleeping && !isDizzy && !isHappyFace;
-      rightEyeRef.current.visible = !isSleeping && !isDizzy && !isHappyFace;
+      const showNormalEyes = !isSleeping && !isDizzy && !isHappyFace && !isPettingActive;
+      leftEyeRef.current.visible = showNormalEyes;
+      rightEyeRef.current.visible = showNormalEyes;
 
-      if (!isSleeping && !isDizzy && !isHappyFace) {
-        let lookX = state.pointer.x * 0.08;
-        let lookY = state.pointer.y * 0.06;
+      if (showNormalEyes) {
+        let targetLookX = state.pointer.x * 0.08;
+        let targetLookY = state.pointer.y * 0.06;
 
         if (isChasingBall) {
           const fb = fetchBallRef.current;
           const dx = fb.ballX - spring.position.x;
           const dz = fb.ballZ - spring.position.z;
           const distXZ = Math.hypot(dx, dz) || 1;
-          lookX = THREE.MathUtils.clamp((dx / distXZ) * 0.06, -0.06, 0.06);
-          lookY = THREE.MathUtils.clamp((fb.ballY - spring.position.y) * 0.05, -0.04, 0.08);
+          targetLookX = (dx / distXZ) * 0.06;
+          targetLookY = (fb.ballY - spring.position.y) * 0.05;
         } else if (isPlayingBubbles) {
-          lookX = Math.sin(t * 3) * 0.04;
-          lookY = 0.068; // Eyes look up at the floating 3D bubbles in the meadow!
+          targetLookX = Math.sin(t * 3) * 0.04;
+          targetLookY = 0.068; // Eyes look up at the floating 3D bubbles in the meadow!
         } else if (isBlowingBubbles) {
-          lookX = THREE.MathUtils.clamp(state.pointer.x * 0.08, -0.06, 0.06);
-          lookY = THREE.MathUtils.clamp(state.pointer.y * 0.06 + 0.04, -0.02, 0.08); // Eyes follow the bubbles on screen!
+          targetLookX = state.pointer.x * 0.08;
+          targetLookY = state.pointer.y * 0.06 + 0.04;
         } else if (isDraggingFood) {
-          // Eyes eagerly locked on food being dragged by player across the screen!
-          lookX = THREE.MathUtils.clamp(state.pointer.x * 0.08, -0.065, 0.065);
-          lookY = THREE.MathUtils.clamp(state.pointer.y * 0.06 + 0.045, -0.02, 0.08);
+          targetLookX = state.pointer.x * 0.08;
+          targetLookY = state.pointer.y * 0.06 + 0.045;
         } else if (isEating) {
-          lookX = 0;
-          lookY = -0.05;
+          targetLookX = 0;
+          targetLookY = -0.05;
         } else if (expression === "hungry") {
-          // Looking up pleadingly at the player begging for food
-          lookX = 0;
-          lookY = 0.045;
+          targetLookX = 0;
+          targetLookY = 0.045;
         } else if (expression === "tired") {
-          // Heavy weary gaze drooping downward
-          lookX = 0;
-          lookY = -0.025;
+          targetLookX = 0;
+          targetLookY = -0.025;
         } else if (currentState === "curious") {
-          lookX = fsm.lookTarget.x * 0.08;
-          lookY = fsm.lookTarget.y * 0.06;
+          targetLookX = fsm.lookTarget.x * 0.08;
+          targetLookY = fsm.lookTarget.y * 0.06;
         }
+
+        // Clamp gaze target safely within facial bounds
+        targetLookX = THREE.MathUtils.clamp(targetLookX, -0.075, 0.075);
+        targetLookY = THREE.MathUtils.clamp(targetLookY, -0.045, 0.075);
+
+        // Critically damped exponential glide (smooth eye tracking with no instant teleportation)
+        currentLookRef.current.x = dampExp(currentLookRef.current.x, targetLookX, 16.0, delta);
+        currentLookRef.current.y = dampExp(currentLookRef.current.y, targetLookY, 16.0, delta);
+
+        const lookX = currentLookRef.current.x;
+        const lookY = currentLookRef.current.y;
 
         leftEyeRef.current.position.x = -0.35 + lookX;
         leftEyeRef.current.position.y = 0.07 + lookY;
@@ -2080,6 +2107,7 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
       !isChewing &&
       !isBathSquint &&
       !isHappyFace &&
+      !isPettingActive &&
       expression !== "bored" &&
       expression !== "tired";
 
@@ -2092,11 +2120,22 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
       rightSubCatchlightRef.current.visible = showCatchlights;
     }
 
-    // Peaceful Sleeping Closed Eyelids or Sweet Petting/Play Eyes (︶ ︶)
+    // Peaceful Sleeping Closed Eyelids (︶ ︶) — strictly during sleep
     if (sleepEyesRef.current) {
-      sleepEyesRef.current.visible = isSleeping || isHappyFace;
-      if (isSleeping || isHappyFace) {
+      sleepEyesRef.current.visible = isSleeping;
+      if (isSleeping) {
         sleepEyesRef.current.position.y = 0.01 - sleepBreath * 0.012;
+      }
+    }
+
+    // Delightful Smiling Curved Crescent Eyes (⌒ ⌒) when Petting or Happy
+    if (petEyesRef.current) {
+      const showPetEyes = !isSleeping && !isDizzy && (isPettingActive || isHappyFace);
+      petEyesRef.current.visible = showPetEyes;
+      if (showPetEyes) {
+        const squishPulse = isPettingActive ? 0.88 + Math.sin(t * 16) * 0.16 : 1.0;
+        petEyesRef.current.scale.set(1.12, squishPulse, 1);
+        petEyesRef.current.position.y = 0.02 + Math.sin(t * 16) * 0.008;
       }
     }
 
@@ -2131,6 +2170,10 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
           // Open mouth anticipating delicious food!
           mouthGroupRef.current.scale.set(1.22, 1.35, 1);
           mouthGroupRef.current.position.set(0, -0.015, 1.035);
+        } else if (isPettingActive) {
+          // Adorable wide joyful smile while purring!
+          mouthGroupRef.current.scale.set(1.26 + Math.sin(t * 12) * 0.08, 1.28, 1);
+          mouthGroupRef.current.position.set(0, -0.01, 1.035);
         } else if (isHappyFace || isBlowingBubbles || isPlayingBubbles) {
           mouthGroupRef.current.scale.set(1.18 + Math.sin(t * 8) * 0.08, 1.16, 1);
           mouthGroupRef.current.position.set(0, -0.01, 1.035);
@@ -2195,7 +2238,7 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
     if (leftCheekMatRef.current) leftCheekMatRef.current.color.set(cheekColor);
     if (rightCheekMatRef.current) rightCheekMatRef.current.color.set(cheekColor);
     if (leftCheekGroupRef.current && rightCheekGroupRef.current) {
-      const cheekScale = isAngry ? 1.25 : 1.0;
+      const cheekScale = isAngry ? 1.25 : isPettingActive ? 1.34 + Math.sin(t * 10) * 0.12 : 1.0;
       leftCheekGroupRef.current.scale.setScalar(cheekScale);
       rightCheekGroupRef.current.scale.setScalar(cheekScale);
     }
@@ -2380,11 +2423,17 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
 
     // 9.6 Mini Golden Crown (Stage 3 Evolution: Juro Mulia, Lv. 10+)
     if (crownRef.current) {
-      crownRef.current.visible = level >= 10;
-      if (level >= 10) {
+      const showCrown = level >= 10 && (!activeHat || activeHat === "hat-none");
+      crownRef.current.visible = showCrown;
+      if (showCrown) {
         crownRef.current.position.y = 0.86 + Math.sin(t * 3.2) * 0.012;
         crownRef.current.rotation.z = Math.sin(t * 2.4) * 0.03;
       }
+    }
+
+    // 9.7 Spinning Propeller on Propeller Cap
+    if (propellerRef.current) {
+      propellerRef.current.rotation.y = t * 14;
     }
 
     // 10. 3D Soap Foam Bubbles Clinging to Juro (InstancedMesh)
@@ -2607,6 +2656,20 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
           {/* Right Closed Eyelid Arc */}
           <mesh position={[0.34, 0.1, 0.985]} rotation={[0, 0.24, Math.PI - 0.06]}>
             <torusGeometry args={[0.095, 0.022, 12, 24, Math.PI]} />
+            <meshStandardMaterial color="#271A12" roughness={0.25} />
+          </mesh>
+        </group>
+
+        {/* === PETTING & DELIGHTFUL SMILING CRESCENT EYELIDS (⌒  ⌒) === */}
+        <group ref={petEyesRef} visible={false}>
+          {/* Left Joyful Smiling Eye Arc */}
+          <mesh position={[-0.34, 0.02, 0.985]} rotation={[0, -0.24, -0.06]}>
+            <torusGeometry args={[0.098, 0.024, 12, 24, Math.PI]} />
+            <meshStandardMaterial color="#271A12" roughness={0.25} />
+          </mesh>
+          {/* Right Joyful Smiling Eye Arc */}
+          <mesh position={[0.34, 0.02, 0.985]} rotation={[0, 0.24, 0.06]}>
+            <torusGeometry args={[0.098, 0.024, 12, 24, Math.PI]} />
             <meshStandardMaterial color="#271A12" roughness={0.25} />
           </mesh>
         </group>
@@ -3097,6 +3160,210 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
             <meshStandardMaterial color="#EF4444" roughness={0.15} metalness={0.4} />
           </mesh>
         </group>
+
+        {/* === 3D WEARABLE HATS (PROPORTIONALLY SCALED FOR JURO'S CHUBBY HEAD) === */}
+        {/* 1. Topi Baling-baling (hat-propeller) */}
+        {activeHat === "hat-propeller" && (
+          <group position={[0, 0.91, 0.02]} rotation={[-0.08, 0, 0]}>
+            {/* Base Red Cap Dome */}
+            <mesh position={[0, 0, 0]} scale={[1.05, 0.65, 1.02]}>
+              <sphereGeometry args={[0.62, 32, 20, 0, Math.PI * 2, 0, Math.PI * 0.5]} />
+              <meshStandardMaterial color="#DC2626" roughness={0.55} />
+            </mesh>
+            {/* Green Quarter Panel */}
+            <mesh position={[0, 0.003, 0]} scale={[1.054, 0.654, 1.024]}>
+              <sphereGeometry args={[0.62, 20, 16, 0, Math.PI * 0.52, 0, Math.PI * 0.5]} />
+              <meshStandardMaterial color="#16A34A" roughness={0.55} />
+            </mesh>
+            {/* Yellow Quarter Panel */}
+            <mesh position={[0, 0.003, 0]} scale={[1.054, 0.654, 1.024]}>
+              <sphereGeometry args={[0.62, 20, 16, Math.PI * 0.95, Math.PI * 0.55, 0, Math.PI * 0.5]} />
+              <meshStandardMaterial color="#EAB308" roughness={0.55} />
+            </mesh>
+            {/* Blue Visor / Cap Brim */}
+            <mesh position={[0, 0.02, 0.44]} rotation={[0.22, 0, 0]}>
+              <boxGeometry args={[0.74, 0.035, 0.38]} />
+              <meshStandardMaterial color="#2563EB" roughness={0.5} />
+            </mesh>
+            {/* Stalk & Beads on Top */}
+            <mesh position={[0, 0.40, 0]}>
+              <sphereGeometry args={[0.06, 14, 14]} />
+              <meshStandardMaterial color="#1D4ED8" roughness={0.4} />
+            </mesh>
+            <mesh position={[0, 0.50, 0]}>
+              <sphereGeometry args={[0.055, 14, 14]} />
+              <meshStandardMaterial color="#FACC15" roughness={0.4} />
+            </mesh>
+            <mesh position={[0, 0.58, 0]}>
+              <cylinderGeometry args={[0.012, 0.012, 0.12, 10]} />
+              <meshStandardMaterial color="#18181B" roughness={0.3} metalness={0.7} />
+            </mesh>
+            {/* Animated Spinning Propeller */}
+            <group ref={propellerRef} position={[0, 0.65, 0]}>
+              {/* Hub */}
+              <mesh>
+                <sphereGeometry args={[0.065, 14, 14]} />
+                <meshStandardMaterial color="#0F172A" roughness={0.2} metalness={0.8} />
+              </mesh>
+              {/* Blades */}
+              <mesh position={[0.34, 0.008, 0]} rotation={[0, 0, 0.08]}>
+                <boxGeometry args={[0.62, 0.025, 0.11]} />
+                <meshStandardMaterial color="#18181B" roughness={0.3} metalness={0.5} />
+              </mesh>
+              <mesh position={[-0.34, -0.008, 0]} rotation={[0, 0, -0.08]}>
+                <boxGeometry args={[0.62, 0.025, 0.11]} />
+                <meshStandardMaterial color="#18181B" roughness={0.3} metalness={0.5} />
+              </mesh>
+            </group>
+          </group>
+        )}
+
+        {/* 2. Topi Koki (hat-chef) */}
+        {activeHat === "hat-chef" && (
+          <group position={[0, 0.90, 0.02]} rotation={[-0.06, 0, 0]}>
+            {/* White Headband Cylinder */}
+            <mesh position={[0, 0.11, 0]}>
+              <cylinderGeometry args={[0.58, 0.62, 0.22, 32]} />
+              <meshStandardMaterial color="#F1F5F9" roughness={0.7} />
+            </mesh>
+            {/* Main Puffy Billowing Toque Body */}
+            <mesh position={[0, 0.38, 0]} scale={[1.28, 0.78, 1.24]}>
+              <sphereGeometry args={[0.55, 24, 20]} />
+              <meshStandardMaterial color="#FFFFFF" roughness={0.85} />
+            </mesh>
+            {/* Pleat Puff Folds around Crown */}
+            <mesh position={[0.34, 0.46, 0.12]} scale={[0.85, 0.75, 0.85]}>
+              <sphereGeometry args={[0.28, 16, 16]} />
+              <meshStandardMaterial color="#FFFFFF" roughness={0.85} />
+            </mesh>
+            <mesh position={[-0.34, 0.46, 0.12]} scale={[0.85, 0.75, 0.85]}>
+              <sphereGeometry args={[0.28, 16, 16]} />
+              <meshStandardMaterial color="#FFFFFF" roughness={0.85} />
+            </mesh>
+            <mesh position={[0, 0.50, 0.32]} scale={[0.85, 0.75, 0.85]}>
+              <sphereGeometry args={[0.28, 16, 16]} />
+              <meshStandardMaterial color="#FFFFFF" roughness={0.85} />
+            </mesh>
+            <mesh position={[0, 0.48, -0.28]} scale={[0.85, 0.75, 0.85]}>
+              <sphereGeometry args={[0.28, 16, 16]} />
+              <meshStandardMaterial color="#FFFFFF" roughness={0.85} />
+            </mesh>
+          </group>
+        )}
+
+        {/* 3. Topi Jerami (hat-straw) */}
+        {activeHat === "hat-straw" && (
+          <group position={[0, 0.94, 0.02]} rotation={[-0.05, 0, -0.04]}>
+            {/* Wide Straw Brim */}
+            <mesh position={[0, 0, 0]}>
+              <cylinderGeometry args={[0.92, 0.92, 0.035, 40]} />
+              <meshStandardMaterial color="#E6D5AC" roughness={0.9} />
+            </mesh>
+            {/* Cylindrical Straw Crown */}
+            <mesh position={[0, 0.14, 0]}>
+              <cylinderGeometry args={[0.56, 0.56, 0.28, 36]} />
+              <meshStandardMaterial color="#D4B982" roughness={0.85} />
+            </mesh>
+            {/* Straw Crown Flat Top */}
+            <mesh position={[0, 0.28, 0]}>
+              <cylinderGeometry args={[0.56, 0.56, 0.015, 36]} />
+              <meshStandardMaterial color="#E6D5AC" roughness={0.9} />
+            </mesh>
+            {/* Black Ribbon Band Around Crown */}
+            <mesh position={[0, 0.06, 0]}>
+              <cylinderGeometry args={[0.57, 0.57, 0.09, 36]} />
+              <meshStandardMaterial color="#18181B" roughness={0.5} />
+            </mesh>
+            {/* Black Ribbon Knot on Side */}
+            <group position={[0.57, 0.06, 0.16]} rotation={[0, 0.3, 0]}>
+              <mesh position={[0, 0, 0]}>
+                <boxGeometry args={[0.06, 0.07, 0.06]} />
+                <meshStandardMaterial color="#18181B" roughness={0.5} />
+              </mesh>
+              <mesh position={[0, 0.04, 0.07]} rotation={[0.4, 0, 0]}>
+                <boxGeometry args={[0.04, 0.08, 0.04]} />
+                <meshStandardMaterial color="#27272A" roughness={0.5} />
+              </mesh>
+              <mesh position={[0, -0.04, 0.07]} rotation={[-0.4, 0, 0]}>
+                <boxGeometry args={[0.04, 0.08, 0.04]} />
+                <meshStandardMaterial color="#27272A" roughness={0.5} />
+              </mesh>
+            </group>
+          </group>
+        )}
+
+        {/* 4. Topi Pesulap (hat-top) */}
+        {activeHat === "hat-top" && (
+          <group position={[0, 0.93, 0.02]} rotation={[-0.06, 0, 0.05]}>
+            {/* Wide Black Silk Brim */}
+            <mesh position={[0, 0, 0]}>
+              <cylinderGeometry args={[0.85, 0.85, 0.035, 40]} />
+              <meshStandardMaterial color="#18181B" roughness={0.4} metalness={0.15} />
+            </mesh>
+            {/* Tall Flared Top Hat Crown */}
+            <mesh position={[0, 0.36, 0]}>
+              <cylinderGeometry args={[0.55, 0.46, 0.72, 36]} />
+              <meshStandardMaterial color="#242428" roughness={0.35} metalness={0.2} />
+            </mesh>
+            {/* Flat Top Cap */}
+            <mesh position={[0, 0.725, 0]}>
+              <cylinderGeometry args={[0.55, 0.55, 0.015, 36]} />
+              <meshStandardMaterial color="#18181B" roughness={0.4} metalness={0.2} />
+            </mesh>
+            {/* Crimson Satin Ribbon Band */}
+            <mesh position={[0, 0.075, 0]}>
+              <cylinderGeometry args={[0.48, 0.47, 0.12, 36]} />
+              <meshStandardMaterial color="#DC2626" roughness={0.25} metalness={0.35} />
+            </mesh>
+          </group>
+        )}
+
+        {/* 5. Topi Pesta (hat-party) */}
+        {activeHat === "hat-party" && (
+          <group position={[0, 0.93, 0.02]} rotation={[-0.06, 0.1, -0.08]}>
+            {/* Cone Body */}
+            <mesh position={[0, 0.48, 0]}>
+              <coneGeometry args={[0.48, 0.96, 32]} />
+              <meshStandardMaterial color="#7DD3FC" roughness={0.5} />
+            </mesh>
+            {/* Bottom Scalloped Rim Accent */}
+            <mesh position={[0, 0.03, 0]}>
+              <cylinderGeometry args={[0.49, 0.49, 0.05, 32]} />
+              <meshStandardMaterial color="#F43F5E" roughness={0.6} />
+            </mesh>
+            {/* Middle Warm Yellow Ring Accent */}
+            <mesh position={[0, 0.07, 0]}>
+              <cylinderGeometry args={[0.47, 0.47, 0.03, 32]} />
+              <meshStandardMaterial color="#FACC15" roughness={0.6} />
+            </mesh>
+            {/* Top Fluffy Pom-Pom */}
+            <mesh position={[0, 0.98, 0]}>
+              <sphereGeometry args={[0.11, 16, 16]} />
+              <meshStandardMaterial color="#FB7185" roughness={0.8} />
+            </mesh>
+            {/* Polka Dot Accents on Cone Surface */}
+            <mesh position={[0.24, 0.35, 0.22]}>
+              <sphereGeometry args={[0.04, 10, 10]} />
+              <meshStandardMaterial color="#FACC15" roughness={0.4} />
+            </mesh>
+            <mesh position={[-0.22, 0.52, 0.18]}>
+              <sphereGeometry args={[0.04, 10, 10]} />
+              <meshStandardMaterial color="#FFFFFF" roughness={0.4} />
+            </mesh>
+            <mesh position={[0.04, 0.68, 0.20]}>
+              <sphereGeometry args={[0.036, 10, 10]} />
+              <meshStandardMaterial color="#F43F5E" roughness={0.4} />
+            </mesh>
+            <mesh position={[-0.18, 0.30, 0.26]}>
+              <sphereGeometry args={[0.04, 10, 10]} />
+              <meshStandardMaterial color="#FB7185" roughness={0.4} />
+            </mesh>
+            <mesh position={[0.18, 0.56, 0.15]}>
+              <sphereGeometry args={[0.036, 10, 10]} />
+              <meshStandardMaterial color="#FFFFFF" roughness={0.4} />
+            </mesh>
+          </group>
+        )}
 
         {/* === 3D SOAP FOAM BUBBLES CLINGING TO JURO (1 Draw Call) === */}
         <instancedMesh

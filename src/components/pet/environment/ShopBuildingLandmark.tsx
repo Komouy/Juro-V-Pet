@@ -24,7 +24,7 @@ export const ShopBuildingLandmark: React.FC<ShopBuildingLandmarkProps> = ({
   woodColor,
   woodDarkColor,
   isLanternLit,
-  isHovered,
+  isHovered: _isHovered,
   shopSignTex,
   onPointerDown,
   onClick,
@@ -34,7 +34,7 @@ export const ShopBuildingLandmark: React.FC<ShopBuildingLandmarkProps> = ({
     <group
       position={[4.55, BASE_GROUND_Y, -2.55]}
       rotation={[0, -0.52, 0]}
-      scale={isHovered ? 1.045 : 1}
+      scale={1}
       onPointerDown={onPointerDown}
       onClick={onClick}
       onPointerOver={(e) => {
@@ -81,7 +81,7 @@ export const ShopBuildingLandmark: React.FC<ShopBuildingLandmarkProps> = ({
         <meshStandardMaterial
           color={isLanternLit ? "#FEF08A" : "#E0F2FE"}
           emissive={isLanternLit ? "#F59E0B" : "#38BDF8"}
-          emissiveIntensity={isLanternLit ? 1.1 : isHovered ? 0.35 : 0.08}
+          emissiveIntensity={isLanternLit ? 1.1 : 0.08}
         />
       </mesh>
       {/* Wooden Display Counter Shelf + Mini Shop Goods */}
@@ -110,23 +110,23 @@ export const ShopBuildingLandmark: React.FC<ShopBuildingLandmarkProps> = ({
           </mesh>
         ))}
       </group>
-      {/* Pixel Wooden Signboard: "TOKO" */}
+      {/* Pixel Wooden Signboard: "WARUNG" */}
       <group position={[0, 1.07, 0.78]}>
-        <mesh position={[-0.24, -0.14, -0.04]}>
+        <mesh position={[-0.26, -0.14, -0.04]}>
           <boxGeometry args={[0.05, 0.18, 0.05]} />
           <meshLambertMaterial color={woodDarkColor} />
         </mesh>
-        <mesh position={[0.24, -0.14, -0.04]}>
+        <mesh position={[0.26, -0.14, -0.04]}>
           <boxGeometry args={[0.05, 0.18, 0.05]} />
           <meshLambertMaterial color={woodDarkColor} />
         </mesh>
         <mesh>
-          <boxGeometry args={[0.82, 0.25, 0.05]} />
+          <boxGeometry args={[0.90, 0.25, 0.05]} />
           <meshLambertMaterial color="#171717" />
         </mesh>
         {shopSignTex && (
           <mesh position={[0, 0, 0.028]}>
-            <planeGeometry args={[0.78, 0.22]} />
+            <planeGeometry args={[0.86, 0.22]} />
             <meshBasicMaterial map={shopSignTex} />
           </mesh>
         )}

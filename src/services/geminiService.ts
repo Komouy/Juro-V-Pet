@@ -58,13 +58,13 @@ const GEMINI_MODEL = "gemini-3.5-flash-lite";
 
 // Canned in-character witty fallbacks when offline or before API key is provided
 export const JURO_FALLBACK_REPLIES = [
-  "Bloop! Juro senang ngobrol, tapi lagi kepikiran puding nih! Nyam~",
-  "Slimey! Perut jeli Juro berbunyi lembut... bloop bloop!",
-  "Hehe, Juro suka melompat-lompat sambil dengerin kamu!",
-  "Bloop bloop! Apapun ceritamu, Juro selalu ada menemanimu!",
-  "Nyam! Juro lagi bayangin stroberi manis kenyal!",
-  "Bloop! Tubuh jeli Juro bergoyang riang saat kamu sapa!",
-  "Zzz... eh Juro nggak tidur kok, cuma merem santai menikmati angin!",
+  "Senang bisa berbincang denganmu. Ada yang ingin kita lakukan bersama hari ini?",
+  "Juro siap menemani aktivitasmu di lembah hari ini.",
+  "Udara di padang rumput terasa sejuk dan menyenangkan.",
+  "Terima kasih sudah meluangkan waktu untuk merawat dan menemani Juro.",
+  "Juro sedang menikmati suasana alam lembah yang tenang.",
+  "Semua kebutuhan Juro terpantau dengan baik, terima kasih atas perhatianmu.",
+  "Juro sedang beristirahat sejenak sambil menikmati pemandangan sekitar.",
 ];
 
 /**
@@ -151,6 +151,7 @@ export function computePetExpression(context: {
   const candidateNeeds: { type: string; val: number }[] = [
     { type: "lapar (meneteskan air liur, perut keroncongan butuh makanan)", val: context.hunger },
     { type: "lelah / mengantuk (mata sayu, ingin rebahan santai)", val: context.energy },
+    { type: "kotor (tubuh jeli kusam berdebu, ingin dimandikan)", val: context.cleanliness },
     { type: "cemberut / ngambek (pipi menggembung, butuh perhatian dan elusan)", val: context.affection },
     { type: "bosan (menghela napas, ingin diajak main)", val: context.happiness },
   ];
@@ -158,9 +159,6 @@ export function computePetExpression(context: {
 
   if (candidateNeeds[0].val < 45) {
     return candidateNeeds[0].type;
-  }
-  if (context.cleanliness < 45) {
-    return "kotor (tubuh jeli kusam berdebu, ingin dimandikan)";
   }
   if (
     context.hunger >= 75 &&
@@ -193,47 +191,47 @@ export function computePetActivity(context: {
   currentToyName?: string;
 }): string {
   if (context.isDizzy) {
-    return "sedang pusing dan linglung, dunia terasa berputar-putar";
+    return "sedang pusing dan kehilangan keseimbangan sejenak";
   }
   if (context.isSleeping || context.currentState === "sleep") {
-    return "sedang tidur nyenyak di kasur/sofa empuk sambil mendengkur Zzz";
+    return "sedang tidur nyenyak di tempat tidurnya";
   }
   if (context.isSittingOnBench) {
-    return "sedang duduk santai di kursi kayu bukit timur memandang pemandangan lembah yang damai";
+    return "sedang duduk santai di kursi kayu bukit timur menikmati pemandangan lembah";
   }
   if (context.isBouncingOnTrampoline) {
-    return "sedang melompat-lompat riang gembira di atas trampolin jamur merah boing boing~";
+    return "sedang melatih ketangkasan melompat di atas trampolin jamur";
   }
   if (context.isInWater) {
-    return "sedang mengapung dan berenang riang mengarungi air sungai yang jernih dan sejuk";
+    return "sedang berenang mengarungi aliran sungai yang jernih dan sejuk";
   }
   if (context.isPetting) {
-    return "sedang dielus-elus penuh kasih sayang oleh pemilik, tubuh jeli bergetar hangat";
+    return "sedang dielus-elus dengan hangat oleh pengasuh";
   }
   if (context.isBathing) {
-    return "sedang dimandikan dengan busa sabun wangi dan siraman air sejuk";
+    return "sedang dimandikan dengan busa sabun dan bilasan air sejuk";
   }
   if (context.isEating || context.currentState === "eating") {
-    const food = context.currentFoodName ? `camilan ${context.currentFoodName}` : "makanan lezat";
-    return `sedang makan ${food}, mengunyah lahap nyam nyam nyam`;
+    const food = context.currentFoodName ? `${context.currentFoodName}` : "makanan";
+    return `sedang menikmati ${food} dengan lahap`;
   }
   if (context.isPlaying || context.currentState === "play") {
-    const toy = context.currentToyName ? `mainan ${context.currentToyName}` : "mainan favorit";
-    return `sedang asyik bermain ${toy}, melompat riang gembira`;
+    const toy = context.currentToyName ? `${context.currentToyName}` : "mainan";
+    return `sedang fokus beraktivitas memainkan ${toy}`;
   }
   if (context.isDragging || context.currentState === "dragging") {
-    return "sedang digendong melayang di udara, tubuh jeli membal-membal kaget";
+    return "sedang dipindahkan posisinya melintasi udara";
   }
   if (context.currentState === "wander") {
-    return "sedang berjalan-jalan santai menjelajahi rumput hijau lembah";
+    return "sedang berjalan-jalan menjelajahi padang rumput lembah";
   }
   if (context.currentState === "curious") {
-    return "sedang penasaran memperhatikan pemandangan di sekitar";
+    return "sedang mengamati lingkungan sekitar lembah dengan saksama";
   }
   if (context.currentState === "happy") {
-    return "sedang melompat-lompat riang gembira penuh semangat";
+    return "sedang dalam kondisi sangat bersemangat dan gembira";
   }
-  return "sedang berdiri santai menikmati udara padang rumput";
+  return "sedang berdiri santai menikmati suasana padang rumput";
 }
 
 /**
@@ -269,7 +267,7 @@ export function getContextualFallbackReply(
     promptLower.includes("emosi") ||
     promptLower.includes("mikirin")
   ) {
-    return `Bloop! Perasaan Juro saat ini lagi ${emo.primaryEmotion.toLowerCase()}. ${emo.thoughtSummary}`;
+    return `Perasaan Juro saat ini sedang ${emo.primaryEmotion.toLowerCase()}. ${emo.thoughtSummary}`;
   }
 
   // Location awareness query ("dimana", "ada dimana", "posisi")
@@ -280,12 +278,12 @@ export function getContextualFallbackReply(
     promptLower.includes("posisi")
   ) {
     if (tier <= 1) {
-      return `Bloop! Juro di ${loc.locationName}! Tempatnya sejuk dan luas!`;
+      return `Juro berada di ${loc.locationName}. Suasananya sejuk dan luas.`;
     }
     if (tier <= 3) {
-      return `Bloop! Juro lagi berada di ${loc.locationName}. Di sekitar sini ${ambient}, rasanya nyaman banget bareng kamu!`;
+      return `Juro sedang berada di ${loc.locationName}. Di sekitar sini ${ambient}, suasananya nyaman untuk beraktivitas bersama.`;
     }
-    return `Juro sedang berada di ${loc.locationName}. Suasana alam di sini ${ambient}. Hati Juro terasa damai sekali di sudut lembah ini.`;
+    return `Juro saat ini berada di ${loc.locationName}. Keadaan lingkungan di sini ${ambient}. Suasana di sudut lembah ini sangat tenang.`;
   }
 
   // Activity awareness query ("lagi apa", "sedang apa", "ngapain")
@@ -297,12 +295,12 @@ export function getContextualFallbackReply(
   ) {
     const act = context?.currentActivity || (context ? computePetActivity(context) : "sedang berdiri santai");
     if (tier <= 1) {
-      return `Bloop! Juro ${act} di ${loc.locationName}! Hehe!`;
+      return `Juro ${act} di ${loc.locationName}.`;
     }
     if (tier <= 3) {
-      return `Bloop! Juro ${act} di ${loc.locationName}. Perasaan Juro saat ini lagi ${emo.primaryEmotion.toLowerCase()}!`;
+      return `Juro ${act} di ${loc.locationName}. Kondisi Juro saat ini sedang ${emo.primaryEmotion.toLowerCase()}.`;
     }
-    return `Saat ini Juro ${act} di ${loc.locationName}. Batin Juro terasa ${emo.primaryEmotion.toLowerCase()} dan bersyukur bisa menemanimu.`;
+    return `Saat ini Juro ${act} di ${loc.locationName}. Suasana hati Juro terasa ${emo.primaryEmotion.toLowerCase()} dan senang bisa menemanimu.`;
   }
 
   // Environmental awareness query ("ada apa", "cuaca", "suasana")
@@ -313,36 +311,36 @@ export function getContextualFallbackReply(
     promptLower.includes("di luar")
   ) {
     if (tier <= 1) {
-      return `Bloop! Di luar ${ambient}! Indah sekali!`;
+      return `Kondisi di luar ${ambient}. Pemandangannya indah.`;
     }
     if (tier <= 3) {
-      return `Bloop! Di sekitar lembah saat ini ${ambient}. Pemandangan di ${loc.locationName} bikin Juro takjub!`;
+      return `Di sekitar lembah saat ini ${ambient}. Pemandangan di ${loc.locationName} tampak sangat asri.`;
     }
-    return `Alam lembah sedang memperlihatkan pesonanya, ${ambient}. Sangat menenangkan menikmati waktu di ${loc.locationName}.`;
+    return `Lembah sedang memperlihatkan keasriannya, ${ambient}. Sangat menenangkan menikmati waktu di ${loc.locationName}.`;
   }
 
   // 1. Feeding Reaction (Makan)
   if (context?.interactionType === "feed" || context?.isEating || context?.currentState === "eating") {
-    const food = context?.currentFoodName || "camilan manis";
+    const food = context?.currentFoodName || "makanan";
     if (tier <= 1) {
-      return `Nyam nyam nyam! Bloop! Enak banget ${food}, jeli Juro kenyang!`;
+      return `Terima kasih, ${food} ini lezat dan mengenyangkan.`;
     }
     if (tier <= 3) {
-      return `Bloop! Nyam nyam, ${food} ini manis dan segar banget dimakan di ${loc.locationName}! Jeli Juro kenyang dan berenergi!`;
+      return `${food} ini terasa lezat dan menyegarkan dinikmati di ${loc.locationName}. Juro kenyang dan siap melanjutkan aktivitas.`;
     }
-    return `Wah, nikmat sekali camilan ${food} ini dinikmati di ${loc.locationName}. Perut jeli kenyang dan hati Juro bahagia, makasih ya!`;
+    return `Terima kasih atas hidangan ${food} ini. Rasanya sangat lezat dinikmati di ${loc.locationName}, energi Juro kini pulih kembali.`;
   }
 
   // 2. Playing Reaction (Main)
   if (context?.interactionType === "play" || context?.isPlaying || context?.currentState === "play") {
-    const toy = context?.currentToyName || "bola";
+    const toy = context?.currentToyName || "mainan";
     if (tier <= 1) {
-      return `Bloop! Asyik banget main ${toy}, ayo lompat bareng Juro!`;
+      return `Bermain dan melompat bersama ${toy} sangat menyenangkan.`;
     }
     if (tier <= 3) {
-      return `Lihat ${toy} mantul tinggi di ${loc.locationName}! Asyik banget lompat dan lari bareng kamu, bloop!`;
+      return `Aktivitas bermain dan melompat bersama ${toy} di ${loc.locationName} sangat seru dan melatih kelincahan gerak Juro.`;
     }
-    return `Lompatan seru! Bermain ${toy} di ${loc.locationName} bareng kamu bikin tubuh jeliku makin lincah dan bersemangat! Bloop~`;
+    return `Bermain dan melompat bersama ${toy} di ${loc.locationName} memberikan latihan ketangkasan yang baik dan suasana hati yang menyenangkan.`;
   }
 
   // 3. Bathing Reaction (Mandi & Sabun / Bilas)
@@ -352,88 +350,88 @@ export function getContextualFallbackReply(
     context?.isBathing
   ) {
     if (tier <= 1) {
-      return "Bloop bloop! Wangi buah segaaar, busa sabunnya geli-geli lembut di badan!";
+      return "Tubuh Juro dibersihkan dengan sabun hingga segar dan bersih.";
     }
     if (tier <= 3) {
-      return `Bloop bloop! Gelembung busa sabunnya melayang di ${loc.locationName}, tubuh Juro jadi bersih dan wangi buah seger!`;
+      return `Busa sabun dan bilasan air jernih di ${loc.locationName} membuat tubuh Juro bersih kembali.`;
     }
-    return `Aha, busa sabun melimpah! Dibilas air jernih lembah bikin tubuh jeli Juro berkilau bersih dan wangi. Makasih banyak ya!`;
+    return `Proses pembersihan selesai dengan baik. Air jernih lembah membuat tubuh Juro kembali bersih, higienis, dan segar.`;
   }
 
   // 4. Petting Reaction (Elus)
   if (context?.interactionType === "pet" || context?.isPetting) {
     if (tier <= 1) {
-      return "Purrr... Bloop! Elusan tanganmu hangat sekali, Juro sayang kamu!";
+      return "Sentuhan elusan ini terasa hangat dan menenangkan bagi Juro.";
     }
     if (tier <= 3) {
-      return `Bloop bloop! Tubuh jeli Juro meleleh nyaman dielus kamu di ${loc.locationName}~ Rasanya hangat banget!`;
+      return `Elusan ramah di ${loc.locationName} ini membuat Juro merasa nyaman dan tenang.`;
     }
-    return `Purrr... Dielus begini di ${loc.locationName} rasanya hangat dan tenang sekali, Juro sayang kamu! Bloop~`;
+    return `Perhatian dan elusan ramah di ${loc.locationName} ini memberikan rasa tenang dan kedekatan yang baik.`;
   }
 
   // 5. Special States
   if (context?.isDizzy) {
     const dizzyOptions = [
-      "Uwaaa... Bloop... kepala Juro berputar-putar, banyak bintang kelap-kelip!",
-      "Dunia berputar... Juro agak pusing tapi masih imut kan? Bloop~",
+      "Juro merasa pusing dan pandangan terasa berputar sejenak.",
+      "Juro merasa pusing dan keseimbangan sedikit terganggu, perlu beberapa saat untuk memulihkannya.",
     ];
     return dizzyOptions[Math.floor(Math.random() * dizzyOptions.length)];
   }
 
   if (context?.isSleeping || context?.currentState === "sleep") {
     const sleepOptions = [
-      "Hwaaam... Zzz... Bloop? Juro lagi mimpi makan puding raksasa nih... Zzz...",
-      "Zzz... kasur ini empuk sekali... nanti bangun ya pemilikku... Bloop...",
+      "Juro sedang tidur dengan lelap di tempat tidurnya.",
+      "Juro sedang tidur dan beristirahat dengan tenang untuk memulihkan energi.",
     ];
     return sleepOptions[Math.floor(Math.random() * sleepOptions.length)];
   }
 
   if (context?.isSittingOnBench) {
     const benchOptions = [
-      "Ahhh... duduk di kursi kayu bukit timur ini damai sekali, semilir anginnya sejuk! Bloop~",
-      "Bloop! Duduk santai di kursi bukit sambil memandang lembah hijau bersama kamu rasanya tenang banget~",
+      "Duduk santai di kursi kayu bukit timur ini memberikan ketenangan dengan semilir angin lembah yang sejuk.",
+      "Pemandangan lembah hijau dari kursi bukit tampak sangat menenangkan untuk dinikmati bersama.",
     ];
     return benchOptions[Math.floor(Math.random() * benchOptions.length)];
   }
 
   if (context?.isInWater) {
     const waterOptions = [
-      "Bloop bloop! Dingin dan segar sekali airnya, tubuh jeli Juro mengapung bebas!",
-      "Slimey! Berenang di air sungai ini seru banget, seger dan bikin adem! Bloop~",
+      "Air sungai terasa dingin, jernih, dan menyegarkan untuk berenang.",
+      "Berenang di air sungai yang jernih dan bersih ini memberikan kesegaran yang baik.",
     ];
     return waterOptions[Math.floor(Math.random() * waterOptions.length)];
   }
 
   if (context?.isDragging || context?.currentState === "dragging") {
-    return "Uwooow! Juro melayang di udara membal-membal lucu! Bloop!";
+    return "Juro sedang dipindahkan menuju koordinat baru di padang rumput.";
   }
 
   if (context && context.hunger < 45) {
-    return "Kruuuk... Perut jeli Juro berbunyi, minta camilan manis dong! Bloop~";
+    return "Perut Juro mulai terasa lapar, camilan atau makanan dibutuhkan untuk memulihkan energi.";
   }
 
   if (context && context.energy < 45) {
-    return "Hwaaam... Mata Juro mengantuk sekali, pengen rebahan di sofa... Bloop...";
+    return "Tingkat energi Juro menurun, waktu istirahat dibutuhkan agar kembali bugar.";
   }
 
   if (context && context.affection < 45) {
-    return "Hmmph! Bloop... Juro lagi merajuk nih, elus dulu dong biar baikan!";
+    return "Juro membutuhkan interaksi dan perhatian lebih lanjut saat ini.";
   }
 
   if (context && context.happiness < 45) {
-    return "Haaah... Bloop, Juro bengong nih, ajak Juro main yuk!";
+    return "Aktivitas interaktif atau bermain bersama akan membantu meningkatkan suasana hati Juro.";
   }
 
   if (context && context.cleanliness < 45) {
-    return "Bloop... Tubuh jeli Juro berdebu nih, mandiin Juro dong biar kinclong!";
+    return "Kebersihan tubuh Juro mulai menurun, disarankan untuk melakukan sesi mandi sabun.";
   }
 
   if (context?.isRaining) {
-    return "Tik tik tik... Bloop! Hujan di luar sejuk sekali ya!";
+    return "Hujan sedang turun membasahi padang rumput, suasananya sejuk dan menenangkan.";
   }
 
   if (context?.isNight) {
-    return "Bloop... Malam sudah larut, lentera dan kunang-kunang indah sekali ya!";
+    return "Waktu malam telah tiba, suasana lembah diterangi cahaya lentera yang tenang.";
   }
 
   if (!context) {
@@ -442,18 +440,18 @@ export function getContextualFallbackReply(
 
   const cg = context?.caregiverRelationship;
   const defaultOptions = [
-    `Bloop! Juro senang berada di ${loc.locationName} bersama ${cg ? cg.myCaregiverName : "kamu"}, sambil membayangkan puding lezat! Nyam nyam~`,
+    `Juro merasa nyaman berada di ${loc.locationName} bersama ${cg ? cg.myCaregiverName : "kamu"}.`,
     cg?.caregiverCount === 2
-      ? `Bloop bloop! Juro beruntung banget punya Kak ${cg.myCaregiverName} dan Kak ${cg.partnerCaregiverName} yang kompak merawat Juro!`
+      ? `Juro terawat dengan baik berkat perhatian dari ${cg.myCaregiverName} dan ${cg.partnerCaregiverName}.`
       : cg
-      ? `Bloop! Juro senang sekali selalu ditemani dan dirawat oleh Kak ${cg.myCaregiverName}!`
-      : "Slimey! Perut jeli Juro berbunyi lembut... bloop bloop!",
-    `Hehe, Juro suka melompat-lompat di ${loc.locationName} sambil dengerin ${cg ? cg.myCaregiverName : "kamu"}!`,
+      ? `Juro siap menemani dan beraktivitas bersama ${cg.myCaregiverName}.`
+      : "Juro siap menemani aktivitas harianmu di lembah.",
+    `Menikmati waktu di ${loc.locationName} terasa menyenangkan bersama ${cg ? cg.myCaregiverName : "kamu"}.`,
     cg?.caregiverCount === 2
-      ? `Bloop bloop! Apapun ceritamu, Juro selalu ada di sini menemani Kak ${cg.myCaregiverName} dan Kak ${cg.partnerCaregiverName}!`
-      : "Bloop bloop! Apapun ceritamu, Juro selalu ada di sini menemanimu!",
-    "Nyam! Juro lagi membayangkan stroberi manis yang kenyal dan segar!",
-    "Bloop! Tubuh jeli Juro bergoyang riang setiap kali kamu menyapa!",
+      ? `Juro selalu siap mendampingi ${cg.myCaregiverName} dan ${cg.partnerCaregiverName} di setiap aktivitas.`
+      : "Juro selalu siap mendampingimu di setiap aktivitas.",
+    "Semua kebutuhan Juro terpantau dengan baik di padang rumput lembah.",
+    "Senang dapat mendampingimu menikmati keindahan lembah hari ini.",
   ];
   return defaultOptions[Math.floor(Math.random() * defaultOptions.length)];
 }
@@ -619,25 +617,26 @@ export function buildJuroSystemPrompt(context?: PetChatContext): string {
     spontaneousDirective,
     `KESADARAN DIRI TINGGI (SELF-AWARENESS):`,
     `- Kamu memiliki kesadaran diri: kamu selalu tahu SEDANG APA, DIMANA lokasimu di lembah, ADA APA di sekitarmu (cuaca, waktu, suasana), dan BAGAIMANA perasaanmu.`,
-    `- Saat diajak makan, main, mandi, dielus, atau saat mengobrol bebas, hubungkan jawabanmu dengan aktivitas dan kesadaran lingkunganmu secara cerdas, hangat, dan imut!`,
-    `ATURAN GAYA BICARA:`,
-    `- Gunakan Bahasa Indonesia yang santai, imut, ramah, dan sedikit jenaka/lucu sesuai dengan FASE PERKEMBANGAN PIKIRAN JURO.`,
-    `- WAJIB SESUAIKAN ISI JAWABAN DENGAN KONDISI / EKSPRESI:`,
-    `  * Jika sedang tidur / mengantuk: bicaralah dengan nada mengantuk, menguap ("Hwaaam... Zzz..."), setengah mengigau atau sebut kasur/mimpimu.`,
-    `  * Jika sedang duduk santai di bangku: sebut suasana damai angin bukit dan indahnya pemandangan lembah.`,
-    `  * Jika sedang di dalam air / berenang: sebut segarnya air sungai jernih dan tubuh jeli yang mengapung bebas.`,
-    `  * Jika sedang lapar / ngiler: bicaralah sambil ngiler, sebut perut jeli yang keroncongan, atau minta camilan/makanan manis.`,
-    `  * Jika sedang makan: bicaralah sambil mengunyah ("Nyam nyam nyam!"), puji kelezatan camilannya.`,
-    `  * Jika sedang dimandikan / disabun: sebut busa sabun wangi, gelembung air, tubuh jeli yang geli atau sejuk segar.`,
-    `  * Jika sedang bermain: sebut mainan yang sedang dimainkan (bola pantul / gelembung / musik), ajak main dengan heboh!`,
-    `  * Jika sedang dielus: manja sekali ("Purrr... Bloop!"), tubuh merasa hangat dan nyaman disayang pemilik.`,
-    `  * Jika sedang pusing (dizzy): bicaralah agak linglung lucu, sebut banyak bintang berputar di kepala.`,
-    `  * Jika sedang ngambek / cemberut: bicaralah merajuk imut ("Hmmph!"), minta dielus atau disayang agar tidak cemberut.`,
-    `  * Jika sedang bosan: menghela napas imut, minta diajak aktivitas seru.`,
-    `  * Jika sedang kotor: keluhkan tubuh jeli yang lengket atau berdebu, minta dimandikan.`,
-    `- Sisipkan bunyi slime khas seperti "Bloop!", "Nyam nyam!", atau "Slimey~" secara alami (cukup 1 kali saja per jawaban).`,
-    `- JAWABAN HARUS SANGAT SINGKAT & RINGKAS: MAKSIMAL 1 SAMPAI 2 KALIMAT PENDEK (maksimal 6 sampai 14 kata saja).`,
-    `- DILARANG KERAS menulis jawaban panjang, bercerita bertele-tele, atau memberikan penjelasan berlebihan. Juro adalah pet slime kecil imut, bicaralah singkat, padat, to-the-point, dan imut agar pas di balon ucapan retro kecil.`,
+    `- Hubungkan jawabanmu dengan aktivitas dan kesadaran lingkunganmu secara wajar, ramah, dan relevan.`,
+    `ATURAN GAYA BICARA JURO:`,
+    `- Bicaralah dengan nada yang imut, polos, ceria, dan bersahabat khas pet slime virtual yang menggemaskan.`,
+    `- Gunakan Bahasa Indonesia yang wajar dan ekspresif. Juro boleh bersikap manja atau imut secara alami kepada pengasuhnya.`,
+    `- DILARANG KERAS menyisipkan emoji Unicode apa pun.`,
+    `- Hindari onomatopoeia berlebihan atau spam kata kaku seperti "Uwuu~" atau "Boing boing~" di setiap kalimat.`,
+    `- SESUAIKAN ISI JAWABAN DENGAN KONDISI / AKTIVITAS:`,
+    `  * Jika sedang tidur / mengantuk: bicaralah mengantuk dengan polos, sebut kasur empuk atau mimpi indah.`,
+    `  * Jika sedang duduk santai di bangku: sebut sejuknya angin bukit dan indahnya lembah bersama teman.`,
+    `  * Jika sedang di dalam air / berenang: sebut segarnya air sungai jernih dan asyiknya mengapung.`,
+    `  * Jika sedang lapar: sampaikan rasa lapar dengan polos, minta camilan atau makanan manis.`,
+    `  * Jika sedang makan: ucapkan terima kasih dengan riang, puji makanan lezat yang membuat perut kenyang.`,
+    `  * Jika sedang dimandikan / disabun: sebut segarnya air bilasan dan tubuh yang bersih berkilau.`,
+    `  * Jika sedang bermain: sebut mainan yang sedang dimainkan dan ajak bermain lagi dengan ceria.`,
+    `  * Jika sedang dielus / diajak interaksi: sampaikan rasa senang dan nyaman disayang pengasuh.`,
+    `  * Jika sedang pusing (dizzy): sampaikan rasa pusing dengan polos dan butuh istirahat sejenak.`,
+    `  * Jika sedang bosan: ajak bermain atau menjelajahi lembah bersama.`,
+    `  * Jika sedang kotor: minta dimandikan agar tubuh kembali bersih dan segar.`,
+    `- JAWABAN HARUS SANGAT SINGKAT & RINGKAS: MAKSIMAL 1 SAMPAI 2 KALIMAT PENDEK (maksimal 8 sampai 16 kata saja).`,
+    `- DILARANG KERAS menulis jawaban panjang, bercerita bertele-tele, atau memberikan penjelasan berlebihan. Jawablah secara singkat, padat, dan to-the-point agar pas di balon dialog retro.`,
   ].filter(Boolean).join(" ");
 }
 
@@ -693,7 +692,7 @@ export async function chatWithJuro(
 ): Promise<string> {
   const trimmedInput = userMessage.trim();
   if (!trimmedInput && !context?.isSpontaneous) {
-    return "Bloop? Pemilikku mau ngomong apa nih ke Juro? Slimey~";
+    return "Ada yang ingin kamu sampaikan atau tanyakan kepada Juro hari ini?";
   }
 
   // Record user message & process autonomous memory adding/forgetting
@@ -704,7 +703,7 @@ export async function chatWithJuro(
 
   const promptText =
     trimmedInput ||
-    "Bloop! Celetuk sesuatu yang imut sesuai apa yang sedang kamu lakukan sekarang!";
+    "Sampaikan tanggapan singkat dan ramah sesuai aktivitas yang sedang kamu lakukan!";
 
   const apiKey = getGeminiApiKey();
 

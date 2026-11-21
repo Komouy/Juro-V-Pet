@@ -128,6 +128,75 @@ export function getSkinById(id: string): JuroSkin {
   return SKIN_CATALOG.find((s) => s.id === id) ?? SKIN_CATALOG[0];
 }
 
+export interface JuroHat {
+  id: string;
+  name: string;
+  illustrationId: string;
+  flavorDesc: string;
+  price: number;
+  crystalCost?: {
+    crystalId: CrystalId;
+    amount: number;
+  } | null;
+}
+
+export const HAT_CATALOG: JuroHat[] = [
+  {
+    id: "hat-none",
+    name: "Tanpa Topi",
+    illustrationId: "hat-none",
+    flavorDesc: "Tampilan alami Juro tanpa aksesoris penutup kepala.",
+    price: 0,
+    crystalCost: null,
+  },
+  {
+    id: "hat-party",
+    name: "Topi Pesta",
+    illustrationId: "hat-party",
+    flavorDesc: "Topi kerucut pesta bernuansa pastel ceria penuh kegembiraan.",
+    price: 80,
+    crystalCost: null,
+  },
+  {
+    id: "hat-straw",
+    name: "Topi Jerami",
+    illustrationId: "hat-straw",
+    flavorDesc: "Anyaman jerami sejuk berhias pita hitam untuk bersantai di bawah terik mentari.",
+    price: 120,
+    crystalCost: null,
+  },
+  {
+    id: "hat-chef",
+    name: "Topi Koki",
+    illustrationId: "hat-chef",
+    flavorDesc: "Topi koki putih berlipit klasik untuk pet yang gemar mencicipi hidangan lezat.",
+    price: 160,
+    crystalCost: null,
+  },
+  {
+    id: "hat-propeller",
+    name: "Topi Baling",
+    illustrationId: "hat-propeller",
+    flavorDesc: "Topi warna-warni ceria dengan baling-baling yang berputar saat tertiup angin.",
+    price: 220,
+    crystalCost: null,
+  },
+  {
+    id: "hat-top",
+    name: "Topi Pesulap",
+    illustrationId: "hat-top",
+    flavorDesc: "Topi silinder hitam anggun berbalut pita merah pekat khas pesulap ulung.",
+    price: 280,
+    crystalCost: null,
+  },
+];
+
+export const DEFAULT_UNLOCKED_HATS: string[] = ["hat-none"];
+
+export function getHatById(id: string): JuroHat {
+  return HAT_CATALOG.find((h) => h.id === id) ?? HAT_CATALOG[0];
+}
+
 export const CRYSTAL_CATALOG: CrystalInfo[] = [
   {
     id: "quartz",
@@ -252,7 +321,7 @@ export const SHOP_TOYS: ShopToyItem[] = [
   {
     id: "music-box",
     name: "Radio Nostalgia",
-    desc: "Memutar melodi chiptune riang yang bikin Juro bergoyang.",
+    desc: "Memutar melodi chiptune klasik untuk menemani waktu santai Juro.",
     happinessGain: 34,
     affectionGain: 16,
     energyCost: 15,

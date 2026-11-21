@@ -91,6 +91,7 @@ export const PetViewport: React.FC = () => {
     sleep,
     wakeUp,
     recoverSleepEnergy,
+    decayNightSleep,
     clean,
     strokePet,
   } = usePetStore();
@@ -438,8 +439,8 @@ export const PetViewport: React.FC = () => {
         const fallbackContext = getLiveChatContext(false);
         setSpeechBubble({
           text: fallbackContext.isSleeping
-            ? "Hwaaam... Zzz... Bloop? Juro lagi mimpi rebahan di kasur empuk... Zzz..."
-            : "Bloop! Juro lagi asyik bergoyang dan agak melamun nih... bloop!",
+            ? "Juro sedang beristirahat dengan tenang di tempat tidurnya."
+            : "Juro sedang bersantai di padang rumput lembah.",
           isLoading: false,
           visible: true,
         });
@@ -529,14 +530,14 @@ export const PetViewport: React.FC = () => {
 
       const promptInstruction =
         interaction === "feed"
-          ? `[REAKSI MAKAN]: Kamu baru saja memakan ${detail?.food?.name || "makanan lezat"}. Bicaralah dengan gembira sambil mengunyah sesuai kesadaran dirimu di ${context.locationName}!`
+          ? `[REAKSI MAKAN]: Kamu baru saja memakan ${detail?.food?.name || "makanan"}. Sampaikan tanggapan yang sopan dan bersyukur di ${context.locationName}.`
           : interaction === "play"
-          ? `[REAKSI MAIN]: Kamu baru saja bermain ${detail?.toy?.name || "mainan favorit"}. Bicaralah dengan riang gembira sesuai kesadaran dirimu di ${context.locationName}!`
+          ? `[REAKSI MAIN]: Kamu baru saja bermain ${detail?.toy?.name || "mainan favorit"}. Sampaikan tanggapan yang ramah dan menyenangkan di ${context.locationName}.`
           : interaction === "bath_scrub"
-          ? `[REAKSI MANDI SABUN]: Tubuhmu sedang disabuni dengan busa wangi buah. Bicaralah merasa geli dan segar di ${context.locationName}!`
+          ? `[REAKSI MANDI SABUN]: Tubuhmu sedang dibersihkan dengan sabun. Sampaikan tanggapan bahwa tubuhmu terasa bersih dan segar di ${context.locationName}.`
           : interaction === "bath_rinse"
-          ? `[REAKSI BILAS AIR]: Kamu selesai dibilas air sejuk lembah dan berkilau bersih. Bicaralah segar dan senang!`
-          : `[REAKSI DIELUS]: Pemilikmu sedang mengelus tubuh jelimu dengan hangat. Bicaralah manja dan nyaman di ${context.locationName}!`;
+          ? `[REAKSI BILAS AIR]: Kamu selesai dibilas air bersih. Sampaikan tanggapan segar dan siap melanjutkan aktivitas.`
+          : `[REAKSI DIELUS]: Pengguna sedang menyapamu dengan ramah. Sampaikan respons yang sopan, hangat, dan bersahabat di ${context.locationName}.`;
 
       try {
         const reply = await chatWithJuro(promptInstruction, context);
@@ -567,6 +568,9 @@ export const PetViewport: React.FC = () => {
     [speechBubble.isLoading, getLiveChatContext]
   );
 
+  const petTimeoutRef = useRef<number | null>(null);
+  const isRubbingJuroRef = useRef(false);
+
   const handleDirectPet = useCallback(() => {
     setActiveTray("none");
     setIsChatOpen(false);
@@ -586,6 +590,11 @@ export const PetViewport: React.FC = () => {
     soundEffects.playPurr();
     strokePet();
     setIsPettingActive(true);
+    if (petTimeoutRef.current) clearTimeout(petTimeoutRef.current);
+    petTimeoutRef.current = window.setTimeout(() => {
+      setIsPettingActive(false);
+      petTimeoutRef.current = null;
+    }, 1400);
 
     petStrokeCountRef.current += 1;
     if (petStrokeCountRef.current >= 3) {
@@ -841,60 +850,105 @@ export const PetViewport: React.FC = () => {
     return () => controls.removeEventListener("start", onOrbitStart);
   }, [juroMenu.open]);
 
-  // Continuous pointer tracking during Direct Petting Mode
+  // Ambient pointer tracking for petting Juro (Desktop mouse hover/drag & Mobile touch swipe)
   useEffect(() => {
-    if (!isPettingActive) return;
     let lastX = 0;
     let lastY = 0;
     let strokeDist = 0;
     let lastSoundAt = 0;
-    let isDown = false;
 
     const onPointerDown = (e: PointerEvent) => {
-      // Check if tap/click is outside Juro's bounding circle on screen -> finish petting!
+      if (dragMetaRef.current) return;
+      // Only trigger hold-to-pet with primary pointer (left mouse click or finger touch)
+      if (e.button !== 0) return;
       const juroPos = juroScreenPosRef.current;
-      if (juroPos) {
-        const dist = Math.hypot(e.clientX - juroPos.x, e.clientY - (juroPos.headY ?? juroPos.y));
-        if (dist > juroPos.radiusPx * 1.5) {
-          setIsPettingActive(false);
-          return;
+      if (!juroPos) return;
+
+      const dist = Math.hypot(e.clientX - juroPos.x, e.clientY - (juroPos.headY ?? juroPos.y));
+      if (dist <= juroPos.radiusPx * 1.35) {
+        isRubbingJuroRef.current = true;
+        lastX = e.clientX;
+        lastY = e.clientY;
+        strokeDist = 0;
+        if (controlsRef.current) {
+          controlsRef.current.enabled = false;
         }
       }
-      isDown = true;
-      lastX = e.clientX;
-      lastY = e.clientY;
-      strokeDist = 0;
     };
 
     const onPointerMove = (e: PointerEvent) => {
-      if (!isDown) return;
+      if (dragMetaRef.current) return;
+      // Require actively holding left click (mouse) or holding finger (touch)
+      const isHolding =
+        e.pointerType === "mouse"
+          ? e.buttons === 1 && isRubbingJuroRef.current
+          : isRubbingJuroRef.current;
+
+      if (!isHolding) {
+        lastX = e.clientX;
+        lastY = e.clientY;
+        return;
+      }
+
+      const juroPos = juroScreenPosRef.current;
+      if (!juroPos) return;
+
+      const dist = Math.hypot(e.clientX - juroPos.x, e.clientY - (juroPos.headY ?? juroPos.y));
+      const isOverJuro = dist <= juroPos.radiusPx * 1.35;
+
+      if (!isOverJuro) {
+        lastX = e.clientX;
+        lastY = e.clientY;
+        return;
+      }
+
+      if (lastX === 0 && lastY === 0) {
+        lastX = e.clientX;
+        lastY = e.clientY;
+        return;
+      }
+
       const step = Math.hypot(e.clientX - lastX, e.clientY - lastY);
       lastX = e.clientX;
       lastY = e.clientY;
-      strokeDist += step;
 
-      if (strokeDist > 26) {
-        strokeDist = 0;
-        const nowMs = Date.now();
-        if (nowMs - lastSoundAt > 220) {
-          lastSoundAt = nowMs;
-          soundEffects.playPet();
-          soundEffects.playPurr();
-        }
-        strokePet();
-        petStrokeCountRef.current += 1;
-        if (petStrokeCountRef.current >= 4) {
-          petStrokeCountRef.current = 0;
-          useCaregiverStore.getState().recordAction(
-            "pet",
-            "Mengelus lembut tubuh jeli Juro dengan hangat.",
-            { affection: 6, happiness: 4 }
-          );
-          triggerInteractionSpeech("pet");
-        }
+      if (step > 1.2 && step < 160) {
+        strokeDist += step;
 
-        const juroPos = juroScreenPosRef.current;
-        if (juroPos) {
+        if (strokeDist > 20) {
+          strokeDist = 0;
+
+          if (usePetStore.getState().currentState === "sleep") {
+            wakeUp();
+            addLog("interaction", "Juro dibangunkan dengan elusan lembut.");
+          }
+
+          setIsPettingActive(true);
+          if (petTimeoutRef.current) clearTimeout(petTimeoutRef.current);
+          petTimeoutRef.current = window.setTimeout(() => {
+            setIsPettingActive(false);
+            petTimeoutRef.current = null;
+          }, 1000);
+
+          const nowMs = Date.now();
+          if (nowMs - lastSoundAt > 200) {
+            lastSoundAt = nowMs;
+            soundEffects.playPet();
+            soundEffects.playPurr();
+          }
+
+          strokePet();
+          petStrokeCountRef.current += 1;
+          if (petStrokeCountRef.current >= 4) {
+            petStrokeCountRef.current = 0;
+            useCaregiverStore.getState().recordAction(
+              "pet",
+              "Mengelus lembut tubuh jeli Juro dengan hangat.",
+              { affection: 6, happiness: 4 }
+            );
+            triggerInteractionSpeech("pet");
+          }
+
           const heartId = nowMs + Math.random();
           const spawnX = juroPos.x + (Math.random() - 0.5) * 44;
           const spawnY = (juroPos.headY ?? (juroPos.y - juroPos.radiusPx)) - 14;
@@ -910,18 +964,34 @@ export const PetViewport: React.FC = () => {
     };
 
     const onPointerUp = () => {
-      isDown = false;
+      if (isRubbingJuroRef.current) {
+        isRubbingJuroRef.current = false;
+        if (controlsRef.current && !dragMetaRef.current) {
+          controlsRef.current.enabled = true;
+        }
+        if (petTimeoutRef.current) clearTimeout(petTimeoutRef.current);
+        petTimeoutRef.current = window.setTimeout(() => {
+          setIsPettingActive(false);
+          petTimeoutRef.current = null;
+        }, 600);
+      }
     };
 
-    window.addEventListener("pointerdown", onPointerDown);
-    window.addEventListener("pointermove", onPointerMove);
-    window.addEventListener("pointerup", onPointerUp);
+    window.addEventListener("pointerdown", onPointerDown, { passive: true });
+    window.addEventListener("pointermove", onPointerMove, { passive: true });
+    window.addEventListener("pointerup", onPointerUp, { passive: true });
+    window.addEventListener("pointercancel", onPointerUp, { passive: true });
+
     return () => {
       window.removeEventListener("pointerdown", onPointerDown);
       window.removeEventListener("pointermove", onPointerMove);
       window.removeEventListener("pointerup", onPointerUp);
+      window.removeEventListener("pointercancel", onPointerUp);
+      if (petTimeoutRef.current) {
+        clearTimeout(petTimeoutRef.current);
+      }
     };
-  }, [isPettingActive, strokePet, triggerInteractionSpeech]);
+  }, [strokePet, triggerInteractionSpeech, wakeUp, addLog]);
 
   // Imperative drag tracking refs (zero allocations, zero layout thrash, zero re-renders)
   const dragMetaRef = useRef<{
@@ -972,6 +1042,7 @@ export const PetViewport: React.FC = () => {
 
   // Real-time local clock tracking for automatic day/night nature atmosphere
   const [now, setNow] = useState(() => new Date());
+  const isNightSleep = isBedtimeHour(now);
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -980,14 +1051,23 @@ export const PetViewport: React.FC = () => {
     return () => clearInterval(interval);
   }, []);
 
-  // Gentle ongoing energy recovery while Juro stays asleep
+  // Gentle ongoing sleep recovery while Juro stays asleep (fills up to 100% full sleep)
   useEffect(() => {
     if (currentState !== "sleep") return;
     const timer = setInterval(() => {
-      recoverSleepEnergy(2);
-    }, 3000);
+      recoverSleepEnergy(3);
+    }, 2500);
     return () => clearInterval(timer);
   }, [currentState, recoverSleepEnergy]);
+
+  // Nighttime sleep depletion: if awake at night (21:00 - 06:00), sleep stat steadily decreases
+  useEffect(() => {
+    if (!isNightSleep || currentState === "sleep") return;
+    const timer = setInterval(() => {
+      decayNightSleep(2);
+    }, 7000);
+    return () => clearInterval(timer);
+  }, [isNightSleep, currentState, decayNightSleep]);
 
   const activePhase: TimePhase = getTimePhaseFromDate(now);
   const activeTheme = TIME_THEMES[activePhase];
@@ -1044,7 +1124,7 @@ export const PetViewport: React.FC = () => {
     clean();
     soundEffects.playSparkle();
     soundEffects.playHappy();
-    addLog("clean", "Juro selesai disabuni dan dibilas hingga bersih berkilau!");
+    addLog("clean", "Juro selesai disabuni dan dibilas hingga bersih.");
     useCaregiverStore.getState().recordAction(
       "bath",
       "Memandikan dan membilas Juro hingga bersih berkilau dan wangi!",
@@ -1328,7 +1408,7 @@ export const PetViewport: React.FC = () => {
     if (usePetStore.getState().currentState !== "sleep") {
       sleep();
       soundEffects.playSleep();
-      addLog("sleep", "Juro sampai di sofa tidurnya dan mulai tidur lelap. Zzz...");
+      addLog("sleep", "Juro sampai di sofa tidurnya dan mulai tidur lelap.");
       useCaregiverStore.getState().recordAction(
         "sleep",
         "Menidurkan Juro di sofa empuk untuk beristirahat.",
@@ -1342,6 +1422,16 @@ export const PetViewport: React.FC = () => {
     setIsSittingOnBench(true);
     soundEffects.playPlop();
     addLog("interaction", "Juro duduk dengan santai di kursi taman sambil menikmati pemandangan.");
+    usePetStore.setState((s) => ({
+      energy: Math.min(100, s.energy + 10),
+      affection: Math.min(100, s.affection + 5),
+    }));
+    useCaregiverStore.getState().recordAction(
+      "interaction",
+      "Duduk santai di bangku taman menikmati pemandangan bukit.",
+      { energy: 10, affection: 5 },
+      "Bangku Taman"
+    );
   }, [addLog]);
 
   const handleBenchClick = useCallback(() => {
@@ -1396,11 +1486,15 @@ export const PetViewport: React.FC = () => {
   const handleTrampolineArrival = useCallback(() => {
     setIsBouncingOnTrampoline(true);
     soundEffects.playBoing();
-    addLog("play", "Juro sampai di trampolin jamur dan melompat riang gembira! Boing boing~");
+    addLog("play", "Juro sampai di trampolin jamur dan mulai melatih ketangkasannya.");
+    usePetStore.setState((s) => ({
+      happiness: Math.min(100, s.happiness + 15),
+      affection: Math.min(100, s.affection + 6),
+    }));
     useCaregiverStore.getState().recordAction(
       "play",
-      "Bermain melompat riang di atas trampolin jamur.",
-      { happiness: 12, affection: 6 },
+      "Bermain di atas trampolin jamur.",
+      { happiness: 15, affection: 6 },
       "Trampolin Jamur"
     );
   }, [addLog]);
@@ -1453,7 +1547,7 @@ export const PetViewport: React.FC = () => {
     if (usePetStore.getState().currentState === "sleep") {
       wakeUp();
       soundEffects.playWakeUp();
-      addLog("interaction", "Juro terbangun untuk bermain trampolin!");
+      addLog("interaction", "Juro bangun dan bersiap menuju trampolin jamur.");
       wakeCooldownUntilRef.current = Date.now() + 180_000;
       isHeadingToBedRef.current = false;
     }
@@ -1515,7 +1609,10 @@ export const PetViewport: React.FC = () => {
     if (currentState === "sleep") {
       wakeUp();
       soundEffects.playWakeUp();
-      addLog("interaction", "Juro terbangun segar dari tidurnya!");
+      if (isNightSleep && energy < 35) {
+        showToast("Juro masih mengantuk dan butuh tidur penuh", "info");
+      }
+      addLog("interaction", "Juro bangun dari waktu istirahatnya.");
       useCaregiverStore.getState().recordAction(
         "wake",
         "Membangunkan Juro dari tidurnya.",
@@ -1538,7 +1635,7 @@ export const PetViewport: React.FC = () => {
   }, [currentState, wakeUp, addLog, isSittingOnBench, isBouncingOnTrampoline]);
 
   const handleMenuAction = useCallback(
-    (action: "food" | "toy" | "sleep" | "bath" | "pet") => {
+    (action: "food" | "toy" | "sleep" | "bath") => {
       if (isSittingOnBench) setIsSittingOnBench(false);
       if (isBouncingOnTrampoline) setIsBouncingOnTrampoline(false);
       isHeadingToBenchRef.current = false;
@@ -1564,12 +1661,9 @@ export const PetViewport: React.FC = () => {
           soundEffects.playPop();
           setActiveTray("bath");
           break;
-        case "pet":
-          handleDirectPet();
-          break;
       }
     },
-    [isSittingOnBench, isBouncingOnTrampoline, handleToggleSleep, handleDirectPet]
+    [isSittingOnBench, isBouncingOnTrampoline, handleToggleSleep]
   );
 
   const handleToggleWeather = useCallback(() => {
@@ -1596,7 +1690,6 @@ export const PetViewport: React.FC = () => {
   }, [weather]);
 
   // Circadian rhythm controller: sleep at 21:00 - 06:00, wake at 06:00
-  const isNightSleep = isBedtimeHour(now);
   const prevHourRef = useRef<number>(now.getHours());
 
   useEffect(() => {
@@ -1634,6 +1727,11 @@ export const PetViewport: React.FC = () => {
       return;
     }
 
+    // If awake at night and sleep stat drops low (<= 25), Juro is exhausted and must sleep full
+    if (energy <= 25) {
+      wakeCooldownUntilRef.current = 0;
+    }
+
     // If player interacted or woke Juro recently, grant temporary grace period
     if (Date.now() < wakeCooldownUntilRef.current) {
       return;
@@ -1650,7 +1748,9 @@ export const PetViewport: React.FC = () => {
       setWalkCommand({ x: JURO_BED_POS.x, z: JURO_BED_POS.z, nonce: Date.now() });
       addLog(
         "sleep",
-        `Waktu malam telah tiba (pukul ${now.getHours()}:00). Juro berjalan menuju sofa tidurnya untuk tidur pulas.`
+        energy <= 25
+          ? `Stat tidur Juro hampir habis (${Math.round(energy)}%). Juro butuh tidur penuh dan kembali ke kasur.`
+          : `Waktu malam telah tiba (pukul ${now.getHours()}:00). Juro berjalan menuju sofa tidurnya untuk tidur pulas.`
       );
     }
   }, [isNightSleep, currentState, isPettingActive, now, wakeUp, addLog]);
@@ -1670,14 +1770,14 @@ export const PetViewport: React.FC = () => {
 
   const totalFoodStock = SHOP_FOODS.reduce((acc, f) => acc + (foodInventory[f.id] ?? 0), 0);
 
-  const orbitEnabled = !isPettingActive && !isDraggingPet && !isDraggingTool;
+  const orbitEnabled = !isDraggingPet && !isDraggingTool;
 
   return (
     <div
       ref={containerRef}
       style={{ background: activeTheme.skyGradient }}
       className={`relative flex-1 min-h-0 w-full overflow-hidden select-none touch-none transition-all duration-700 ${
-        isPettingActive ? "cursor-grab" : isDraggingPet ? "cursor-grabbing" : "cursor-default"
+        isDraggingPet ? "cursor-grabbing" : "cursor-default"
       }`}
     >
       {/* Top Overlay Bar: Compact Tap-to-Peek Stat Strip */}
@@ -1917,7 +2017,6 @@ export const PetViewport: React.FC = () => {
               setActiveTray((prev) => (prev === tray ? "none" : tray));
             }}
             onToggleSleep={handleToggleSleep}
-            onPet={handleDirectPet}
             onToggleChat={() => {
               setActiveTray("none");
               setIsChatOpen((prev) => !prev);

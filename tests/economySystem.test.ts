@@ -266,4 +266,38 @@ describe("Economy, Mining & Shop System", () => {
     useGameStore.getState().syncMiningStamina(startNow + STAMINA_REGEN_MS * 2 + 500);
     expect(useGameStore.getState().miningStamina).toBe(2);
   });
+
+  it("unlocks and equips wearable hats correctly in accessory system", () => {
+    // Initial state: hat-none unlocked and active
+    expect(useGameStore.getState().unlockedHats).toContain("hat-none");
+    expect(useGameStore.getState().activeHat).toBe("hat-none");
+
+    // Topi Baling costs 220 coins; initial coins = 50 -> unlock fails
+    expect(useGameStore.getState().unlockHat("hat-propeller")).toBe(false);
+    expect(useGameStore.getState().coins).toBe(50);
+    expect(useGameStore.getState().unlockedHats).not.toContain("hat-propeller");
+
+    // Cannot equip locked hat
+    expect(useGameStore.getState().equipHat("hat-propeller")).toBe(false);
+    expect(useGameStore.getState().activeHat).toBe("hat-none");
+
+    // Add coins and unlock Topi Baling
+    useGameStore.setState({ coins: 300 });
+    expect(useGameStore.getState().unlockHat("hat-propeller")).toBe(true);
+    expect(useGameStore.getState().coins).toBe(80); // 300 - 220 = 80
+    expect(useGameStore.getState().unlockedHats).toContain("hat-propeller");
+    expect(useGameStore.getState().activeHat).toBe("hat-propeller");
+
+    // Cannot buy already unlocked hat again
+    expect(useGameStore.getState().unlockHat("hat-propeller")).toBe(false);
+    expect(useGameStore.getState().coins).toBe(80);
+
+    // Unequip hat back to hat-none
+    expect(useGameStore.getState().equipHat("hat-none")).toBe(true);
+    expect(useGameStore.getState().activeHat).toBe("hat-none");
+
+    // Re-equip Topi Baling
+    expect(useGameStore.getState().equipHat("hat-propeller")).toBe(true);
+    expect(useGameStore.getState().activeHat).toBe("hat-propeller");
+  });
 });

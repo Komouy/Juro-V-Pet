@@ -28,6 +28,7 @@ export type CareActionType =
   | "pet"
   | "shop"
   | "skin"
+  | "accessory"
   | "message"
   | "interaction";
 

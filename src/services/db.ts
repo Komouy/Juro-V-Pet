@@ -24,6 +24,8 @@ export interface GameSaveRecord {
   logs: ActivityLog[];
   unlockedCases: string[];
   activeSkin?: string;
+  unlockedHats?: string[];
+  activeHat?: string;
   crystals?: Record<CrystalId, number>;
   foodInventory?: Record<string, number>;
   ownedToys?: string[];
