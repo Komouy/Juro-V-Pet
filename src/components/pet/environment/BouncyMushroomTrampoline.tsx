@@ -40,20 +40,23 @@ export const BouncyMushroomTrampoline: React.FC<BouncyMushroomTrampolineProps> =
     const t = state.clock.getElapsedTime();
 
     if (isBouncing) {
-      // Bouncing rhythm: squash when landed, stretch as launched
-      const bounceCycle = Math.sin(t * 7.5);
-      const capSquash = 1 + bounceCycle * 0.14;
-      const capStretchY = 1 - bounceCycle * 0.16;
+      // Impact compression occurs when Juro lands (sin < 0)
+      const sinVal = Math.sin(t * 7.5);
+      const impact = Math.max(0, -sinVal); // 0 when airborne, 0 -> 1 during landing squash
+      const capSquash = 1 + impact * 0.18;
+      const capStretchY = 1 - impact * 0.22;
 
       capMeshRef.current.scale.set(1.08 * capSquash, 0.44 * capStretchY, 1.08 * capSquash);
-      capMeshRef.current.position.y = 0.20 + bounceCycle * 0.03;
+      capMeshRef.current.position.y = 0.20 - impact * 0.04;
       stemMeshRef.current.scale.set(capSquash * 0.95, capStretchY, capSquash * 0.95);
+      stemMeshRef.current.position.y = 0.10 - impact * 0.02;
     } else {
       // Gentle idle breathing
       const idleWave = Math.sin(t * 1.8) * 0.02;
       capMeshRef.current.scale.set(1.08 * (1 + idleWave), 0.44 * (1 - idleWave), 1.08 * (1 + idleWave));
       capMeshRef.current.position.y = 0.20;
       stemMeshRef.current.scale.set(1, 1, 1);
+      stemMeshRef.current.position.y = 0.10;
     }
   });
 
@@ -74,9 +77,9 @@ export const BouncyMushroomTrampoline: React.FC<BouncyMushroomTrampolineProps> =
       onPointerOut={() => onHoverChange?.(false)}
     >
       {/* Invisible enlarged hitbox for reliable clicks/taps across desktop & touch devices */}
-      <mesh position={[0, 0.35, 0]} visible={false}>
+      <mesh position={[0, 0.35, 0]}>
         <cylinderGeometry args={[0.7, 0.7, 0.85, 12]} />
-        <meshBasicMaterial transparent opacity={0} />
+        <meshBasicMaterial transparent opacity={0} depthWrite={false} />
       </mesh>
 
       {/* Earthy Ring Base with tiny grass collar */}
@@ -130,7 +133,7 @@ export const BouncyMushroomTrampoline: React.FC<BouncyMushroomTrampolineProps> =
       {/* Contextual Trampoline Popover Menu - ALWAYS strictly anchored atop the trampoline in 3D world space! */}
       {isMenuOpen && (
         <Html
-          position={[0, 0.94, 0]}
+          position={[0, isBouncing ? 1.45 : 0.94, 0]}
           zIndexRange={[80, 0]}
           style={{ pointerEvents: "none" }}
         >

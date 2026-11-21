@@ -51,7 +51,7 @@ export const MAP_OBSTACLES: SolidObstacle[] = [
   { x: 3.84, z: 1.13, radius: 0.24, topY: BASE_GROUND_Y + 0.82, tag: "bench" },
 
   // Bouncy Mushroom Trampoline in South-West Meadow
-  { x: -1.75, z: 1.25, radius: 0.50, topY: BASE_GROUND_Y + 0.44, tag: "trampoline" },
+  { x: -1.75, z: 1.25, radius: 0.50, topY: BASE_GROUND_Y + 0.38, tag: "trampoline" },
 
   // West Knoll Sofa Bed Frame (Backrest, Armrests & Nightstand)
   { x: -3.88, z: -0.52, radius: 0.24, topY: BASE_GROUND_Y + 0.85, tag: "bed-frame" }, // Nightstand & Lamp
@@ -433,9 +433,9 @@ export function pickScenicWaypoint(bias?: "water" | "bed" | "food" | "bench" | "
       }
     }
   } else if (bias === "bed") {
-    // Grassy knoll right beside the cozy sleeping leaf bed
-    const bedX = -2.35 + (Math.random() - 0.5) * 0.5;
-    const bedZ = 1.15 + (Math.random() - 0.5) * 0.5;
+    // Grassy area beside West Knoll sofa bed
+    const bedX = -2.6 + (Math.random() - 0.5) * 0.4;
+    const bedZ = -0.15 + (Math.random() - 0.5) * 0.4;
     if (!isInsideObstacle(bedX, bedZ, 0.3)) {
       return { x: bedX, z: bedZ };
     }
@@ -447,8 +447,8 @@ export function pickScenicWaypoint(bias?: "water" | "bed" | "food" | "bench" | "
       return { x: benchX, z: benchZ };
     }
   } else if (bias === "trampoline") {
-    // Grassy area in front of the bouncy mushroom trampoline
-    const tx = -1.35 + (Math.random() - 0.5) * 0.4;
+    // Clear meadow path in front of the bouncy mushroom trampoline
+    const tx = -0.75 + (Math.random() - 0.5) * 0.4;
     const tz = 1.25 + (Math.random() - 0.5) * 0.4;
     if (!isInsideObstacle(tx, tz, 0.3)) {
       return { x: tx, z: tz };

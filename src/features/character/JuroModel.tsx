@@ -702,12 +702,13 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
     let crawlScaleY = 1;
     let crawlScaleZ = 1;
 
-    if (isHeadingToBedRef?.current) {
+    if (isHeadingToBedRef?.current && currentState !== "sleep") {
       const distToBed = Math.hypot(
         spring.position.x - JURO_BED_POS.x,
         spring.position.z - JURO_BED_POS.z
       );
-      if (distToBed < 0.35) {
+      if (distToBed < 0.28) {
+        jumpRef.current.active = false;
         spring.position.x = JURO_BED_POS.x;
         spring.position.z = JURO_BED_POS.z;
         spring.target.x = JURO_BED_POS.x;
@@ -717,31 +718,41 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
       }
     }
 
-    if (isHeadingToBenchRef?.current) {
+    if (isHeadingToBenchRef?.current && !isSittingOnBench) {
       const distToBench = Math.hypot(
         spring.position.x - JURO_BENCH_POS.x,
         spring.position.z - JURO_BENCH_POS.z
       );
-      if (distToBench < 0.38) {
+      if (distToBench < 0.26) {
+        jumpRef.current.active = false;
         spring.position.x = JURO_BENCH_POS.x;
         spring.position.z = JURO_BENCH_POS.z;
-        spring.target.x = JURO_BENCH_POS.x;
-        spring.target.z = JURO_BENCH_POS.z;
+        spring.position.y = JURO_BENCH_POS.seatY + currentBottomOffset;
+        spring.target.set(
+          JURO_BENCH_POS.x,
+          JURO_BENCH_POS.seatY + currentBottomOffset,
+          JURO_BENCH_POS.z
+        );
         spring.velocity.set(0, 0, 0);
         onBenchArrival?.();
       }
     }
 
-    if (isHeadingToTrampolineRef?.current) {
+    if (isHeadingToTrampolineRef?.current && !isBouncingOnTrampoline) {
       const distToTrampoline = Math.hypot(
         spring.position.x - JURO_TRAMPOLINE_POS.x,
         spring.position.z - JURO_TRAMPOLINE_POS.z
       );
-      if (distToTrampoline < 0.45) {
+      if (distToTrampoline < 0.26) {
+        jumpRef.current.active = false;
         spring.position.x = JURO_TRAMPOLINE_POS.x;
         spring.position.z = JURO_TRAMPOLINE_POS.z;
-        spring.target.x = JURO_TRAMPOLINE_POS.x;
-        spring.target.z = JURO_TRAMPOLINE_POS.z;
+        spring.position.y = JURO_TRAMPOLINE_POS.surfaceY + currentBottomOffset;
+        spring.target.set(
+          JURO_TRAMPOLINE_POS.x,
+          JURO_TRAMPOLINE_POS.surfaceY + currentBottomOffset,
+          JURO_TRAMPOLINE_POS.z
+        );
         spring.velocity.set(0, 0, 0);
         onTrampolineArrival?.();
       }
@@ -1131,24 +1142,29 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
           spring.velocity.x = 0;
           spring.velocity.z = 0;
 
-          // Spring bounce arc rhythm
+          // Synchronized bounce rhythm with mushroom cap
           const bouncePhase = Math.sin(t * 7.5);
-          const bounceUp = Math.max(0, bouncePhase);
-          const bounceY = JURO_TRAMPOLINE_POS.surfaceY + currentBottomOffset + bounceUp * 0.48;
-          _targetVec.set(JURO_TRAMPOLINE_POS.x, bounceY, JURO_TRAMPOLINE_POS.z);
-          spring.setTarget(_targetVec);
+          if (bouncePhase >= 0) {
+            // Airborne phase: stretch vertically as launched, smooth arc
+            const bounceUp = bouncePhase;
+            const bounceY = JURO_TRAMPOLINE_POS.surfaceY + currentBottomOffset + bounceUp * 0.48;
+            _targetVec.set(JURO_TRAMPOLINE_POS.x, bounceY, JURO_TRAMPOLINE_POS.z);
+            spring.setTarget(_targetVec);
 
-          // Squash & stretch physics synced with mushroom
-          if (bouncePhase < 0) {
-            // Impact squash
-            crawlScaleY = 0.76 + bouncePhase * 0.14;
-            crawlScaleX = 1.18 - bouncePhase * 0.10;
-            crawlScaleZ = 1.18 - bouncePhase * 0.10;
-          } else {
-            // Airborne stretch
             crawlScaleY = 1.0 + bouncePhase * 0.22;
             crawlScaleX = 1.0 - bouncePhase * 0.10;
             crawlScaleZ = 1.0 - bouncePhase * 0.10;
+          } else {
+            // Impact & squash phase: sink slightly into springy mushroom pad
+            const impact = -bouncePhase; // 0 -> 1 -> 0
+            crawlScaleY = 0.76 - impact * 0.14;
+            crawlScaleX = 1.18 + impact * 0.10;
+            crawlScaleZ = 1.18 + impact * 0.10;
+
+            const padDepression = impact * 0.05;
+            const bounceY = JURO_TRAMPOLINE_POS.surfaceY + currentBottomOffset * crawlScaleY - padDepression;
+            _targetVec.set(JURO_TRAMPOLINE_POS.x, bounceY, JURO_TRAMPOLINE_POS.z);
+            spring.setTarget(_targetVec);
           }
 
           if (groupRef.current) {
@@ -1389,7 +1405,7 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
       const surfaceBaseY = isSittingOnBenchNear
         ? JURO_BENCH_POS.seatY
         : isBouncingOnTrampolineNear
-        ? JURO_TRAMPOLINE_POS.surfaceY
+        ? JURO_TRAMPOLINE_POS.surfaceY - 0.06
         : liveSurfaceY + (isSleepingOnBed ? 0.120 : 0);
       const minCenterY = surfaceBaseY + BODY_BOTTOM_LOCAL * scale.y;
       spring.clampFloor(minCenterY, 0.22);

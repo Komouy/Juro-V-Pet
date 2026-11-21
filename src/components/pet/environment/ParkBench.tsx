@@ -51,9 +51,9 @@ export const ParkBench: React.FC<ParkBenchProps> = ({
       onPointerOut={() => onHoverChange?.(false)}
     >
       {/* Invisible enlarged hitbox for reliable clicks/taps across desktop & touch devices */}
-      <mesh position={[0, 0.2, 0]} visible={false}>
+      <mesh position={[0, 0.2, 0]}>
         <boxGeometry args={[1.1, 0.65, 0.7]} />
-        <meshBasicMaterial transparent opacity={0} />
+        <meshBasicMaterial transparent opacity={0} depthWrite={false} />
       </mesh>
 
       {/* Bench Seat Board */}

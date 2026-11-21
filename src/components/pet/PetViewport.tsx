@@ -1369,9 +1369,18 @@ export const PetViewport: React.FC = () => {
     setIsSittingOnBench(false);
     setIsBouncingOnTrampoline(false);
     isHeadingToTrampolineRef.current = false;
+
+    if (usePetStore.getState().currentState === "sleep") {
+      wakeUp();
+      soundEffects.playWakeUp();
+      addLog("interaction", "Juro terbangun untuk duduk santai di kursi taman.");
+      wakeCooldownUntilRef.current = Date.now() + 180_000;
+      isHeadingToBedRef.current = false;
+    }
+
     setWalkCommand({ x: JURO_BENCH_POS.x, z: JURO_BENCH_POS.z, nonce: Date.now() });
     addLog("interaction", "Juro berjalan menuju kursi taman untuk duduk santai.");
-  }, [addLog]);
+  }, [addLog, wakeUp]);
 
   const handleStandFromBench = useCallback(() => {
     soundEffects.playClick();
@@ -1385,7 +1394,6 @@ export const PetViewport: React.FC = () => {
   }, [addLog]);
 
   const handleTrampolineArrival = useCallback(() => {
-    isHeadingToTrampolineRef.current = false;
     setIsBouncingOnTrampoline(true);
     soundEffects.playBoing();
     addLog("play", "Juro sampai di trampolin jamur dan melompat riang gembira! Boing boing~");
@@ -1396,6 +1404,25 @@ export const PetViewport: React.FC = () => {
       "Trampolin Jamur"
     );
   }, [addLog]);
+
+  // Keep refs active until the respective React state renders true to prevent 1-frame race conditions
+  useEffect(() => {
+    if (isBouncingOnTrampoline) {
+      isHeadingToTrampolineRef.current = false;
+    }
+  }, [isBouncingOnTrampoline]);
+
+  useEffect(() => {
+    if (isSittingOnBench) {
+      isHeadingToBenchRef.current = false;
+    }
+  }, [isSittingOnBench]);
+
+  useEffect(() => {
+    if (currentState === "sleep") {
+      isHeadingToBedRef.current = false;
+    }
+  }, [currentState]);
 
   const handleTrampolineClick = useCallback(() => {
     if (isPettingActive) setIsPettingActive(false);
@@ -1422,9 +1449,18 @@ export const PetViewport: React.FC = () => {
     isHeadingToBenchRef.current = false;
     isHeadingToTrampolineRef.current = true;
     setIsBouncingOnTrampoline(false);
+
+    if (usePetStore.getState().currentState === "sleep") {
+      wakeUp();
+      soundEffects.playWakeUp();
+      addLog("interaction", "Juro terbangun untuk bermain trampolin!");
+      wakeCooldownUntilRef.current = Date.now() + 180_000;
+      isHeadingToBedRef.current = false;
+    }
+
     setWalkCommand({ x: JURO_TRAMPOLINE_POS.x, z: JURO_TRAMPOLINE_POS.z, nonce: Date.now() });
     addLog("play", "Juro berjalan menuju trampolin jamur untuk bermain.");
-  }, [addLog, isSittingOnBench]);
+  }, [addLog, isSittingOnBench, wakeUp]);
 
   const handleStopBounce = useCallback(() => {
     soundEffects.playClick();
@@ -1432,8 +1468,8 @@ export const PetViewport: React.FC = () => {
     setIsBouncingOnTrampoline(false);
     isHeadingToTrampolineRef.current = false;
     soundEffects.playPlop();
-    // Walk to clear ground slightly beside the trampoline
-    setWalkCommand({ x: -1.35, z: 1.25, nonce: Date.now() });
+    // Walk to clear open meadow grass safely in front of the trampoline
+    setWalkCommand({ x: -0.75, z: 1.25, nonce: Date.now() });
     addLog("interaction", "Juro selesai bermain trampolin dan melangkah kembali ke padang rumput.");
   }, [addLog]);
 
