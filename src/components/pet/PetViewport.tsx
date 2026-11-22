@@ -258,6 +258,21 @@ export const PetViewport: React.FC = () => {
   const [soapBadgePercent, setSoapBadgePercent] = useState(0);
   const [walkCommand, setWalkCommand] = useState<WalkCommand | null>(null);
 
+  const isMobileViewport = useMemo(() => {
+    if (typeof window === "undefined") return false;
+    return window.innerWidth < 768 || (typeof navigator !== "undefined" && navigator.maxTouchPoints > 0);
+  }, []);
+
+  const adaptiveDpr = useMemo(() => {
+    if (typeof window === "undefined") return 1;
+    const maxDpr = isMobileViewport ? 1.2 : 1.45;
+    return Math.min(window.devicePixelRatio || 1, maxDpr);
+  }, [isMobileViewport]);
+
+  const shadowResolution = useMemo(() => {
+    return isMobileViewport ? 512 : 1024;
+  }, [isMobileViewport]);
+
   const handleBedArrival = useCallback(() => {
     isHeadingToBedRef.current = false;
     if (usePetStore.getState().currentState !== "sleep") {
@@ -274,13 +289,50 @@ export const PetViewport: React.FC = () => {
 
   const handleWalkPointSelect = useCallback(
     (x: number, z: number) => {
-      // Guard: Ignore if camera was actively being dragged/rotated (or within 250ms release buffer)
+      // Guard 1: Ignore if camera was actively being dragged/rotated (or within 250ms release buffer)
       if (isCameraDraggingRef.current || Date.now() - cameraDragEndTimeRef.current < 250) {
         return;
       }
 
-      // Guard: Do not interrupt sleep with ground clicks (preserves restful sleep)
+      // Guard 2: If Juro is sleeping, NEVER MAKE JURO WALK!
+      // Tapping anywhere while Juro is asleep opens the menu so the user can wake him up, chat, or check stats
       if (currentState === "sleep") {
+        handlePetClick();
+        return;
+      }
+
+      // Guard 3: If Juro is sitting on bench or bouncing on trampoline, tap near Juro opens the landmark menu
+      if (isSittingOnBench) {
+        const juroPos = juroWorldPosRef.current;
+        const dist = juroPos ? Math.hypot(x - juroPos.x, z - juroPos.z) : 999;
+        if (dist < 1.8) {
+          setIsBenchMenuOpen(true);
+          return;
+        }
+      }
+      if (isBouncingOnTrampoline) {
+        const juroPos = juroWorldPosRef.current;
+        const dist = juroPos ? Math.hypot(x - juroPos.x, z - juroPos.z) : 999;
+        if (dist < 1.8) {
+          setIsTrampolineMenuOpen(true);
+          return;
+        }
+      }
+
+      // Guard 4: If Juro is awake and user clicks on or close to Juro (<1.75m), open Juro's menu/chat! DO NOT walk!
+      const currentPos = juroWorldPosRef.current;
+      if (currentPos) {
+        const distToJuro = Math.hypot(x - currentPos.x, z - currentPos.z);
+        if (distToJuro < 1.75) {
+          handlePetClick();
+          return;
+        }
+      }
+
+      // Guard 5: If clicked on or near the sofa bed (<2.2m), handle bed interaction
+      const distToBedCheck = Math.hypot(x - JURO_BED_POS.x, z - JURO_BED_POS.z);
+      if (distToBedCheck < 2.2) {
+        handleBedClick();
         return;
       }
 
@@ -723,16 +775,6 @@ export const PetViewport: React.FC = () => {
         speechTimerRef.current = null;
       }
       setSpeechBubble({ visible: false, text: "", isLoading: false });
-
-      // If Juro is sleeping, wake Juro up cleanly AND continue to open the menu
-      if (currentState === "sleep") {
-        wakeUp();
-        soundEffects.playWakeUp();
-        addLog("interaction", "Membangunkan Juro dari waktu istirahatnya.");
-        useCaregiverStore.getState().recordAction("wake", "Membangunkan Juro dari tidurnya.", {});
-        wakeCooldownUntilRef.current = Date.now() + 180_000;
-        isHeadingToBedRef.current = false;
-      }
 
       if (actionMenuStyle === "floating") {
         setShowStatDetails(false);
@@ -1591,6 +1633,14 @@ export const PetViewport: React.FC = () => {
     setActiveTray("none");
   }, [currentState, wakeUp, addLog, isSittingOnBench, isBouncingOnTrampoline, handleBedArrival, isNightSleep, energy, showToast]);
 
+  const handleBedClick = useCallback(() => {
+    if (currentState === "sleep") {
+      handlePetClick();
+    } else {
+      handleToggleSleep();
+    }
+  }, [currentState, handlePetClick, handleToggleSleep]);
+
   const handleMenuAction = useCallback(
     (action: "food" | "toy" | "sleep" | "bath") => {
       if (isSittingOnBench) setIsSittingOnBench(false);
@@ -1779,10 +1829,10 @@ export const PetViewport: React.FC = () => {
 
       {/* 3D Canvas with Realistic Soft Shadows, Atmospheric Sky & Fog */}
       <Canvas
-        shadows={{ type: THREE.PCFSoftShadowMap }}
+        shadows={{ type: THREE.PCFShadowMap }}
         camera={{ position: [11.5, 13.5, 13.5], fov: 42, near: 0.5, far: 180 }}
-        dpr={[1, Math.min(typeof window !== "undefined" ? window.devicePixelRatio : 1.5, 1.5)]}
-        performance={{ min: 0.75, max: 1.5 }}
+        dpr={[1, adaptiveDpr]}
+        performance={{ min: 0.75, max: 1.4 }}
         gl={{
           antialias: true,
           alpha: false,
@@ -1817,7 +1867,7 @@ export const PetViewport: React.FC = () => {
             color={activePalette.sunColor}
             intensity={activePalette.sunIntensity}
             castShadow
-            shadow-mapSize={[1024, 1024]}
+            shadow-mapSize={[shadowResolution, shadowResolution]}
             shadow-camera-near={4}
             shadow-camera-far={80}
             shadow-camera-left={-28}
@@ -1849,6 +1899,7 @@ export const PetViewport: React.FC = () => {
             juroWorldPosRef={juroWorldPosRef}
             onOpenShop={handleOpenShopFromMap}
             onOpenMine={handleOpenMineFromMap}
+            onBedClick={handleBedClick}
             isBenchMenuOpen={isBenchMenuOpen}
             onBenchClick={handleBenchClick}
             onSitOnBench={handleSitOnBench}

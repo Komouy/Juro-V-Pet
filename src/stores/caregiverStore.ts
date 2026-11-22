@@ -272,6 +272,8 @@ export const useCaregiverStore = create<CaregiverState>((set, get) => {
       const { myProfile, activeRoomCode } = get();
       if (!myProfile) return;
 
+      const safeItemUsedName = itemUsedName ?? null;
+
       const logEntry: CaregiverActionLog = {
         id: `log_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
         timestamp: Date.now(),
@@ -280,7 +282,7 @@ export const useCaregiverStore = create<CaregiverState>((set, get) => {
         caregiverRoleTitle: myProfile.roleTitle,
         actionType,
         description,
-        itemUsedName,
+        ...(safeItemUsedName ? { itemUsedName: safeItemUsedName } : {}),
         statChanges,
       };
 
@@ -304,7 +306,7 @@ export const useCaregiverStore = create<CaregiverState>((set, get) => {
             actionType,
             description,
             statChanges,
-            itemUsedName,
+            ...(safeItemUsedName ? { itemUsedName: safeItemUsedName } : {}),
           },
           {
             name: pet.name,

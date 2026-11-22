@@ -37,6 +37,7 @@ interface OutdoorEnvironmentProps {
   juroWorldPosRef?: React.RefObject<THREE.Vector3>;
   onOpenShop?: () => void;
   onOpenMine?: () => void;
+  onBedClick?: () => void;
   isBenchMenuOpen?: boolean;
   onBenchClick?: () => void;
   onSitOnBench?: () => void;
@@ -70,6 +71,7 @@ export const OutdoorEnvironment: React.FC<OutdoorEnvironmentProps> = React.memo(
     juroWorldPosRef,
     onOpenShop,
     onOpenMine,
+    onBedClick,
     isBenchMenuOpen = false,
     onBenchClick,
     onSitOnBench,
@@ -153,6 +155,10 @@ export const OutdoorEnvironment: React.FC<OutdoorEnvironmentProps> = React.memo(
           onOpenMine?.();
           return;
         }
+        if (landmarkId === "bed") {
+          onBedClick?.();
+          return;
+        }
         if (landmarkId === "overlook") {
           onBenchClick?.();
           return;
@@ -167,7 +173,7 @@ export const OutdoorEnvironment: React.FC<OutdoorEnvironmentProps> = React.memo(
           onWalkPointSelect?.(e.point.x, e.point.z);
         }
       },
-      [onOpenShop, onOpenMine, onBenchClick, onTrampolineClick, onWalkPointSelect]
+      [onOpenShop, onOpenMine, onBedClick, onBenchClick, onTrampolineClick, onWalkPointSelect]
     );
 
     const handlePointerOver = useCallback((e: ThreeEvent<PointerEvent>) => {
@@ -242,17 +248,24 @@ export const OutdoorEnvironment: React.FC<OutdoorEnvironmentProps> = React.memo(
       const normW = normalizeWeather(weather);
       const isNight = normW === "malam" || (normW === "cerah" && theme.isNight);
       const isSunset = normW === "senja";
-      const targetIntensity = isNight ? 3.0 : isSunset ? 1.9 : isRaining ? 1.5 : 0.2;
+      const targetIntensity = isNight ? 3.0 : isSunset ? 1.9 : isRaining ? 1.5 : 0.0;
       const targetEmissive = isNight ? 2.3 : isSunset ? 1.6 : isRaining ? 1.3 : 0.35;
+      const needLights = isNight || isSunset || isRaining;
 
-      // Adjust lantern light intensity & bulb emissive only when transitioning
-      if (lanternLights.length > 0 && Math.abs(lanternLights[0].intensity - targetIntensity) > 0.01) {
+      // Adjust lantern light visibility & intensity to optimize mobile GPU shader passes
+      if (lanternLights.length > 0) {
         for (let l = 0; l < lanternLights.length; l++) {
-          lanternLights[l].intensity = THREE.MathUtils.lerp(
-            lanternLights[l].intensity,
-            targetIntensity,
-            delta * 3.0
-          );
+          const lt = lanternLights[l];
+          if (lt.visible !== needLights) {
+            lt.visible = needLights;
+          }
+          if (needLights && Math.abs(lt.intensity - targetIntensity) > 0.01) {
+            lt.intensity = THREE.MathUtils.lerp(
+              lt.intensity,
+              targetIntensity,
+              delta * 3.0
+            );
+          }
         }
         for (let b = 0; b < lanternBulbs.length; b++) {
           const mat = lanternBulbs[b].material as THREE.MeshStandardMaterial;

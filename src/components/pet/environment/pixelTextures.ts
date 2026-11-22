@@ -21,6 +21,31 @@ export interface PixelTextureSet {
   dispose: () => void;
 }
 
+function drawRoundRect(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+  r = 4
+) {
+  if (typeof (ctx as any).roundRect === "function") {
+    (ctx as any).roundRect(x, y, w, h, r);
+  } else {
+    // Universal Canvas 2D fallback for all mobile browsers/WebViews
+    const radius = Math.min(r, w / 2, h / 2);
+    ctx.moveTo(x + radius, y);
+    ctx.lineTo(x + w - radius, y);
+    ctx.quadraticCurveTo(x + w, y, x + w, y + radius);
+    ctx.lineTo(x + w, y + h - radius);
+    ctx.quadraticCurveTo(x + w, y + h, x + w - radius, y + h);
+    ctx.lineTo(x + radius, y + h);
+    ctx.quadraticCurveTo(x, y + h, x, y + h - radius);
+    ctx.lineTo(x, y + radius);
+    ctx.quadraticCurveTo(x, y, x + radius, y);
+  }
+}
+
 function makeSoftCanvas(
   width: number,
   height: number,
@@ -107,7 +132,7 @@ export function createPixelTextureSet(): PixelTextureSet {
         for (const [x, y, w, h, col] of stones) {
           ctx.fillStyle = col;
           ctx.beginPath();
-          ctx.roundRect(x, y, w, h, 4);
+          drawRoundRect(ctx, x, y, w, h, 4);
           ctx.fill();
         }
       },
@@ -246,7 +271,7 @@ export function createPixelTextureSet(): PixelTextureSet {
           for (let x = -16; x < 64; x += 32) {
             ctx.fillStyle = "#a4acb8";
             ctx.beginPath();
-            ctx.roundRect(x + off + 2, y + 2, 28, 12, 3);
+            drawRoundRect(ctx, x + off + 2, y + 2, 28, 12, 3);
             ctx.fill();
           }
         }
@@ -311,14 +336,14 @@ export function createPixelTextureSet(): PixelTextureSet {
         ctx.fillRect(0, 0, 128, 128);
         ctx.fillStyle = "rgba(130, 212, 255, 0.45)";
         ctx.beginPath();
-        ctx.roundRect(12, 20, 28, 6, 3);
-        ctx.roundRect(72, 54, 34, 6, 3);
-        ctx.roundRect(26, 94, 24, 5, 3);
+        drawRoundRect(ctx, 12, 20, 28, 6, 3);
+        drawRoundRect(ctx, 72, 54, 34, 6, 3);
+        drawRoundRect(ctx, 26, 94, 24, 5, 3);
         ctx.fill();
         ctx.fillStyle = "rgba(230, 248, 255, 0.5)";
         ctx.beginPath();
-        ctx.roundRect(18, 21, 12, 3, 2);
-        ctx.roundRect(80, 55, 14, 3, 2);
+        drawRoundRect(ctx, 18, 21, 12, 3, 2);
+        drawRoundRect(ctx, 80, 55, 14, 3, 2);
         ctx.fill();
       },
       5,

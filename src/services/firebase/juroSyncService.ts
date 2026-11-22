@@ -19,6 +19,26 @@ import type {
 } from "../../types/caregiver";
 
 /**
+ * Menghapus rekursif seluruh properti bernilai `undefined` agar aman dikirim ke Firebase Realtime Database
+ */
+export function sanitizeForFirebase<T>(data: T): T {
+  if (data === null || data === undefined) return null as unknown as T;
+  if (Array.isArray(data)) {
+    return data.map((item) => sanitizeForFirebase(item)) as unknown as T;
+  }
+  if (typeof data === "object") {
+    const clean: Record<string, unknown> = {};
+    for (const [key, val] of Object.entries(data as Record<string, unknown>)) {
+      if (val !== undefined) {
+        clean[key] = sanitizeForFirebase(val);
+      }
+    }
+    return clean as unknown as T;
+  }
+  return data;
+}
+
+/**
  * Menghasilkan kode pairing kamar 4-digit yang mudah dibaca (misal: JURO-5821)
  */
 export function generatePairingCode(): string {
@@ -125,7 +145,7 @@ export class JuroRealtimeSyncService {
         },
       };
 
-      await set(roomRef, roomData);
+      await set(roomRef, sanitizeForFirebase(roomData));
       return { ok: true, roomCode };
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Gagal membuat kamar pairing Juro.";
@@ -203,12 +223,12 @@ export class JuroRealtimeSyncService {
           lastUpdated: Date.now(),
         };
 
-        await update(ref(db, `rooms/${cleanCode}`), {
+        await update(ref(db, `rooms/${cleanCode}`), sanitizeForFirebase({
           "caregivers/caregiver2": caregiver,
           [`pets/${caregiver.id}`]: myInitialPet,
           lastUpdatedAt: Date.now(),
           [`activityLogs/${joinLog.id}`]: joinLog,
-        });
+        }));
 
         room.caregivers.caregiver2 = caregiver;
       }
@@ -331,11 +351,16 @@ export class JuroRealtimeSyncService {
           callbacks.onInitialLogsLoaded?.(logsDesc.slice(0, 80));
           lastKnownLogsCount = logsDesc.length;
         } else if (logsDesc.length > lastKnownLogsCount) {
-          const newestLog = logsDesc[0];
-          // Jika aksi dilakukan oleh perawat pasangan, picu callback notifikasi
-          if (newestLog && newestLog.caregiverId !== myCaregiverId) {
-            callbacks.onActivityLogAdded?.(newestLog);
+          const newLogsCount = logsDesc.length - lastKnownLogsCount;
+          const newLogs = logsDesc.slice(0, newLogsCount);
+          for (let i = newLogs.length - 1; i >= 0; i--) {
+            const log = newLogs[i];
+            if (log && log.caregiverId !== myCaregiverId) {
+              callbacks.onActivityLogAdded?.(log);
+            }
           }
+          lastKnownLogsCount = logsDesc.length;
+        } else {
           lastKnownLogsCount = logsDesc.length;
         }
       }
@@ -416,7 +441,7 @@ export class JuroRealtimeSyncService {
         updates[`rooms/${cleanCode}/juro/memories`] = updatedJuro.memories;
       }
 
-      await update(ref(db), updates);
+      await update(ref(db), sanitizeForFirebase(updates));
       return true;
     } catch (err) {
       console.error("Gagal mengirim aksi pengasuhan ke Firebase:", err);
@@ -443,12 +468,14 @@ export class JuroRealtimeSyncService {
       };
 
       for (const [key, val] of Object.entries(updatedJuro)) {
-        updates[`rooms/${cleanCode}/juro/${key}`] = val;
+        if (val !== undefined) {
+          updates[`rooms/${cleanCode}/juro/${key}`] = val;
+        }
       }
       updates[`rooms/${cleanCode}/juro/updatedByCaregiverId`] = caregiverId;
       updates[`rooms/${cleanCode}/juro/lastUpdated`] = Date.now();
 
-      await update(ref(db), updates);
+      await update(ref(db), sanitizeForFirebase(updates));
       return true;
     } catch (err) {
       console.error("Gagal menyinkronkan status Juro ke Firebase:", err);
@@ -473,7 +500,7 @@ export class JuroRealtimeSyncService {
         [`rooms/${cleanCode}/lastUpdatedAt`]: Date.now(),
         [`rooms/${cleanCode}/pets/${caregiverId}`]: petState,
       };
-      await update(ref(db), updates);
+      await update(ref(db), sanitizeForFirebase(updates));
       return true;
     } catch (err) {
       console.error("Gagal menyinkronkan status pet saya ke Firebase:", err);

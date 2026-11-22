@@ -132,7 +132,7 @@ class SoundSystem {
   private bgmStep: number = 0;
   private bgmNextNoteTime: number = 0;
 
-  private initCtx() {
+  private initCtx(resume = false) {
     if (!this.ctx && typeof window !== "undefined") {
       const AudioCtx =
         window.AudioContext ||
@@ -141,7 +141,7 @@ class SoundSystem {
         this.ctx = new AudioCtx();
       }
     }
-    if (this.ctx && this.ctx.state === "suspended") {
+    if (resume && this.ctx && this.ctx.state === "suspended") {
       this.ctx.resume().catch(() => {});
     }
     return this.ctx;
@@ -153,7 +153,7 @@ class SoundSystem {
 
   public unlockAudio() {
     if (typeof window === "undefined") return;
-    const ctx = this.initCtx();
+    const ctx = this.initCtx(true);
     if (ctx && ctx.state === "suspended") {
       ctx.resume().catch(() => {});
     }

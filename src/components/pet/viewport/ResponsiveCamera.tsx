@@ -85,7 +85,15 @@ export const ResponsiveCamera: React.FC<ResponsiveCameraProps> = ({
   useFrame((state, delta) => {
     const controls = controlsRef.current;
     const targetPos = targetPosRef?.current;
-    if (!controls || !targetPos) return;
+    if (!controls || !controls.target || !targetPos) return;
+    if (
+      typeof targetPos.x !== "number" ||
+      typeof targetPos.y !== "number" ||
+      typeof targetPos.z !== "number" ||
+      typeof controls.target.x !== "number"
+    ) {
+      return;
+    }
 
     if (cameraMode === "free") {
       controls.update();

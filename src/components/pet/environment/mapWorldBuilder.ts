@@ -577,6 +577,7 @@ export function buildRetroWorld(
     const baseY = groundHeightAt(-15, 4);
     const lounge = new THREE.Group();
     lounge.position.set(-15.0, baseY, 4.0);
+    lounge.userData = { landmarkId: "bed" };
 
     const sofaFrameMat = trackMat(
       new THREE.MeshStandardMaterial({ color: "#df7643", roughness: 0.65 })
@@ -593,12 +594,14 @@ export function buildRetroWorld(
     baseFrame.position.set(-0.35, 0.12, 0);
     baseFrame.receiveShadow = !isSoftwareGl;
     baseFrame.castShadow = !isSoftwareGl;
+    baseFrame.userData = { landmarkId: "bed" };
     lounge.add(baseFrame);
 
     // Low rounded backrest along the rear wall
     const backWall = new THREE.Mesh(trackGeo(new THREE.BoxGeometry(0.38, 0.56, 4.4)), sofaFrameMat);
     backWall.position.set(-1.42, 0.40, 0);
     backWall.castShadow = !isSoftwareGl;
+    backWall.userData = { landmarkId: "bed" };
     lounge.add(backWall);
 
     // Cozy rounded side armrests (spaced comfortably apart)
@@ -606,6 +609,7 @@ export function buildRetroWorld(
       const armrest = new THREE.Mesh(trackGeo(new THREE.BoxGeometry(2.0, 0.44, 0.32)), sofaFrameMat);
       armrest.position.set(-0.32, 0.34, sz);
       armrest.castShadow = !isSoftwareGl;
+      armrest.userData = { landmarkId: "bed" };
       lounge.add(armrest);
     }
 
@@ -613,6 +617,7 @@ export function buildRetroWorld(
     const mattress = new THREE.Mesh(trackGeo(new THREE.BoxGeometry(1.92, 0.28, 3.92)), cushionMat);
     mattress.position.set(-0.35, 0.29, 0);
     mattress.receiveShadow = !isSoftwareGl;
+    mattress.userData = { landmarkId: "bed" };
     lounge.add(mattress);
 
     // 3 Cute decorative accent pillows against the backrest
@@ -969,10 +974,13 @@ export function buildRetroWorld(
       pineTrees.length
     );
 
-    [pTrunk, pCone1, pCone2, pCone3].forEach((im) => {
-      im.castShadow = !isSoftwareGl;
-      im.receiveShadow = !isSoftwareGl;
-    });
+    pTrunk.castShadow = !isSoftwareGl;
+    pTrunk.receiveShadow = !isSoftwareGl;
+    pCone1.castShadow = !isSoftwareGl;
+    pCone1.receiveShadow = !isSoftwareGl;
+    // Upper cones (pCone2, pCone3) receive shadows while base cone casts the footprint
+    pCone2.receiveShadow = !isSoftwareGl;
+    pCone3.receiveShadow = !isSoftwareGl;
 
     pineTrees.forEach((t: TreeSpec, idx: number) => {
       const gy = groundHeightAt(t.x, t.z);
@@ -1027,10 +1035,12 @@ export function buildRetroWorld(
       roundTrees.length
     );
 
-    [rTrunk, rCrownMain, rCrownTop].forEach((im) => {
-      im.castShadow = !isSoftwareGl;
-      im.receiveShadow = !isSoftwareGl;
-    });
+    rTrunk.castShadow = !isSoftwareGl;
+    rTrunk.receiveShadow = !isSoftwareGl;
+    rCrownMain.castShadow = !isSoftwareGl;
+    rCrownMain.receiveShadow = !isSoftwareGl;
+    // Top crown sits inside main crown shadow volume
+    rCrownTop.receiveShadow = !isSoftwareGl;
 
     roundTrees.forEach((t: TreeSpec, idx: number) => {
       const gy = groundHeightAt(t.x, t.z);

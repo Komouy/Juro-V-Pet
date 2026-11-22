@@ -488,6 +488,7 @@ export const MAP_BOUNDS = {
 // Cozy sleep bed location atop the Bukit Santai terrace
 export const JURO_BED_POS = {
   x: -15.35,
+  y: 1.42,
   z: 4.0,
   platformId: "bukit-santai",
 } as const;
@@ -495,6 +496,7 @@ export const JURO_BED_POS = {
 // Dual Pet Sleep Slots on the Bukit Santai Twin Terracotta Sofa:
 export const JURO_BED_SLOT_1 = {
   x: -15.35,
+  y: 1.42,
   z: 3.2,
   platformId: "bukit-santai",
   label: "Slot Tidur Pet 1 (Kiri)",
@@ -502,6 +504,7 @@ export const JURO_BED_SLOT_1 = {
 
 export const JURO_BED_SLOT_2 = {
   x: -15.35,
+  y: 1.42,
   z: 4.8,
   platformId: "bukit-santai",
   label: "Slot Tidur Pet 2 (Kanan)",

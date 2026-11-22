@@ -322,7 +322,7 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
         : JURO_BED_SLOT_1;
       const bedGroundY = getTerrainHeightAt(sleepBed.x, sleepBed.z);
       return new SpringOscillator3D(
-        new THREE.Vector3(sleepBed.x, bedGroundY + 0.120 + initBottom * 0.88, sleepBed.z),
+        new THREE.Vector3(sleepBed.x, bedGroundY + 0.44 + initBottom * 0.88, sleepBed.z),
         {
           stiffness: 145,
           damping: 10,
@@ -405,10 +405,9 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
       Math.hypot(rawX - JURO_TRAMPOLINE_POS.x, rawZ - JURO_TRAMPOLINE_POS.z) < 0.45;
 
     if (usePetStore.getState().currentState === "sleep") {
-      if (isBedTarget) return; // Already asleep at bed
-      wakeCooldownRef.current = Date.now() + 4500;
-      usePetStore.getState().wakeUp();
-      fsm.transitionTo("idle", true);
+      // While sleeping, Juro stays asleep and ignores ground walk commands.
+      // Juro only wakes up when the caregiver taps "Bangunkan" or when energy is fully restored.
+      return;
     }
 
     let targetX = rawX;
@@ -1588,7 +1587,8 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
       // Hard terrain collision boundary: keep Juro's bottom resting cleanly on grass/hill/bridge/stump/mattress/bench/trampoline
       const isSleepingOnBed =
         currentState === "sleep" &&
-        Math.hypot(spring.position.x - JURO_BED_POS.x, spring.position.z - JURO_BED_POS.z) < 0.85;
+        Math.abs(spring.position.x - JURO_BED_POS.x) < 2.0 &&
+        Math.abs(spring.position.z - JURO_BED_POS.z) < 2.8;
       const isSittingOnBenchNear =
         isSittingOnBench &&
         Math.hypot(spring.position.x - JURO_BENCH_POS.x, spring.position.z - JURO_BENCH_POS.z) < 0.65;
@@ -1599,7 +1599,7 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
         ? JURO_BENCH_POS.seatY
         : isBouncingOnTrampolineNear
         ? JURO_TRAMPOLINE_POS.surfaceY - 0.06
-        : liveSurfaceY + (isSleepingOnBed ? 0.120 : 0);
+        : liveSurfaceY + (isSleepingOnBed ? 0.44 : 0);
       const minCenterY = surfaceBaseY + BODY_BOTTOM_LOCAL * scale.y;
       spring.clampFloor(minCenterY, 0.22);
 
@@ -1689,7 +1689,8 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
     if (shadowRef.current && groupRef.current) {
       const isSleepingOnBed =
         currentState === "sleep" &&
-        Math.hypot(spring.position.x - JURO_BED_POS.x, spring.position.z - JURO_BED_POS.z) < 0.85;
+        Math.abs(spring.position.x - JURO_BED_POS.x) < 2.0 &&
+        Math.abs(spring.position.z - JURO_BED_POS.z) < 2.8;
       const isSittingOnBenchNear =
         isSittingOnBench &&
         Math.hypot(spring.position.x - JURO_BENCH_POS.x, spring.position.z - JURO_BENCH_POS.z) < 0.65;
@@ -1700,7 +1701,7 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
         ? JURO_BENCH_POS.seatY + 0.003
         : isBouncingOnTrampolineNear
         ? JURO_TRAMPOLINE_POS.surfaceY + 0.003
-        : liveSurfaceY + (isSleepingOnBed ? 0.36 : 0);
+        : liveSurfaceY + (isSleepingOnBed ? 0.44 : 0);
       shadowRef.current.position.set(
         spring.position.x,
         contactSurfaceY + 0.005,
@@ -2713,7 +2714,9 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
             const dy = e.nativeEvent.clientY - petPointerDownPosRef.current.y;
             const dist = Math.hypot(dx, dy);
             const elapsed = Date.now() - petPointerDownPosRef.current.time;
-            if (dist > 10 || elapsed > 1200) {
+            const isTouch = typeof window !== "undefined" && ("ontouchstart" in window || navigator.maxTouchPoints > 0);
+            const maxSlop = isTouch ? 24 : 12;
+            if (dist > maxSlop || elapsed > 1200) {
               return;
             }
           }
@@ -2724,9 +2727,6 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
             jumpRef.current.active = false;
             fsm.transitionTo("idle", true);
             setBehaviorState("idle");
-          }
-          if (fsm.currentState === "sleep") {
-            fsm.transitionTo("idle", true);
           }
           // Project Juro's crown/head to screen coordinates immediately
           _projCenter
@@ -2742,9 +2742,9 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
           onPetClick?.({ x: screenX, y: screenY });
         }}
       >
-        {/* Invisible Comfortable Hitbox (Radius 1.35) so tapping Juro is effortless on all screens */}
+        {/* Invisible Comfortable Hitbox (Radius 1.6) so tapping Juro is effortless on all screens */}
         <mesh position={[0, 0.45, 0]}>
-          <sphereGeometry args={[1.35, 16, 12]} />
+          <sphereGeometry args={[1.6, 16, 12]} />
           <meshBasicMaterial transparent opacity={0} depthWrite={false} side={THREE.DoubleSide} />
         </mesh>
         {/* Main Sculpted Chubby Jelly Body (Casts soft directional shadow on terrain/bridge) */}
