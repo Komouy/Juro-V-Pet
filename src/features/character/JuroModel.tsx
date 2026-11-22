@@ -20,6 +20,8 @@ import {
   BASE_GROUND_Y,
   MAP_BOUNDS,
   JURO_BED_POS,
+  JURO_BED_SLOT_1,
+  JURO_BED_SLOT_2,
   JURO_BENCH_POS,
   JURO_TRAMPOLINE_POS,
   getTerrainHeightAt,
@@ -103,6 +105,12 @@ export interface JuroModelProps {
   isRaining?: boolean;
   isDizzyRef?: React.RefObject<boolean>;
   level?: number;
+  // Dual-Pet 2-Player Properties
+  customSkin?: string;
+  customHat?: string;
+  isPartner?: boolean;
+  initialPosition?: { x: number; y?: number; z: number };
+  partnerName?: string;
 }
 
 export const JuroModel: React.FC<JuroModelProps> = React.memo(({
@@ -126,6 +134,11 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
   isRaining = false,
   isDizzyRef,
   level = 1,
+  customSkin,
+  customHat,
+  isPartner = false,
+  initialPosition,
+  partnerName: _partnerName,
 }) => {
   const groupRef = useRef<THREE.Group>(null);
   const leftEyeRef = useRef<THREE.Group>(null);
@@ -238,7 +251,9 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
     clearToyBeingPlayed,
     setBehaviorState,
   } = usePetStore();
-  const { activeSkin, activeHat } = useGameStore();
+  const { activeSkin: storeSkin, activeHat: storeHat } = useGameStore();
+  const activeSkin = customSkin ?? storeSkin;
+  const activeHat = customHat !== undefined ? customHat : storeHat;
   const skinPalette = getSkinById(activeSkin);
 
   // Behavior Finite State Machine
@@ -264,14 +279,31 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
   const spring = useMemo(() => {
     const isNight = isBedtimeHour(new Date());
     const initialSleep = isNight || usePetStore.getState().currentState === "sleep";
-    const initialLevel = usePetStore.getState().level;
+    const initialLevel = level ?? usePetStore.getState().level;
     const initialGrowth = 0.68 + (Math.min(10, Math.max(1, initialLevel)) - 1) * (0.52 / 9);
     const initBottom = BODY_BOTTOM_LOCAL * JURO_BASE_SCALE * initialGrowth;
 
-    if (initialSleep) {
-      const bedGroundY = getTerrainHeightAt(JURO_BED_POS.x, JURO_BED_POS.z);
+    if (initialPosition) {
+      const initY =
+        initialPosition.y ??
+        getTerrainHeightAt(initialPosition.x, initialPosition.z) + initBottom;
       return new SpringOscillator3D(
-        new THREE.Vector3(JURO_BED_POS.x, bedGroundY + 0.120 + initBottom * 0.88, JURO_BED_POS.z),
+        new THREE.Vector3(initialPosition.x, initY, initialPosition.z),
+        {
+          stiffness: 145,
+          damping: 10,
+          mass: 1,
+        }
+      );
+    }
+
+    if (initialSleep) {
+      const sleepBed = isPartner
+        ? (initialPosition || JURO_BED_SLOT_2)
+        : JURO_BED_SLOT_1;
+      const bedGroundY = getTerrainHeightAt(sleepBed.x, sleepBed.z);
+      return new SpringOscillator3D(
+        new THREE.Vector3(sleepBed.x, bedGroundY + 0.120 + initBottom * 0.88, sleepBed.z),
         {
           stiffness: 145,
           damping: 10,
@@ -296,17 +328,19 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
       damping: 10,
       mass: 1,
     });
-  }, []);
+  }, [initialPosition, level]);
 
   // Persist Juro's position across route transitions (e.g. navigating to Shop, Mine, Evolution, etc.)
   useEffect(() => {
     return () => {
-      const pos = spring.position;
-      if (Number.isFinite(pos.x) && Number.isFinite(pos.z)) {
-        usePetStore.getState().setLastPosition({ x: pos.x, y: pos.y, z: pos.z });
+      if (!isPartner) {
+        const pos = spring.position;
+        if (Number.isFinite(pos.x) && Number.isFinite(pos.z)) {
+          usePetStore.getState().setLastPosition({ x: pos.x, y: pos.y, z: pos.z });
+        }
       }
     };
-  }, [spring]);
+  }, [spring, isPartner]);
 
   // Parabolic jump-up / hop-down state when climbing hills, bridges & stumps
   const jumpRef = useRef({
@@ -647,7 +681,7 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
       fsm.timeInState = 0;
     } else {
       const activeState = fsm.update(delta, liveAttributes, liveMood);
-      if (activeState !== storeState) {
+      if (!isPartner && activeState !== storeState) {
         setBehaviorState(activeState);
       }
     }
@@ -721,16 +755,17 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
     let crawlScaleZ = 1;
 
     if (isHeadingToBedRef?.current && currentState !== "sleep") {
+      const bedTarget = JURO_BED_SLOT_1;
       const distToBed = Math.hypot(
-        spring.position.x - JURO_BED_POS.x,
-        spring.position.z - JURO_BED_POS.z
+        spring.position.x - bedTarget.x,
+        spring.position.z - bedTarget.z
       );
       if (distToBed < 0.28) {
         jumpRef.current.active = false;
-        spring.position.x = JURO_BED_POS.x;
-        spring.position.z = JURO_BED_POS.z;
-        spring.target.x = JURO_BED_POS.x;
-        spring.target.z = JURO_BED_POS.z;
+        spring.position.x = bedTarget.x;
+        spring.position.z = bedTarget.z;
+        spring.target.x = bedTarget.x;
+        spring.target.z = bedTarget.z;
         spring.velocity.set(0, 0, 0);
         onBedArrival?.();
       }
@@ -1192,21 +1227,23 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
             );
           }
         } else if (currentState === "sleep") {
-          // Whether Juro fell asleep from night time, low energy, or player command,
-          // anchor Juro snugly in the center of the sofa mattress atop the West Knoll!
+          // Anchor Juro snugly in their designated bed slot atop the West Knoll!
+          const sleepTarget = isPartner
+            ? (initialPosition || JURO_BED_SLOT_2)
+            : JURO_BED_SLOT_1;
           const distToBed = Math.hypot(
-            spring.position.x - JURO_BED_POS.x,
-            spring.position.z - JURO_BED_POS.z
+            spring.position.x - sleepTarget.x,
+            spring.position.z - sleepTarget.z
           );
           if (distToBed > 0.04) {
-            spring.position.x = dampExp(spring.position.x, JURO_BED_POS.x, 10.0, delta);
-            spring.position.z = dampExp(spring.position.z, JURO_BED_POS.z, 10.0, delta);
+            spring.position.x = dampExp(spring.position.x, sleepTarget.x, 10.0, delta);
+            spring.position.z = dampExp(spring.position.z, sleepTarget.z, 10.0, delta);
           } else {
-            spring.position.x = JURO_BED_POS.x;
-            spring.position.z = JURO_BED_POS.z;
+            spring.position.x = sleepTarget.x;
+            spring.position.z = sleepTarget.z;
           }
-          spring.target.x = JURO_BED_POS.x;
-          spring.target.z = JURO_BED_POS.z;
+          spring.target.x = sleepTarget.x;
+          spring.target.z = sleepTarget.z;
           spring.velocity.x *= 0.1;
           spring.velocity.z *= 0.1;
 

@@ -260,4 +260,44 @@ describe("Caregiver Co-Parenting & Firebase Realtime Foundation", () => {
     expect(mockRoomData.juro.deepestFloor).toBe(5);
     expect(mockRoomData.juro.memories.length).toBe(1);
   });
+
+  it("synchronizes dual-pet partner state and maintains separate individual pets in 2-Player mode", () => {
+    const store = useCaregiverStore.getState();
+    store.setProfile("Dhavi", "Papi Juro");
+
+    expect(useCaregiverStore.getState().partnerPet).toBeNull();
+    expect(useCaregiverStore.getState().isPartnerPetPresent).toBe(false);
+
+    // Partner Juro arrives with Level 8 and Topi Koki
+    const partnerPetMock = {
+      ownerCaregiverId: "cg-partner-2",
+      ownerName: "Partner",
+      ownerRoleTitle: "Mami Juro",
+      name: "Juro Mint",
+      level: 8,
+      hunger: 90,
+      energy: 85,
+      cleanliness: 95,
+      happiness: 88,
+      affection: 92,
+      currentState: "idle",
+      activeSkin: "mint-lime",
+      activeHat: "hat-chef",
+      isOnline: true,
+      lastUpdated: Date.now(),
+    };
+
+    useCaregiverStore.getState().setPartnerPet(partnerPetMock);
+
+    expect(useCaregiverStore.getState().isPartnerPetPresent).toBe(true);
+    expect(useCaregiverStore.getState().partnerPet?.name).toBe("Juro Mint");
+    expect(useCaregiverStore.getState().partnerPet?.level).toBe(8);
+    expect(useCaregiverStore.getState().partnerPet?.activeHat).toBe("hat-chef");
+    expect(useCaregiverStore.getState().partnerPet?.activeSkin).toBe("mint-lime");
+
+    // When room is disconnected, partner pet is cleared cleanly
+    useCaregiverStore.getState().disconnectRoom();
+    expect(useCaregiverStore.getState().partnerPet).toBeNull();
+    expect(useCaregiverStore.getState().isPartnerPetPresent).toBe(false);
+  });
 });

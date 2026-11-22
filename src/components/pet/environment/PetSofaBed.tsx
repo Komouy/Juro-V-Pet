@@ -11,8 +11,10 @@ export interface PetSofaBedProps {
 }
 
 /**
- * Juro's Cozy Pet Sofa Bed & Bedside Table on West Knoll
- * Featuring plush sofa cushion, padded backrest & armrests, bedside table with drawer and warm glowing lamp.
+ * Juro's Cozy Twin Pet Luxury Sofa Bed & Bedside Table on West Knoll
+ * Featuring extra-wide plush dual cushion, padded backrest, dual throw pillows,
+ * bedside table with drawer and warm glowing lamp.
+ * Comfortably accommodates 2 Juro pets sleeping side-by-side in 2-Player mode.
  */
 export const PetSofaBed: React.FC<PetSofaBedProps> = ({
   theme,
@@ -35,95 +37,113 @@ export const PetSofaBed: React.FC<PetSofaBedProps> = ({
       }}
       onPointerOut={() => onHoverChange?.(false)}
     >
-      {/* 1. Cozy Woven Rug under the sofa */}
+      {/* 1. Cozy Woven Rug under the sofa (Twin Dimensions: 1.95 x 1.15) */}
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.003, 0]}>
-        <planeGeometry args={[1.35, 1.05]} />
+        <planeGeometry args={[1.95, 1.15]} />
         <meshLambertMaterial color={theme.isNight ? "#1E293B" : "#FEF3C7"} />
       </mesh>
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.005, 0]}>
-        <planeGeometry args={[1.22, 0.92]} />
+        <planeGeometry args={[1.80, 1.02]} />
         <meshLambertMaterial color={theme.isNight ? "#334155" : "#FDE68A"} />
       </mesh>
 
-      {/* 2. Pet Sofa Bed Base (Sofa Alas Tidur Pet) */}
-      {/* 4 Tiny Wooden Stubby Feet */}
-      <mesh position={[-0.38, 0.02, -0.24]}>
+      {/* 2. Pet Sofa Bed Base (Sofa Alas Tidur Pet - Double Width 1.44) */}
+      {/* 6 Tiny Wooden Stubby Feet (Corners + Center Support) */}
+      <mesh position={[-0.65, 0.02, -0.24]}>
         <cylinderGeometry args={[0.028, 0.02, 0.04, 6]} />
         <meshLambertMaterial color={woodDarkColor} />
       </mesh>
-      <mesh position={[0.38, 0.02, -0.24]}>
+      <mesh position={[0.65, 0.02, -0.24]}>
         <cylinderGeometry args={[0.028, 0.02, 0.04, 6]} />
         <meshLambertMaterial color={woodDarkColor} />
       </mesh>
-      <mesh position={[-0.38, 0.02, 0.24]}>
+      <mesh position={[-0.65, 0.02, 0.24]}>
         <cylinderGeometry args={[0.028, 0.02, 0.04, 6]} />
         <meshLambertMaterial color={woodDarkColor} />
       </mesh>
-      <mesh position={[0.38, 0.02, 0.24]}>
+      <mesh position={[0.65, 0.02, 0.24]}>
+        <cylinderGeometry args={[0.028, 0.02, 0.04, 6]} />
+        <meshLambertMaterial color={woodDarkColor} />
+      </mesh>
+      <mesh position={[0, 0.02, -0.24]}>
+        <cylinderGeometry args={[0.028, 0.02, 0.04, 6]} />
+        <meshLambertMaterial color={woodDarkColor} />
+      </mesh>
+      <mesh position={[0, 0.02, 0.24]}>
         <cylinderGeometry args={[0.028, 0.02, 0.04, 6]} />
         <meshLambertMaterial color={woodDarkColor} />
       </mesh>
 
       {/* Wooden Trim Plinth */}
       <mesh position={[0, 0.042, 0]}>
-        <boxGeometry args={[0.92, 0.025, 0.68]} />
+        <boxGeometry args={[1.46, 0.025, 0.68]} />
         <meshLambertMaterial color={woodDarkColor} />
       </mesh>
 
       {/* Sofa Upholstered Outer Base */}
       <mesh position={[0, 0.075, 0]}>
-        <boxGeometry args={[0.9, 0.05, 0.66]} />
+        <boxGeometry args={[1.44, 0.05, 0.66]} />
         <meshLambertMaterial color={theme.isNight ? "#312E81" : "#EA580C"} />
       </mesh>
 
-      {/* Padded Curved Backrest (Sandaran Punggung Sofa Empuk) */}
+      {/* Padded Curved Backrest (Sandaran Punggung Sofa Empuk Panjang) */}
       <mesh position={[0, 0.165, -0.24]}>
-        <boxGeometry args={[0.9, 0.15, 0.14]} />
+        <boxGeometry args={[1.44, 0.15, 0.14]} />
         <meshLambertMaterial color={theme.isNight ? "#3730A3" : "#F97316"} />
       </mesh>
       {/* Backrest Bolster Curve */}
       <mesh position={[0, 0.24, -0.24]} rotation={[0, 0, Math.PI / 2]}>
-        <cylinderGeometry args={[0.07, 0.07, 0.9, 12]} />
+        <cylinderGeometry args={[0.07, 0.07, 1.44, 12]} />
         <meshLambertMaterial color={theme.isNight ? "#4338CA" : "#FB923C"} />
       </mesh>
 
-      {/* Left Padded Armrest (Sandaran Tangan Kiri) */}
-      <mesh position={[-0.39, 0.135, 0.04]}>
+      {/* Left Padded Armrest */}
+      <mesh position={[-0.66, 0.135, 0.04]}>
         <boxGeometry args={[0.12, 0.11, 0.44]} />
         <meshLambertMaterial color={theme.isNight ? "#3730A3" : "#F97316"} />
       </mesh>
-      <mesh position={[-0.39, 0.19, 0.04]} rotation={[Math.PI / 2, 0, 0]}>
+      <mesh position={[-0.66, 0.19, 0.04]} rotation={[Math.PI / 2, 0, 0]}>
         <cylinderGeometry args={[0.06, 0.06, 0.44, 10]} />
         <meshLambertMaterial color={theme.isNight ? "#4338CA" : "#FB923C"} />
       </mesh>
 
-      {/* Right Padded Armrest (Sandaran Tangan Kanan) */}
-      <mesh position={[0.39, 0.135, 0.04]}>
+      {/* Right Padded Armrest */}
+      <mesh position={[0.66, 0.135, 0.04]}>
         <boxGeometry args={[0.12, 0.11, 0.44]} />
         <meshLambertMaterial color={theme.isNight ? "#3730A3" : "#F97316"} />
       </mesh>
-      <mesh position={[0.39, 0.19, 0.04]} rotation={[Math.PI / 2, 0, 0]}>
+      <mesh position={[0.66, 0.19, 0.04]} rotation={[Math.PI / 2, 0, 0]}>
         <cylinderGeometry args={[0.06, 0.06, 0.44, 10]} />
         <meshLambertMaterial color={theme.isNight ? "#4338CA" : "#FB923C"} />
       </mesh>
 
-      {/* 3. Super Soft Center Mattress Cushion Pad (Bantalan Tengah Super Empuk untuk Juro) */}
+      {/* 3. Super Soft Twin Center Mattress Cushion Pad (Bantalan Tengah Panjang Lebar 1.20) */}
       <mesh position={[0, 0.09, 0.035]}>
-        <boxGeometry args={[0.66, 0.075, 0.44]} />
+        <boxGeometry args={[1.20, 0.075, 0.44]} />
         <meshLambertMaterial color={theme.isNight ? "#CBD5E1" : "#FFFBEB"} />
       </mesh>
-      {/* Subtle Button Tuft Impressions */}
-      <mesh position={[-0.14, 0.129, 0.035]}>
+      {/* Subtle Button Tuft Impressions for Pet 1 (Slot Kiri) */}
+      <mesh position={[-0.38, 0.129, 0.035]}>
         <cylinderGeometry args={[0.016, 0.016, 0.005, 8]} />
         <meshLambertMaterial color={theme.isNight ? "#94A3B8" : "#FDE68A"} />
       </mesh>
-      <mesh position={[0.14, 0.129, 0.035]}>
+      <mesh position={[-0.18, 0.129, 0.035]}>
+        <cylinderGeometry args={[0.016, 0.016, 0.005, 8]} />
+        <meshLambertMaterial color={theme.isNight ? "#94A3B8" : "#FDE68A"} />
+      </mesh>
+      {/* Subtle Button Tuft Impressions for Pet 2 (Slot Kanan) */}
+      <mesh position={[0.18, 0.129, 0.035]}>
+        <cylinderGeometry args={[0.016, 0.016, 0.005, 8]} />
+        <meshLambertMaterial color={theme.isNight ? "#94A3B8" : "#FDE68A"} />
+      </mesh>
+      <mesh position={[0.38, 0.129, 0.035]}>
         <cylinderGeometry args={[0.016, 0.016, 0.005, 8]} />
         <meshLambertMaterial color={theme.isNight ? "#94A3B8" : "#FDE68A"} />
       </mesh>
 
-      {/* 4. Cute Accent Throw Pillow (Bantal Sofa Bintang Pastel) */}
-      <group position={[0.26, 0.155, -0.12]} rotation={[0.15, -0.28, 0.12]}>
+      {/* 4. Cute Accent Throw Pillows (Dua Bantal Bintang untuk Kedua Juro) */}
+      {/* Right Pillow (Bantal Kuning Hangat) */}
+      <group position={[0.50, 0.155, -0.12]} rotation={[0.15, -0.28, 0.12]}>
         <mesh>
           <boxGeometry args={[0.16, 0.16, 0.05]} />
           <meshLambertMaterial color="#FDE047" />
@@ -133,9 +153,20 @@ export const PetSofaBed: React.FC<PetSofaBedProps> = ({
           <meshBasicMaterial color="#FFFFFF" />
         </mesh>
       </group>
+      {/* Left Pillow (Bantal Oranye/Coral Lembut) */}
+      <group position={[-0.50, 0.155, -0.12]} rotation={[0.15, 0.28, -0.12]}>
+        <mesh>
+          <boxGeometry args={[0.16, 0.16, 0.05]} />
+          <meshLambertMaterial color="#FB923C" />
+        </mesh>
+        <mesh position={[0, 0, 0.026]}>
+          <sphereGeometry args={[0.022, 8, 8]} />
+          <meshBasicMaterial color="#FFFFFF" />
+        </mesh>
+      </group>
 
-      {/* 5. Adorable Wooden Nightstand & Warm Bedside Lamp (Di Sebelah Kiri) */}
-      <group position={[-0.62, 0, -0.18]}>
+      {/* 5. Wooden Nightstand & Warm Bedside Lamp (Di Sebelah Kiri Sofa) */}
+      <group position={[-0.90, 0, -0.18]}>
         {/* Nightstand Table */}
         <mesh position={[0, 0.11, 0]}>
           <boxGeometry args={[0.22, 0.22, 0.22]} />
@@ -161,7 +192,7 @@ export const PetSofaBed: React.FC<PetSofaBedProps> = ({
           <cylinderGeometry args={[0.012, 0.012, 0.04, 6]} />
           <meshLambertMaterial color="#E5E7EB" />
         </mesh>
-        {/* Lamp Shade (Glowing Warm Amber at Night!) */}
+        {/* Lamp Shade (Glowing Warm Amber at Night) */}
         <mesh position={[0, 0.31, 0]}>
           <cylinderGeometry args={[0.055, 0.08, 0.075, 10]} />
           <meshStandardMaterial

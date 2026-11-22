@@ -85,13 +85,36 @@ export interface SharedJuroState {
 }
 
 /**
+ * Snapshot status Pet milik Pengasuh Pasangan yang berkunjung ke lembah bersama (Mode Dual-Pet)
+ */
+export interface PartnerPetState {
+  ownerCaregiverId: string;
+  ownerName: string;
+  ownerRoleTitle?: string;
+  name: string;
+  level: number;
+  hunger: number;
+  energy: number;
+  cleanliness: number;
+  happiness: number;
+  affection: number;
+  currentState: string;
+  activeSkin: string;
+  activeHat?: string;
+  isOnline: boolean;
+  position?: { x: number; y: number; z: number };
+  lastUpdated: number;
+}
+
+/**
  * Struktur Kamar Pairing di Firebase Realtime Database: /rooms/{roomCode}
  */
 export interface JuroPairingRoomData {
   roomCode: string;
   createdAt: number;
   lastUpdatedAt: number;
-  juro: SharedJuroState;
+  juro?: SharedJuroState;
+  pets?: Record<string, PartnerPetState>;
   caregivers: {
     caregiver1: CaregiverProfile;
     caregiver2?: CaregiverProfile | null;

@@ -5,6 +5,7 @@ import type {
   SharedJuroState,
   CareActionType,
   CaregiverRelationshipInfo,
+  PartnerPetState,
 } from "../types/caregiver";
 import { juroSyncService } from "../services/firebase/juroSyncService";
 import { usePetStore } from "./petStore";
@@ -50,6 +51,10 @@ interface CaregiverState {
   hasRegisteredName: boolean;
   isHubModalOpen: boolean;
 
+  // Dual-Pet 2-Player State
+  partnerPet: PartnerPetState | null;
+  isPartnerPetPresent: boolean;
+
   // Actions
   openHubModal: () => void;
   closeHubModal: () => void;
@@ -65,6 +70,8 @@ interface CaregiverState {
   ) => Promise<void>;
   getCaregiverRelationship: () => CaregiverRelationshipInfo;
   syncCurrentState: () => Promise<boolean>;
+  syncMyPetToCloud: () => Promise<boolean>;
+  setPartnerPet: (partnerPet: PartnerPetState | null) => void;
   initRealtimeSubscription: () => void;
 }
 
@@ -81,9 +88,13 @@ export const useCaregiverStore = create<CaregiverState>((set, get) => {
     activityLogs: [],
     hasRegisteredName: initialProfile !== null && initialProfile.name.trim().length > 0,
     isHubModalOpen: false,
+    partnerPet: null,
+    isPartnerPetPresent: false,
 
     openHubModal: () => set({ isHubModalOpen: true }),
     closeHubModal: () => set({ isHubModalOpen: false }),
+    setPartnerPet: (partnerPet: PartnerPetState | null) =>
+      set({ partnerPet, isPartnerPetPresent: partnerPet !== null }),
 
     setProfile: (name: string, roleTitle = "Perawat Juro") => {
       const cleanName = name.trim();
@@ -178,47 +189,48 @@ export const useCaregiverStore = create<CaregiverState>((set, get) => {
 
         // Sync data Juro dari kamar ke store lokal
         if (room.juro) {
+          const roomJuro = room.juro;
           usePetStore.setState({
-            name: room.juro.name,
-            level: room.juro.level,
-            xp: room.juro.xp,
-            xpToNextLevel: room.juro.xpToNextLevel,
-            hunger: room.juro.hunger,
-            energy: room.juro.energy,
-            happiness: room.juro.happiness,
-            cleanliness: room.juro.cleanliness,
-            affection: room.juro.affection,
-            currentState: (room.juro.currentState as any) || "idle",
-            lastUpdated: room.juro.lastUpdated || Date.now(),
+            name: roomJuro.name,
+            level: roomJuro.level,
+            xp: roomJuro.xp,
+            xpToNextLevel: roomJuro.xpToNextLevel,
+            hunger: roomJuro.hunger,
+            energy: roomJuro.energy,
+            happiness: roomJuro.happiness,
+            cleanliness: roomJuro.cleanliness,
+            affection: roomJuro.affection,
+            currentState: (roomJuro.currentState as any) || "idle",
+            lastUpdated: roomJuro.lastUpdated || Date.now(),
           });
 
           useGameStore.setState((prev) => {
             const mergedHats = Array.from(
-              new Set([...(prev.unlockedHats || []), ...(room.juro.unlockedHats || [])])
+              new Set([...(prev.unlockedHats || []), ...(roomJuro.unlockedHats || [])])
             );
             const mergedSkins = Array.from(
-              new Set([...(prev.unlockedSkins || []), ...(room.juro.unlockedSkins || [])])
+              new Set([...(prev.unlockedSkins || []), ...(roomJuro.unlockedSkins || [])])
             );
             const mergedToys = Array.from(
-              new Set([...(prev.ownedToys || []), ...(room.juro.ownedToys || [])])
+              new Set([...(prev.ownedToys || []), ...(roomJuro.ownedToys || [])])
             );
 
             return {
-              activeSkin: room.juro.activeSkin || prev.activeSkin,
+              activeSkin: roomJuro.activeSkin || prev.activeSkin,
               unlockedSkins: mergedSkins,
-              activeHat: room.juro.activeHat !== undefined ? room.juro.activeHat : prev.activeHat,
+              activeHat: roomJuro.activeHat !== undefined ? roomJuro.activeHat : prev.activeHat,
               unlockedHats: mergedHats,
-              deepestFloor: Math.max(prev.deepestFloor ?? 1, room.juro.deepestFloor ?? 1),
-              coins: room.juro.coins ?? prev.coins,
-              crystals: room.juro.crystals || prev.crystals,
-              foodInventory: room.juro.foodInventory || prev.foodInventory,
+              deepestFloor: Math.max(prev.deepestFloor ?? 1, roomJuro.deepestFloor ?? 1),
+              coins: roomJuro.coins ?? prev.coins,
+              crystals: roomJuro.crystals || prev.crystals,
+              foodInventory: roomJuro.foodInventory || prev.foodInventory,
               ownedToys: mergedToys,
-              pickaxeLevel: Math.max(prev.pickaxeLevel ?? 1, room.juro.pickaxeLevel ?? 1),
+              pickaxeLevel: Math.max(prev.pickaxeLevel ?? 1, roomJuro.pickaxeLevel ?? 1),
             };
           });
 
-          if (room.juro.memories && Array.isArray(room.juro.memories)) {
-            syncAndMergeMemories(room.juro.memories);
+          if (roomJuro.memories && Array.isArray(roomJuro.memories)) {
+            syncAndMergeMemories(roomJuro.memories);
           }
         }
 
@@ -248,6 +260,8 @@ export const useCaregiverStore = create<CaregiverState>((set, get) => {
       set({
         activeRoomCode: null,
         partnerProfile: null,
+        partnerPet: null,
+        isPartnerPetPresent: false,
         pairingStatus: "idle",
         errorMessage: null,
       });
@@ -345,6 +359,33 @@ export const useCaregiverStore = create<CaregiverState>((set, get) => {
         pickaxeLevel: game.pickaxeLevel,
         memories: getPetMemories(),
       });
+    },
+
+    syncMyPetToCloud: async () => {
+      const { activeRoomCode, myProfile } = get();
+      if (!activeRoomCode || !myProfile) return false;
+      const pet = usePetStore.getState();
+      const game = useGameStore.getState();
+
+      const myPetState: PartnerPetState = {
+        ownerCaregiverId: myProfile.id,
+        ownerName: myProfile.name,
+        ownerRoleTitle: myProfile.roleTitle,
+        name: pet.name,
+        level: pet.level,
+        hunger: pet.hunger,
+        energy: pet.energy,
+        cleanliness: pet.cleanliness,
+        happiness: pet.happiness,
+        affection: pet.affection,
+        currentState: pet.currentState,
+        activeSkin: game.activeSkin,
+        activeHat: game.activeHat,
+        isOnline: true,
+        lastUpdated: Date.now(),
+      };
+
+      return await juroSyncService.syncMyPet(activeRoomCode, myProfile.id, myPetState);
     },
 
     getCaregiverRelationship: (): CaregiverRelationshipInfo => {
@@ -514,6 +555,13 @@ export const useCaregiverStore = create<CaregiverState>((set, get) => {
               "profile"
             );
           }
+        },
+
+        onPartnerPetSync: (partnerPet) => {
+          set({
+            partnerPet,
+            isPartnerPetPresent: partnerPet !== null,
+          });
         },
 
         onInitialLogsLoaded: (logs) => {

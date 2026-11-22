@@ -27,7 +27,8 @@ import {
   type TimePhase,
 } from "../../utils/timeOfDay";
 import {
-  JURO_BED_POS,
+  JURO_BED_SLOT_1,
+  JURO_BED_SLOT_2,
   JURO_BENCH_POS,
   JURO_TRAMPOLINE_POS,
   isWaterAt,
@@ -101,6 +102,7 @@ export const PetViewport: React.FC = () => {
   const showToast = useUIStore((s) => s.showToast);
   const actionMenuStyle = useUIStore((s) => s.actionMenuStyle);
   const hasRegisteredName = useCaregiverStore((s) => s.hasRegisteredName);
+  const partnerPet = useCaregiverStore((s) => s.partnerPet);
 
   const [activeTray, setActiveTray] = useState<ActiveTray>("none");
   const [showStatDetails, setShowStatDetails] = useState(false);
@@ -144,15 +146,12 @@ export const PetViewport: React.FC = () => {
     };
   }, []);
 
-  const [isPettingActive, setIsPettingActive] = useState(false);
-  const [hearts, setHearts] = useState<{ id: number; x: number; y: number; dx: number }[]>([]);
   const [dragBubbles, setDragBubbles] = useState<
     { id: number; x: number; y: number; size: number; dx: number; popped?: boolean }[]
   >([]);
   const lastBubbleSpawnRef = useRef<number>(0);
   const lastBubbleSoundRef = useRef<number>(0);
   const lastInteractionSpeechAtRef = useRef<Record<string, number>>({});
-  const petStrokeCountRef = useRef<number>(0);
 
   const handlePopBubble = useCallback((bubbleId: number) => {
     soundEffects.playPop();
@@ -191,9 +190,6 @@ export const PetViewport: React.FC = () => {
 
   const handleWalkPointSelect = useCallback(
     (x: number, z: number) => {
-      if (isPettingActive) {
-        setIsPettingActive(false);
-      }
       if (isSittingOnBench) {
         setIsSittingOnBench(false);
       }
@@ -215,11 +211,10 @@ export const PetViewport: React.FC = () => {
       setShowStatDetails(false);
       setWalkCommand({ x, z, nonce: Date.now() });
     },
-    [isPettingActive, isSittingOnBench, isBouncingOnTrampoline, isBenchMenuOpen, isTrampolineMenuOpen, setActiveTray, setShowStatDetails]
+    [isSittingOnBench, isBouncingOnTrampoline, isBenchMenuOpen, isTrampolineMenuOpen, setActiveTray, setShowStatDetails]
   );
 
   const handleOpenShopFromMap = useCallback(() => {
-    if (isPettingActive) setIsPettingActive(false);
     if (isSittingOnBench) setIsSittingOnBench(false);
     if (isBouncingOnTrampoline) setIsBouncingOnTrampoline(false);
     isHeadingToBenchRef.current = false;
@@ -230,10 +225,9 @@ export const PetViewport: React.FC = () => {
     setJuroMenu((prev) => ({ ...prev, open: false }));
     soundEffects.playClick();
     navigate("/shop");
-  }, [isPettingActive, isSittingOnBench, isBouncingOnTrampoline, navigate]);
+  }, [isSittingOnBench, isBouncingOnTrampoline, navigate]);
 
   const handleOpenMineFromMap = useCallback(() => {
-    if (isPettingActive) setIsPettingActive(false);
     if (isSittingOnBench) setIsSittingOnBench(false);
     if (isBouncingOnTrampoline) setIsBouncingOnTrampoline(false);
     isHeadingToBenchRef.current = false;
@@ -244,16 +238,15 @@ export const PetViewport: React.FC = () => {
     setJuroMenu((prev) => ({ ...prev, open: false }));
     soundEffects.playClick();
     navigate("/mine");
-  }, [isPettingActive, isSittingOnBench, isBouncingOnTrampoline, navigate]);
+  }, [isSittingOnBench, isBouncingOnTrampoline, navigate]);
 
-  // Dismiss open trays / stat popover / bench menu / trampoline menu / Petting Mode / Speech Bubble / Chat / Juro Menu on Escape key
+  // Dismiss open trays / stat popover / bench menu / trampoline menu / Speech Bubble / Chat / Juro Menu on Escape key
   useEffect(() => {
     if (
       activeTray === "none" &&
       !showStatDetails &&
       !isBenchMenuOpen &&
       !isTrampolineMenuOpen &&
-      !isPettingActive &&
       !speechBubble.visible &&
       !isChatOpen &&
       !juroMenu.open
@@ -261,7 +254,6 @@ export const PetViewport: React.FC = () => {
       return;
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
-        if (isPettingActive) setIsPettingActive(false);
         setActiveTray("none");
         setShowStatDetails(false);
         setIsBenchMenuOpen(false);
@@ -273,7 +265,7 @@ export const PetViewport: React.FC = () => {
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [activeTray, showStatDetails, isBenchMenuOpen, isTrampolineMenuOpen, isPettingActive, speechBubble.visible, isChatOpen, juroMenu.open]);
+  }, [activeTray, showStatDetails, isBenchMenuOpen, isTrampolineMenuOpen, speechBubble.visible, isChatOpen, juroMenu.open]);
 
   // Dynamically assemble pet context: activities, emotions, sensations & environmental state
   const getLiveChatContext = useCallback(
@@ -338,7 +330,6 @@ export const PetViewport: React.FC = () => {
         isSleeping,
         isEating,
         isBathing,
-        isPetting: isPettingActive,
         isPlaying,
         isDragging,
         isDizzy,
@@ -378,7 +369,6 @@ export const PetViewport: React.FC = () => {
         currentFoodName: petState.currentFoodBeingEaten?.name,
         currentToyName: petState.currentToyBeingPlayed?.name,
         isSleeping,
-        isPetting: isPettingActive,
         isBathing,
         isEating,
         isPlaying,
@@ -398,7 +388,7 @@ export const PetViewport: React.FC = () => {
         ambientDescription: ambient,
       };
     },
-    [weather, isPettingActive, isDraggingPet, isSittingOnBench, isBouncingOnTrampoline]
+    [weather, isDraggingPet, isSittingOnBench, isBouncingOnTrampoline]
   );
 
   // AI Pet Chat message handler (triggers Gemini API or fallback & shows speech bubble)
@@ -568,60 +558,6 @@ export const PetViewport: React.FC = () => {
     [speechBubble.isLoading, getLiveChatContext]
   );
 
-  const petTimeoutRef = useRef<number | null>(null);
-  const isRubbingJuroRef = useRef(false);
-
-  const handleDirectPet = useCallback(() => {
-    setActiveTray("none");
-    setIsChatOpen(false);
-    setShowStatDetails(false);
-
-    if (currentState === "sleep") {
-      wakeUp();
-      soundEffects.playWakeUp();
-      addLog("interaction", "Juro dibangunkan dengan elusan lembut.");
-      useCaregiverStore.getState().recordAction("wake", "Membangunkan Juro dengan elusan lembut.", {});
-      wakeCooldownUntilRef.current = Date.now() + 180_000;
-      isHeadingToBedRef.current = false;
-      return;
-    }
-
-    soundEffects.playPet();
-    soundEffects.playPurr();
-    strokePet();
-    setIsPettingActive(true);
-    if (petTimeoutRef.current) clearTimeout(petTimeoutRef.current);
-    petTimeoutRef.current = window.setTimeout(() => {
-      setIsPettingActive(false);
-      petTimeoutRef.current = null;
-    }, 1400);
-
-    petStrokeCountRef.current += 1;
-    if (petStrokeCountRef.current >= 3) {
-      petStrokeCountRef.current = 0;
-      useCaregiverStore.getState().recordAction(
-        "pet",
-        "Mengelus lembut tubuh jeli Juro dengan hangat.",
-        { affection: 6, happiness: 4 }
-      );
-      triggerInteractionSpeech("pet");
-    }
-
-    const juroPos = juroScreenPosRef.current;
-    if (juroPos) {
-      const heartId = Date.now() + Math.random();
-      const spawnX = juroPos.x + (Math.random() - 0.5) * 44;
-      const spawnY = (juroPos.headY ?? (juroPos.y - juroPos.radiusPx)) - 14;
-      setHearts((prev) => [
-        ...prev.slice(-5),
-        { id: heartId, x: spawnX, y: spawnY, dx: (Math.random() - 0.5) * 28 },
-      ]);
-      setTimeout(() => {
-        setHearts((prev) => prev.filter((h) => h.id !== heartId));
-      }, 850);
-    }
-  }, [currentState, wakeUp, strokePet, triggerInteractionSpeech, addLog]);
-
   const handlePetClick = useCallback(
     (screenPos?: { x: number; y: number }) => {
       // Dismiss active speech bubble if already visible
@@ -631,6 +567,17 @@ export const PetViewport: React.FC = () => {
           speechTimerRef.current = null;
         }
         setSpeechBubble((s) => ({ ...s, visible: false }));
+      }
+
+      // If Juro is sleeping, clicking Juro wakes Juro up cleanly
+      if (currentState === "sleep") {
+        wakeUp();
+        soundEffects.playWakeUp();
+        addLog("interaction", "Membangunkan Juro dari waktu istirahatnya.");
+        useCaregiverStore.getState().recordAction("wake", "Membangunkan Juro dari tidurnya.", {});
+        wakeCooldownUntilRef.current = Date.now() + 180_000;
+        isHeadingToBedRef.current = false;
+        return;
       }
 
       if (actionMenuStyle === "floating") {
@@ -677,11 +624,14 @@ export const PetViewport: React.FC = () => {
           isNearTop,
         });
       } else {
-        // "dock" style: clicking Juro directly pets or wakes Juro
-        handleDirectPet();
+        // "dock" style: clicking Juro directly opens chat modal cleanly
+        setShowStatDetails(false);
+        setActiveTray("none");
+        setIsChatOpen(true);
+        soundEffects.playPop();
       }
     },
-    [actionMenuStyle, speechBubble.visible, juroMenu.open, handleDirectPet]
+    [actionMenuStyle, speechBubble.visible, juroMenu.open, currentState, wakeUp, addLog]
   );
 
   // Keep Juro Context Menu smoothly anchored above Juro's head during animations/walking
@@ -849,149 +799,6 @@ export const PetViewport: React.FC = () => {
     controls.addEventListener("start", onOrbitStart);
     return () => controls.removeEventListener("start", onOrbitStart);
   }, [juroMenu.open]);
-
-  // Ambient pointer tracking for petting Juro (Desktop mouse hover/drag & Mobile touch swipe)
-  useEffect(() => {
-    let lastX = 0;
-    let lastY = 0;
-    let strokeDist = 0;
-    let lastSoundAt = 0;
-
-    const onPointerDown = (e: PointerEvent) => {
-      if (dragMetaRef.current) return;
-      // Only trigger hold-to-pet with primary pointer (left mouse click or finger touch)
-      if (e.button !== 0) return;
-      const juroPos = juroScreenPosRef.current;
-      if (!juroPos) return;
-
-      const dist = Math.hypot(e.clientX - juroPos.x, e.clientY - (juroPos.headY ?? juroPos.y));
-      if (dist <= juroPos.radiusPx * 1.35) {
-        isRubbingJuroRef.current = true;
-        lastX = e.clientX;
-        lastY = e.clientY;
-        strokeDist = 0;
-        if (controlsRef.current) {
-          controlsRef.current.enabled = false;
-        }
-      }
-    };
-
-    const onPointerMove = (e: PointerEvent) => {
-      if (dragMetaRef.current) return;
-      // Require actively holding left click (mouse) or holding finger (touch)
-      const isHolding =
-        e.pointerType === "mouse"
-          ? e.buttons === 1 && isRubbingJuroRef.current
-          : isRubbingJuroRef.current;
-
-      if (!isHolding) {
-        lastX = e.clientX;
-        lastY = e.clientY;
-        return;
-      }
-
-      const juroPos = juroScreenPosRef.current;
-      if (!juroPos) return;
-
-      const dist = Math.hypot(e.clientX - juroPos.x, e.clientY - (juroPos.headY ?? juroPos.y));
-      const isOverJuro = dist <= juroPos.radiusPx * 1.35;
-
-      if (!isOverJuro) {
-        lastX = e.clientX;
-        lastY = e.clientY;
-        return;
-      }
-
-      if (lastX === 0 && lastY === 0) {
-        lastX = e.clientX;
-        lastY = e.clientY;
-        return;
-      }
-
-      const step = Math.hypot(e.clientX - lastX, e.clientY - lastY);
-      lastX = e.clientX;
-      lastY = e.clientY;
-
-      if (step > 1.2 && step < 160) {
-        strokeDist += step;
-
-        if (strokeDist > 20) {
-          strokeDist = 0;
-
-          if (usePetStore.getState().currentState === "sleep") {
-            wakeUp();
-            addLog("interaction", "Juro dibangunkan dengan elusan lembut.");
-          }
-
-          setIsPettingActive(true);
-          if (petTimeoutRef.current) clearTimeout(petTimeoutRef.current);
-          petTimeoutRef.current = window.setTimeout(() => {
-            setIsPettingActive(false);
-            petTimeoutRef.current = null;
-          }, 1000);
-
-          const nowMs = Date.now();
-          if (nowMs - lastSoundAt > 200) {
-            lastSoundAt = nowMs;
-            soundEffects.playPet();
-            soundEffects.playPurr();
-          }
-
-          strokePet();
-          petStrokeCountRef.current += 1;
-          if (petStrokeCountRef.current >= 4) {
-            petStrokeCountRef.current = 0;
-            useCaregiverStore.getState().recordAction(
-              "pet",
-              "Mengelus lembut tubuh jeli Juro dengan hangat.",
-              { affection: 6, happiness: 4 }
-            );
-            triggerInteractionSpeech("pet");
-          }
-
-          const heartId = nowMs + Math.random();
-          const spawnX = juroPos.x + (Math.random() - 0.5) * 44;
-          const spawnY = (juroPos.headY ?? (juroPos.y - juroPos.radiusPx)) - 14;
-          setHearts((prev) => [
-            ...prev.slice(-5),
-            { id: heartId, x: spawnX, y: spawnY, dx: (Math.random() - 0.5) * 28 },
-          ]);
-          setTimeout(() => {
-            setHearts((prev) => prev.filter((h) => h.id !== heartId));
-          }, 850);
-        }
-      }
-    };
-
-    const onPointerUp = () => {
-      if (isRubbingJuroRef.current) {
-        isRubbingJuroRef.current = false;
-        if (controlsRef.current && !dragMetaRef.current) {
-          controlsRef.current.enabled = true;
-        }
-        if (petTimeoutRef.current) clearTimeout(petTimeoutRef.current);
-        petTimeoutRef.current = window.setTimeout(() => {
-          setIsPettingActive(false);
-          petTimeoutRef.current = null;
-        }, 600);
-      }
-    };
-
-    window.addEventListener("pointerdown", onPointerDown, { passive: true });
-    window.addEventListener("pointermove", onPointerMove, { passive: true });
-    window.addEventListener("pointerup", onPointerUp, { passive: true });
-    window.addEventListener("pointercancel", onPointerUp, { passive: true });
-
-    return () => {
-      window.removeEventListener("pointerdown", onPointerDown);
-      window.removeEventListener("pointermove", onPointerMove);
-      window.removeEventListener("pointerup", onPointerUp);
-      window.removeEventListener("pointercancel", onPointerUp);
-      if (petTimeoutRef.current) {
-        clearTimeout(petTimeoutRef.current);
-      }
-    };
-  }, [strokePet, triggerInteractionSpeech, wakeUp, addLog]);
 
   // Imperative drag tracking refs (zero allocations, zero layout thrash, zero re-renders)
   const dragMetaRef = useRef<{
@@ -1588,7 +1395,7 @@ export const PetViewport: React.FC = () => {
       isHeadingToBedRef.current = false;
     } else {
       isHeadingToBedRef.current = true;
-      setWalkCommand({ x: JURO_BED_POS.x, z: JURO_BED_POS.z, nonce: Date.now() });
+      setWalkCommand({ x: JURO_BED_SLOT_1.x, z: JURO_BED_SLOT_1.z, nonce: Date.now() });
       addLog("sleep", "Juro berjalan menuju sofa untuk tidur lelap.");
       useCaregiverStore.getState().recordAction(
         "sleep",
@@ -1622,7 +1429,7 @@ export const PetViewport: React.FC = () => {
       isHeadingToBedRef.current = false;
     } else {
       isHeadingToBedRef.current = true;
-      setWalkCommand({ x: JURO_BED_POS.x, z: JURO_BED_POS.z, nonce: Date.now() });
+      setWalkCommand({ x: JURO_BED_SLOT_1.x, z: JURO_BED_SLOT_1.z, nonce: Date.now() });
       addLog("sleep", "Juro berjalan menuju sofa untuk tidur lelap.");
       useCaregiverStore.getState().recordAction(
         "sleep",
@@ -1745,7 +1552,7 @@ export const PetViewport: React.FC = () => {
     // Automatically walk to bed to sleep
     if (!isHeadingToBedRef.current) {
       isHeadingToBedRef.current = true;
-      setWalkCommand({ x: JURO_BED_POS.x, z: JURO_BED_POS.z, nonce: Date.now() });
+      setWalkCommand({ x: JURO_BED_SLOT_1.x, z: JURO_BED_SLOT_1.z, nonce: Date.now() });
       addLog(
         "sleep",
         energy <= 25
@@ -1826,6 +1633,16 @@ export const PetViewport: React.FC = () => {
           )}
         </button>
       </div>
+
+      {/* Partner Pet Presence Pill in 2-Player Shared Meadow */}
+      {partnerPet && (
+        <div className="absolute top-14 right-3 z-20 pointer-events-auto flex items-center gap-1.5 px-2.5 py-1 bg-warm-white/95 dark:bg-neutral-900/90 backdrop-blur-xs border-2 border-charcoal dark:border-neutral-600 shadow-[2px_2px_0px_#171717] dark:shadow-[2px_2px_0px_#000000]">
+          <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse shrink-0" />
+          <span className="pixel-text text-[9px] text-charcoal dark:text-neutral-200">
+            {partnerPet.name} ({partnerPet.ownerName}) · Lv.{partnerPet.level}
+          </span>
+        </div>
+      )}
 
       {/* 3D Canvas (Full Stage — Mobile-Optimized DPR & GPU Settings) */}
       <Canvas
@@ -1926,6 +1743,28 @@ export const PetViewport: React.FC = () => {
               dragVisual.payload.kind === "food"
             }
           />
+
+          {/* Partner's Juro 3D Slime Model in 2-Player Shared Meadow */}
+          {partnerPet && (
+            <JuroModel
+              isPartner={true}
+              customSkin={partnerPet.activeSkin}
+              customHat={partnerPet.activeHat}
+              level={partnerPet.level}
+              initialPosition={JURO_BED_SLOT_2}
+              partnerName={partnerPet.name}
+              isRaining={weather === "rain"}
+              onPetClick={() => {
+                soundEffects.playPop();
+                showToast(`Mengelus ${partnerPet.name} milik ${partnerPet.ownerName}!`, "info");
+                useCaregiverStore.getState().recordAction(
+                  "pet",
+                  `Mengelus ${partnerPet.name} milik ${partnerPet.ownerName} yang sedang berkunjung di lembah.`,
+                  { affection: 5, happiness: 5 }
+                );
+              }}
+            />
+          )}
 
           {/* Wide Diorama Orbit Controls — centered on Juro */}
           <OrbitControls

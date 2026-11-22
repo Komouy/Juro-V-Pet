@@ -14,6 +14,7 @@ import type {
   CaregiverActionLog,
   SharedJuroState,
   JuroPairingRoomData,
+  PartnerPetState,
 } from "../../types/caregiver";
 
 /**
@@ -26,6 +27,7 @@ export function generatePairingCode(): string {
 
 export interface SyncCallbacks {
   onJuroStateSync: (juroState: SharedJuroState) => void;
+  onPartnerPetSync?: (partnerPet: PartnerPetState | null) => void;
   onActivityLogAdded?: (log: CaregiverActionLog) => void;
   onInitialLogsLoaded?: (logs: CaregiverActionLog[]) => void;
   onPartnerStatusChange?: (partner: CaregiverProfile | null) => void;
@@ -204,6 +206,43 @@ export class JuroRealtimeSyncService {
         callbacks.onJuroStateSync(data.juro);
       }
 
+      // 1b. Deteksi status Pet Pasangan di mode Dual-Pet
+      if (data.pets) {
+        const partnerEntry = Object.entries(data.pets).find(
+          ([cgId]) => cgId !== myCaregiverId
+        );
+        if (partnerEntry) {
+          callbacks.onPartnerPetSync?.(partnerEntry[1]);
+        } else {
+          callbacks.onPartnerPetSync?.(null);
+        }
+      } else if (data.juro && data.caregivers) {
+        // Fallback backward-compatible: jika perawat pasangan ada tapi kamar masih format single pet
+        const partner =
+          data.caregivers.caregiver1.id === myCaregiverId
+            ? data.caregivers.caregiver2 ?? null
+            : data.caregivers.caregiver1 ?? null;
+        if (partner) {
+          callbacks.onPartnerPetSync?.({
+            ownerCaregiverId: partner.id,
+            ownerName: partner.name,
+            ownerRoleTitle: partner.roleTitle,
+            name: `${data.juro.name} (${partner.name})`,
+            level: data.juro.level,
+            hunger: data.juro.hunger,
+            energy: data.juro.energy,
+            cleanliness: data.juro.cleanliness,
+            happiness: data.juro.happiness,
+            affection: data.juro.affection,
+            currentState: data.juro.currentState,
+            activeSkin: data.juro.activeSkin,
+            activeHat: data.juro.activeHat,
+            isOnline: true,
+            lastUpdated: data.juro.lastUpdated,
+          });
+        }
+      }
+
       // 2. Deteksi status perawat pasangan
       const partner =
         data.caregivers.caregiver1.id === myCaregiverId
@@ -320,6 +359,31 @@ export class JuroRealtimeSyncService {
       return true;
     } catch (err) {
       console.error("Gagal menyinkronkan status Juro ke Firebase:", err);
+      return false;
+    }
+  }
+
+  /**
+   * Menyinkronkan status Pet Pribadi ke kamar Firebase (Mode Dual-Pet)
+   */
+  public async syncMyPet(
+    roomCode: string,
+    caregiverId: string,
+    petState: PartnerPetState
+  ): Promise<boolean> {
+    const db = getFirebaseDatabaseInstance();
+    if (!db) return false;
+    const cleanCode = roomCode.trim().toUpperCase();
+
+    try {
+      const updates: Record<string, unknown> = {
+        [`rooms/${cleanCode}/lastUpdatedAt`]: Date.now(),
+        [`rooms/${cleanCode}/pets/${caregiverId}`]: petState,
+      };
+      await update(ref(db), updates);
+      return true;
+    } catch (err) {
+      console.error("Gagal menyinkronkan status pet saya ke Firebase:", err);
       return false;
     }
   }

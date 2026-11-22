@@ -122,6 +122,21 @@ export const JURO_BED_POS = {
   platformId: "west-knoll",
 } as const;
 
+// Dual Pet Sleep Slots on the expanded Twin Luxury Sofa Bed:
+export const JURO_BED_SLOT_1 = {
+  x: -3.50,
+  z: -0.42,
+  platformId: "west-knoll",
+  label: "Slot Tidur Pet 1 (Kiri)",
+} as const;
+
+export const JURO_BED_SLOT_2 = {
+  x: -2.98,
+  z: -0.61,
+  platformId: "west-knoll",
+  label: "Slot Tidur Pet 2 (Kanan)",
+} as const;
+
 // Cozy wooden park bench atop East Knoll where Juro can sit and look over the meadow
 export const JURO_BENCH_POS = {
   x: 3.65,
@@ -280,7 +295,7 @@ export function isInsideObstacle(
 ): boolean {
   for (let i = 0; i < MAP_OBSTACLES.length; i++) {
     const obs = MAP_OBSTACLES[i];
-    if (isSleepingOrHeading && (obs.tag === "bed-frame" || Math.hypot(obs.x - JURO_BED_POS.x, obs.z - JURO_BED_POS.z) < 0.95)) {
+    if (isSleepingOrHeading && (obs.tag === "bed-frame" || Math.hypot(obs.x - JURO_BED_POS.x, obs.z - JURO_BED_POS.z) < 1.25)) {
       continue;
     }
     if (isSittingOrHeadingToBench && (obs.tag === "bench" || Math.hypot(obs.x - JURO_BENCH_POS.x, obs.z - JURO_BENCH_POS.z) < 0.65)) {
@@ -322,7 +337,7 @@ export function resolveHorizontalCollisions(
       const obs = MAP_OBSTACLES[i];
       if (
         isSleepingOrHeadingToBed &&
-        (obs.tag === "bed-frame" || Math.hypot(obs.x - JURO_BED_POS.x, obs.z - JURO_BED_POS.z) < 0.95)
+        (obs.tag === "bed-frame" || Math.hypot(obs.x - JURO_BED_POS.x, obs.z - JURO_BED_POS.z) < 1.25)
       ) {
         continue;
       }
