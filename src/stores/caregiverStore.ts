@@ -307,6 +307,7 @@ export const useCaregiverStore = create<CaregiverState>((set, get) => {
             itemUsedName,
           },
           {
+            name: pet.name,
             hunger: pet.hunger,
             energy: pet.energy,
             cleanliness: pet.cleanliness,
@@ -316,16 +317,8 @@ export const useCaregiverStore = create<CaregiverState>((set, get) => {
             xp: pet.xp,
             xpToNextLevel: pet.xpToNextLevel,
             currentState: pet.currentState,
-            coins: game.coins,
-            crystals: game.crystals,
-            foodInventory: game.foodInventory,
-            ownedToys: game.ownedToys,
             activeSkin: game.activeSkin,
-            unlockedSkins: game.unlockedSkins,
             activeHat: game.activeHat,
-            unlockedHats: game.unlockedHats,
-            deepestFloor: game.deepestFloor,
-            pickaxeLevel: game.pickaxeLevel,
             memories: getPetMemories(),
           }
         );
@@ -473,76 +466,15 @@ export const useCaregiverStore = create<CaregiverState>((set, get) => {
       const { activeRoomCode, myProfile } = get();
       if (!activeRoomCode || !myProfile) return;
 
-      let hasSyncedInitialState = false;
+      // Segera publikasikan status pet lokal ke cloud kamar bersama saat terhubung
+      get().syncMyPetToCloud();
 
       juroSyncService.subscribeToRoom(activeRoomCode, myProfile.id, {
         onJuroStateSync: (incoming) => {
-          const currentPet = usePetStore.getState();
-          const localLastUpdated = currentPet.lastUpdated || 0;
-          const incomingLastUpdated = incoming.lastUpdated || 0;
-
-          // Snapshot pertama dari cloud atau perubahan oleh perawat pasangan
-          const isFromPartner = !!(
-            incoming.updatedByCaregiverId && incoming.updatedByCaregiverId !== myProfile.id
-          );
-          const isNewer = incomingLastUpdated >= localLastUpdated;
-
-          const shouldSync = !hasSyncedInitialState || isFromPartner || isNewer;
-          hasSyncedInitialState = true;
-
-          if (shouldSync) {
-            isSyncingFromRemote = true;
-            try {
-              // Sinkronisasi status tidur / bangun Juro secara visual
-              if (incoming.currentState === "sleep" && currentPet.currentState !== "sleep") {
-                currentPet.sleep();
-              } else if (incoming.currentState !== "sleep" && currentPet.currentState === "sleep") {
-                currentPet.wakeUp();
-              }
-
-              usePetStore.setState({
-                hunger: incoming.hunger,
-                energy: incoming.energy,
-                cleanliness: incoming.cleanliness,
-                happiness: incoming.happiness,
-                affection: incoming.affection,
-                level: incoming.level,
-                xp: incoming.xp,
-                xpToNextLevel: incoming.xpToNextLevel,
-                lastUpdated: incoming.lastUpdated || Date.now(),
-              });
-
-              useGameStore.setState((prev) => {
-                const mergedHats = Array.from(
-                  new Set([...(prev.unlockedHats || []), ...(incoming.unlockedHats || [])])
-                );
-                const mergedSkins = Array.from(
-                  new Set([...(prev.unlockedSkins || []), ...(incoming.unlockedSkins || [])])
-                );
-                const mergedToys = Array.from(
-                  new Set([...(prev.ownedToys || []), ...(incoming.ownedToys || [])])
-                );
-
-                return {
-                  coins: incoming.coins ?? prev.coins,
-                  activeSkin: incoming.activeSkin || prev.activeSkin,
-                  unlockedSkins: mergedSkins,
-                  activeHat: incoming.activeHat !== undefined ? incoming.activeHat : prev.activeHat,
-                  unlockedHats: mergedHats,
-                  crystals: incoming.crystals || prev.crystals,
-                  foodInventory: incoming.foodInventory || prev.foodInventory,
-                  ownedToys: mergedToys,
-                  pickaxeLevel: Math.max(prev.pickaxeLevel ?? 1, incoming.pickaxeLevel ?? 1),
-                  deepestFloor: Math.max(prev.deepestFloor ?? 1, incoming.deepestFloor ?? 1),
-                };
-              });
-
-              if (incoming.memories && Array.isArray(incoming.memories)) {
-                syncAndMergeMemories(incoming.memories);
-              }
-            } finally {
-              isSyncingFromRemote = false;
-            }
+          // Pada mode Dual-Pet, ekonomi dan status pet masing-masing pemain 100% independen.
+          // Hanya memori kolektif yang disinkronkan secara bersama jika tersedia.
+          if (incoming.memories && Array.isArray(incoming.memories)) {
+            syncAndMergeMemories(incoming.memories);
           }
         },
 
@@ -609,5 +541,42 @@ onPetMemoriesChanged(() => {
   const store = useCaregiverStore.getState();
   if (store.activeRoomCode) {
     store.syncCurrentState();
+  }
+});
+
+let syncDebounceTimer: ReturnType<typeof setTimeout> | null = null;
+
+/**
+ * Memicu sinkronisasi status pet lokal ke kamar bersama secara debounced (350ms)
+ */
+export function triggerDebouncedPetSync(): void {
+  if (syncDebounceTimer) clearTimeout(syncDebounceTimer);
+  syncDebounceTimer = setTimeout(() => {
+    const store = useCaregiverStore.getState();
+    if (store.activeRoomCode) {
+      store.syncMyPetToCloud();
+    }
+  }, 350);
+}
+
+// Pantau perubahan status pet & kosmetik untuk sinkronisasi otomatis ke pasangan
+usePetStore.subscribe((state, prevState) => {
+  if (
+    state.currentState !== prevState.currentState ||
+    state.level !== prevState.level ||
+    Math.abs(state.hunger - prevState.hunger) >= 2 ||
+    Math.abs(state.energy - prevState.energy) >= 3 ||
+    state.name !== prevState.name
+  ) {
+    triggerDebouncedPetSync();
+  }
+});
+
+useGameStore.subscribe((state, prevState) => {
+  if (
+    state.activeHat !== prevState.activeHat ||
+    state.activeSkin !== prevState.activeSkin
+  ) {
+    triggerDebouncedPetSync();
   }
 });

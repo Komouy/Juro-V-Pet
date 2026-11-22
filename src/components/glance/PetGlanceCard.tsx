@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useRef, useEffect } from "react";
+import React, { useState, useCallback, useRef, useEffect, useMemo } from "react";
 import {
   Send,
   Moon,
@@ -15,6 +15,7 @@ import { useCaregiverStore } from "../../stores/caregiverStore";
 import { soundEffects } from "../../engine/audio/soundEffects";
 import { chatWithJuro, type PetChatContext } from "../../services/geminiService";
 import { getCognitiveTier, computePetEmotionalState } from "../../engine/ai/cognitiveCore";
+import { desktopGlanceService } from "../../services/desktopGlanceService";
 import { JuroAvatar2D } from "./JuroAvatar2D";
 
 export interface PetGlanceCardProps {
@@ -43,24 +44,31 @@ export const PetGlanceCard: React.FC<PetGlanceCardProps> = ({
   const { partnerPet, activeRoomCode } = useCaregiverStore();
 
   const [messageInput, setMessageInput] = useState("");
-  const [speechText, setSpeechText] = useState<string>(() => {
+  const [customReply, setCustomReply] = useState<string | null>(null);
+  const [isChatLoading, setIsChatLoading] = useState(false);
+  const speechTimerRef = useRef<number | null>(null);
+
+  const defaultSpeech = useMemo(() => {
     if (currentState === "sleep") {
-      return "Zzz... Juro sedang tidur lelap di kasur empuk.";
+      return "Zzz... Juro sedang beristirahat di kasur empuk.";
     }
     if (hunger < 30) {
       return "Perut jeli Juro berbunyi... Juro agak lapar.";
     }
     return `Halo! Senang bisa menyapamu hari ini.`;
-  });
-  const [isChatLoading, setIsChatLoading] = useState(false);
-  const speechTimerRef = useRef<number | null>(null);
+  }, [currentState, hunger]);
 
-  // Update default speech when state changes if user is not actively chatting
+  const speechText = customReply ?? defaultSpeech;
+
+  // Synchronize state with Android Native AppWidget if running on Android
   useEffect(() => {
-    if (currentState === "sleep") {
-      setSpeechText("Zzz... Juro sedang beristirahat di kasur empuk.");
-    }
-  }, [currentState]);
+    desktopGlanceService.updateAndroidWidget(
+      name,
+      speechText,
+      Math.round(hunger),
+      Math.round(energy)
+    );
+  }, [name, speechText, hunger, energy]);
 
   const handleSendQuickChat = useCallback(
     async (e?: React.FormEvent) => {
@@ -100,16 +108,14 @@ export const PetGlanceCard: React.FC<PetGlanceCardProps> = ({
         };
 
         const reply = await chatWithJuro(text, chatContext);
-        setSpeechText(reply);
+        setCustomReply(reply);
         soundEffects.playHappy();
 
         speechTimerRef.current = window.setTimeout(() => {
-          if (currentState === "sleep") {
-            setSpeechText("Zzz... Juro kembali tidur lelap.");
-          }
+          setCustomReply(null);
         }, 12000);
       } catch {
-        setSpeechText("Senang bisa mengobrol denganmu!");
+        setCustomReply("Senang bisa mengobrol denganmu!");
       } finally {
         setIsChatLoading(false);
       }
@@ -128,7 +134,6 @@ export const PetGlanceCard: React.FC<PetGlanceCardProps> = ({
       {/* 1. Header Bar: Identity & Window Controls */}
       <div className="flex items-center justify-between gap-2 pb-2 border-b-2 border-charcoal/15 dark:border-neutral-700">
         <div className="flex items-center gap-1.5">
-          <span className="w-2.5 h-2.5 bg-emerald-500 rounded-full animate-pulse" />
           <h2 className="pixel-text text-xs font-bold text-charcoal dark:text-neutral-100 tracking-wide truncate">
             {name} · Lv.{level}
           </h2>
@@ -274,22 +279,40 @@ export const PetGlanceCard: React.FC<PetGlanceCardProps> = ({
         </button>
       </form>
 
-      {/* 6. Jump to 3D Valley Button (Care actions stay inside the 3D app) */}
-      <div className="pt-1 flex flex-col gap-1">
+      {/* 6. Action Button to Return to Full 3D Valley */}
+      {onOpenValley3D && (
         <button
           type="button"
-          onClick={onOpenValley3D}
-          className="w-full h-9 bg-warm-white hover:bg-neutral-100 dark:bg-neutral-800 dark:hover:bg-neutral-700 border-2 border-charcoal dark:border-neutral-600 shadow-[2px_2px_0px_#18181B] dark:shadow-[2px_2px_0px_#000000] active:translate-x-[1px] active:translate-y-[1px] flex items-center justify-center gap-1.5 text-xs font-bold text-charcoal dark:text-white cursor-pointer transition-all"
+          onClick={() => {
+            soundEffects.playPop();
+            onOpenValley3D();
+          }}
+          className="w-full mt-2 py-1.5 bg-neutral-100 dark:bg-neutral-800 hover:bg-neutral-200 dark:hover:bg-neutral-700 text-charcoal dark:text-neutral-200 border-2 border-charcoal dark:border-neutral-600 pixel-text text-[9px] uppercase font-bold flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
         >
-          <ExternalLink size={13} className="text-juro-orange" />
-          <span className="pixel-text text-[9.5px] uppercase">
-            Buka Lembah 3D
-          </span>
+          <ExternalLink size={11} />
+          <span>Buka Lembah 3D</span>
         </button>
-        <span className="text-[8.5px] text-center text-muted">
-          Makan, mandi, main, dan tidur dilakukan di dalam lembah 3D.
-        </span>
-      </div>
+      )}
+
+      {/* 7. Mobile Android Floating PiP & Widget Guidance */}
+      {desktopGlanceService.isNativeAndroid() && !isDetachedWindow && (
+        <div className="mt-2 pt-1.5 border-t border-charcoal/15 dark:border-neutral-700/50 flex flex-col gap-1.5">
+          <button
+            type="button"
+            onClick={() => {
+              soundEffects.playPop();
+              desktopGlanceService.enterNativePip();
+            }}
+            className="w-full py-1.5 bg-juro-orange hover:bg-orange-600 text-white border-2 border-charcoal pixel-text text-[8.5px] uppercase font-bold flex items-center justify-center gap-1.5 shadow-[2px_2px_0px_#18181B] active:translate-x-[1px] active:translate-y-[1px] cursor-pointer"
+          >
+            <ExternalLink size={10} />
+            <span>Mode Mengambang di Layar (PiP)</span>
+          </button>
+          <p className="pixel-text text-[7.5px] text-muted text-center leading-tight">
+            Tip: Kamu juga dapat memasang widget di layar beranda ponsel (tekan lama layar &gt; Widget &gt; Juro).
+          </p>
+        </div>
+      )}
     </div>
   );
 };

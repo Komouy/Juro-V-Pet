@@ -294,10 +294,52 @@ describe("Caregiver Co-Parenting & Firebase Realtime Foundation", () => {
     expect(useCaregiverStore.getState().partnerPet?.level).toBe(8);
     expect(useCaregiverStore.getState().partnerPet?.activeHat).toBe("hat-chef");
     expect(useCaregiverStore.getState().partnerPet?.activeSkin).toBe("mint-lime");
+    expect(useCaregiverStore.getState().partnerPet?.isOnline).toBe(true);
+
+    // When partner goes offline (e.g. background/app closed), presence updates
+    useCaregiverStore.getState().setPartnerPet({
+      ...partnerPetMock,
+      isOnline: false,
+    });
+    expect(useCaregiverStore.getState().partnerPet?.isOnline).toBe(false);
 
     // When room is disconnected, partner pet is cleared cleanly
     useCaregiverStore.getState().disconnectRoom();
     expect(useCaregiverStore.getState().partnerPet).toBeNull();
     expect(useCaregiverStore.getState().isPartnerPetPresent).toBe(false);
+  });
+
+  it("safeguards local player economy and pet stats from being overwritten by incoming cloud events", () => {
+    // Set initial local player state
+    useGameStore.setState({
+      coins: 300,
+      activeHat: "hat-straw",
+      activeSkin: "classic-orange",
+    });
+
+    const store = useCaregiverStore.getState();
+    store.setProfile("Dhavi", "Papi Juro");
+
+    // Partner pushes care action or activity log in shared room
+    const mockLog = {
+      id: "action-123",
+      timestamp: Date.now(),
+      caregiverId: "partner-999",
+      caregiverName: "Partner",
+      caregiverRoleTitle: "Mami Juro",
+      actionType: "feed" as const,
+      description: "Partner memberi makan petnya",
+      statChanges: { hunger: 30 },
+    };
+
+    useCaregiverStore.setState((prev) => ({
+      activityLogs: [mockLog, ...prev.activityLogs],
+    }));
+
+    // Verify local player's coins and cosmetics remain unchanged and 100% independent
+    const currentGame = useGameStore.getState();
+    expect(currentGame.coins).toBe(300);
+    expect(currentGame.activeHat).toBe("hat-straw");
+    expect(currentGame.activeSkin).toBe("classic-orange");
   });
 });

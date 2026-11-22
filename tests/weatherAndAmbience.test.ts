@@ -7,6 +7,7 @@ import {
   generateRiverRipplesData,
 } from "../src/components/pet/environment/landscapeData";
 import { isWaterAt } from "../src/engine/world/mapTerrain";
+import { shouldShowRainLeaf } from "../src/features/character/juroHelpers";
 
 describe("Dynamic Weather & Ambience System", () => {
   beforeEach(() => {
@@ -74,5 +75,25 @@ describe("Dynamic Weather & Ambience System", () => {
       // Every ripple must sit squarely in water (brook or lily pond)
       expect(isWaterAt(r.x, r.z)).toBe(true);
     });
+  });
+
+  it("only shows green leaf parasol in the rain when Juro is not wearing any hat", () => {
+    // 1. When clear/not raining: leaf parasol is never shown
+    expect(shouldShowRainLeaf(false, null)).toBe(false);
+    expect(shouldShowRainLeaf(false, "hat-none")).toBe(false);
+    expect(shouldShowRainLeaf(false, "hat-straw")).toBe(false);
+
+    // 2. When raining and Juro has no hat: leaf parasol shelters Juro's head
+    expect(shouldShowRainLeaf(true, null)).toBe(true);
+    expect(shouldShowRainLeaf(true, undefined)).toBe(true);
+    expect(shouldShowRainLeaf(true, "")).toBe(true);
+    expect(shouldShowRainLeaf(true, "hat-none")).toBe(true);
+
+    // 3. When raining and Juro is already wearing a hat: leaf parasol is hidden to prevent clipping
+    expect(shouldShowRainLeaf(true, "hat-straw")).toBe(false);
+    expect(shouldShowRainLeaf(true, "hat-propeller")).toBe(false);
+    expect(shouldShowRainLeaf(true, "hat-wizard")).toBe(false);
+    expect(shouldShowRainLeaf(true, "hat-chef")).toBe(false);
+    expect(shouldShowRainLeaf(true, "hat-crown")).toBe(false);
   });
 });

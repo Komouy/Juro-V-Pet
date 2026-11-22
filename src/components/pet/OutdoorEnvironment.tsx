@@ -1,46 +1,42 @@
-import React, { useRef, useMemo, useEffect, useState } from "react";
+import React, { useRef, useMemo, useEffect, useState, useCallback } from "react";
 import { useFrame, type ThreeEvent } from "@react-three/fiber";
+import { Html } from "@react-three/drei";
 import * as THREE from "three";
-import type { TimeThemeConfig } from "../../utils/timeOfDay";
-import { BASE_GROUND_Y, MAP_PLATFORMS, JURO_TRAMPOLINE_POS } from "../../engine/world/mapTerrain";
-import { PetSofaBed } from "./environment/PetSofaBed";
-import { ParkBench } from "./environment/ParkBench";
-import { BouncyMushroomTrampoline } from "./environment/BouncyMushroomTrampoline";
-import { ShopBuildingLandmark } from "./environment/ShopBuildingLandmark";
-import { MineCaveLandmark } from "./environment/MineCaveLandmark";
-import { PixelRain } from "./environment/PixelRain";
-import { NightFireflies } from "./environment/NightFireflies";
-import { RiverFishes } from "./environment/RiverFishes";
-import { WalkTargetMarker } from "./environment/WalkTargetMarker";
-import type { WeatherMode } from "../../types/ui";
-import type { WalkCommand } from "../../features/character/JuroModel";
 import {
-  createSignTexture,
-  createOrganicPondShape,
-  createStreamShape,
-  generateStarsData,
-  generateButterfliesData,
-  generateRoundTreesData,
-  generatePineTreesData,
-  generateBushesData,
-  generateFenceSegmentsData,
-  generateGrassBladesData,
-  generateOuterGrassBladesData,
-  generateReedsData,
-  generateRocksData,
-  generateSteppingStonesData,
-  generateMushroomsData,
-  generateWaterShimmersData,
-} from "./environment/landscapeData";
+  Armchair,
+  Footprints,
+  ArrowBigUp,
+  ShoppingBag,
+  Pickaxe,
+  X,
+} from "lucide-react";
+import type { TimeThemeConfig } from "../../utils/timeOfDay";
+import {
+  JURO_BENCH_POS,
+  JURO_TRAMPOLINE_POS,
+  JURO_SHOP_POS,
+  JURO_MINE_POS,
+  walkableHeightAt,
+} from "../../engine/world/mapTerrain";
+import { createPixelTextureSet } from "./environment/pixelTextures";
+import { buildRetroWorld, type BuiltWorld } from "./environment/mapWorldBuilder";
+import { WalkTargetMarker } from "./environment/WalkTargetMarker";
+import {
+  type WeatherMode,
+  isRainingWeather,
+  normalizeWeather,
+} from "../../types/ui";
+import type { WalkCommand } from "../../features/character/JuroModel";
 
 interface OutdoorEnvironmentProps {
   theme: TimeThemeConfig;
   weather?: WeatherMode;
   onWalkPointSelect?: (x: number, z: number) => void;
   walkCommand?: WalkCommand | null;
+  routeWaypoints?: Array<{ x: number; z: number }>;
+  juroWorldPosRef?: React.RefObject<THREE.Vector3>;
   onOpenShop?: () => void;
   onOpenMine?: () => void;
-  onBedClick?: () => void;
   isBenchMenuOpen?: boolean;
   onBenchClick?: () => void;
   onSitOnBench?: () => void;
@@ -55,42 +51,14 @@ interface OutdoorEnvironmentProps {
   isBouncingOnTrampoline?: boolean;
 }
 
-// Reusable scratch objects at module scope (zero GC allocations per frame, 0 lint warnings)
 const _dummy = new THREE.Object3D();
-const _color = new THREE.Color();
-
-// Soft volumetric Ghibli cumulus cloud cluster
-const FluffyCloud: React.FC<{
-  position: [number, number, number];
-  scale?: number;
-  rotationY?: number;
-  cloudColor: string;
-  cloudOpacity: number;
-  puffiness?: number;
-}> = ({ position, scale = 1, rotationY = 0, cloudColor, cloudOpacity, puffiness = 1 }) => (
-  <group position={position} scale={scale} rotation={[0, rotationY, 0]}>
-    <mesh>
-      <sphereGeometry args={[0.72 * puffiness, 14, 12]} />
-      <meshBasicMaterial color={cloudColor} transparent opacity={cloudOpacity} depthWrite={false} />
-    </mesh>
-    <mesh position={[0.56 * puffiness, -0.08 * puffiness, 0]}>
-      <sphereGeometry args={[0.52 * puffiness, 12, 10]} />
-      <meshBasicMaterial color={cloudColor} transparent opacity={cloudOpacity} depthWrite={false} />
-    </mesh>
-    <mesh position={[-0.52 * puffiness, -0.1 * puffiness, 0]}>
-      <sphereGeometry args={[0.48 * puffiness, 12, 10]} />
-      <meshBasicMaterial color={cloudColor} transparent opacity={cloudOpacity} depthWrite={false} />
-    </mesh>
-    <mesh position={[0.12 * puffiness, 0.24 * puffiness, 0]}>
-      <sphereGeometry args={[0.46 * puffiness, 12, 10]} />
-      <meshBasicMaterial color={cloudColor} transparent opacity={cloudOpacity * 0.92} depthWrite={false} />
-    </mesh>
-    <mesh position={[-0.1 * puffiness, 0.05 * puffiness, -0.22 * puffiness]}>
-      <sphereGeometry args={[0.44 * puffiness, 10, 8]} />
-      <meshBasicMaterial color={cloudColor} transparent opacity={cloudOpacity * 0.88} depthWrite={false} />
-    </mesh>
-  </group>
-);
+const _navV1 = new THREE.Vector3();
+const _navEuler = new THREE.Euler();
+const _navQuat = new THREE.Quaternion();
+const _navScale = new THREE.Vector3(1, 1, 1);
+const _navMat4 = new THREE.Matrix4();
+const _crumbSamplesX = new Float32Array(64);
+const _crumbSamplesZ = new Float32Array(64);
 
 export const OutdoorEnvironment: React.FC<OutdoorEnvironmentProps> = React.memo(
   ({
@@ -98,9 +66,10 @@ export const OutdoorEnvironment: React.FC<OutdoorEnvironmentProps> = React.memo(
     weather = "clear",
     onWalkPointSelect,
     walkCommand,
+    routeWaypoints = [],
+    juroWorldPosRef,
     onOpenShop,
     onOpenMine,
-    onBedClick,
     isBenchMenuOpen = false,
     onBenchClick,
     onSitOnBench,
@@ -118,23 +87,26 @@ export const OutdoorEnvironment: React.FC<OutdoorEnvironmentProps> = React.memo(
       "none" | "shop" | "mine" | "bed" | "bench" | "trampoline"
     >("none");
 
-    // Signboard textures for interactive 3D Shop ("WARUNG") & Mine Cave ("TAMBANG")
-    const shopSignTex = useMemo(
-      () => createSignTexture("WARUNG", "#FFF7ED", "#171717", "#EA580C"),
-      []
-    );
-    const mineSignTex = useMemo(
-      () => createSignTexture("TAMBANG", "#1C1917", "#F59E0B", "#FEF08A"),
-      []
-    );
+    const worldRef = useRef<BuiltWorld | null>(null);
+
+    // Build the complete 3D Storybook world with pixel-art canvas textures
+    const { group, textures, built } = useMemo(() => {
+      const g = new THREE.Group();
+      const tex = createPixelTextureSet();
+      const b = buildRetroWorld(g, tex, false);
+      return { group: g, textures: tex, built: b };
+    }, []);
 
     useEffect(() => {
+      worldRef.current = built;
       return () => {
-        shopSignTex?.dispose();
-        mineSignTex?.dispose();
+        built.dispose();
+        textures.dispose();
+        worldRef.current = null;
       };
-    }, [shopSignTex, mineSignTex]);
+    }, [built, textures]);
 
+    // Manage mouse cursor on landmark hover
     useEffect(() => {
       if (typeof document === "undefined") return;
       document.body.style.cursor = hoveredLandmark !== "none" ? "pointer" : "auto";
@@ -143,599 +115,228 @@ export const OutdoorEnvironment: React.FC<OutdoorEnvironmentProps> = React.memo(
       };
     }, [hoveredLandmark]);
 
-    // InstancedMesh refs for mobile-optimized batched rendering
-    const starsInstRef = useRef<THREE.InstancedMesh>(null);
-    const grassInstRef = useRef<THREE.InstancedMesh>(null);
-    const outerGrassInstRef = useRef<THREE.InstancedMesh>(null);
-    const reedsInstRef = useRef<THREE.InstancedMesh>(null);
-    const rocksInstRef = useRef<THREE.InstancedMesh>(null);
-    const bushesInstRef = useRef<THREE.InstancedMesh>(null);
-    const steppingStonesInstRef = useRef<THREE.InstancedMesh>(null);
-    const mushroomStemsInstRef = useRef<THREE.InstancedMesh>(null);
-    const mushroomCapsInstRef = useRef<THREE.InstancedMesh>(null);
-    const roundTreeTrunksInstRef = useRef<THREE.InstancedMesh>(null);
-    const roundTreeCrownsInstRef = useRef<THREE.InstancedMesh>(null);
-    const pineTrunksInstRef = useRef<THREE.InstancedMesh>(null);
-    const pineLowerInstRef = useRef<THREE.InstancedMesh>(null);
-    const pineUpperInstRef = useRef<THREE.InstancedMesh>(null);
-    const fencePostsInstRef = useRef<THREE.InstancedMesh>(null);
-    const fenceRailsInstRef = useRef<THREE.InstancedMesh>(null);
-    const shimmerInstRef = useRef<THREE.InstancedMesh>(null);
+    // Record pointer down coordinates to distinguish clean tap vs camera orbit/drag
+    const pointerDownPosRef = useRef<{ x: number; y: number; time: number } | null>(null);
 
-    // Small dynamic groups
-    const cloudsGroupRef = useRef<THREE.Group>(null);
-    const ripple1Ref = useRef<THREE.Mesh>(null);
-    const ripple2Ref = useRef<THREE.Mesh>(null);
-    const butterfliesGroupRef = useRef<THREE.Group>(null);
+    const handlePointerDown = useCallback((e: ThreeEvent<PointerEvent>) => {
+      pointerDownPosRef.current = {
+        x: e.nativeEvent.clientX,
+        y: e.nativeEvent.clientY,
+        time: Date.now(),
+      };
+    }, []);
 
-    // Track pointer down coords to distinguish a clean tap-to-walk from an OrbitControls camera drag
-    const pointerDownPos = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
-
-    const handleGroundPointerDown = (e: ThreeEvent<PointerEvent>) => {
-      pointerDownPos.current.x = e.clientX;
-      pointerDownPos.current.y = e.clientY;
-    };
-
-    const handleGroundClick = (e: ThreeEvent<MouseEvent>) => {
-      if (!onWalkPointSelect) return;
-      const dist = Math.hypot(
-        e.clientX - pointerDownPos.current.x,
-        e.clientY - pointerDownPos.current.y
-      );
-      // Only command Juro to walk on a deliberate tap/click (not after dragging camera)
-      if (dist < 6) {
+    // Handle clicks across the 3D diorama
+    const handleClick = useCallback(
+      (e: ThreeEvent<MouseEvent>) => {
         e.stopPropagation();
-        onWalkPointSelect(e.point.x, e.point.z);
-      }
-    };
 
-    const handleLandmarkPointerDown = (e: ThreeEvent<PointerEvent>) => {
+        // Reject if this click was actually a camera rotate/drag gesture (>8px movement or >1200ms hold)
+        if (pointerDownPosRef.current) {
+          const dx = e.nativeEvent.clientX - pointerDownPosRef.current.x;
+          const dy = e.nativeEvent.clientY - pointerDownPosRef.current.y;
+          const dist = Math.hypot(dx, dy);
+          const elapsed = Date.now() - pointerDownPosRef.current.time;
+          if (dist > 8 || elapsed > 1200) {
+            return;
+          }
+        }
+
+        const hitObj = e.object;
+        const landmarkId = hitObj.userData?.landmarkId;
+
+        if (landmarkId === "cafe") {
+          onOpenShop?.();
+          return;
+        }
+        if (landmarkId === "tunnel") {
+          onOpenMine?.();
+          return;
+        }
+        if (landmarkId === "overlook") {
+          onBenchClick?.();
+          return;
+        }
+        if (landmarkId === "trampoline") {
+          onTrampolineClick?.();
+          return;
+        }
+
+        // Click on walkable ground / trail / bridge / plaza
+        if (e.point) {
+          onWalkPointSelect?.(e.point.x, e.point.z);
+        }
+      },
+      [onOpenShop, onOpenMine, onBenchClick, onTrampolineClick, onWalkPointSelect]
+    );
+
+    const handlePointerOver = useCallback((e: ThreeEvent<PointerEvent>) => {
       e.stopPropagation();
-      pointerDownPos.current.x = e.clientX;
-      pointerDownPos.current.y = e.clientY;
-    };
+      const id = e.object.userData?.landmarkId;
+      if (id === "cafe") setHoveredLandmark("shop");
+      else if (id === "tunnel") setHoveredLandmark("mine");
+      else if (id === "overlook") setHoveredLandmark("bench");
+      else if (id === "trampoline") setHoveredLandmark("trampoline");
+    }, []);
 
-    const handleShopClick = (e: ThreeEvent<MouseEvent>) => {
-      e.stopPropagation();
-      const dist = Math.hypot(
-        e.clientX - pointerDownPos.current.x,
-        e.clientY - pointerDownPos.current.y
-      );
-      if (dist < 6) {
-        onOpenShop?.();
-      }
-    };
+    const handlePointerOut = useCallback(() => {
+      setHoveredLandmark("none");
+    }, []);
 
-    const handleMineClick = (e: ThreeEvent<MouseEvent>) => {
-      e.stopPropagation();
-      const dist = Math.hypot(
-        e.clientX - pointerDownPos.current.x,
-        e.clientY - pointerDownPos.current.y
-      );
-      if (dist < 6) {
-        onOpenMine?.();
-      }
-    };
+    // 60fps frame loop for ambient animations (koi, ducks, ripples, rain, lanterns, water caustics)
+    useFrame((state, delta) => {
+      if (!worldRef.current) return;
+      const { kois, rain, lanternLights, lanternBulbs } = worldRef.current;
 
-    // Pond & Stream shapes (Recessed Basin, Shoreline Bank & Sparkling Surface)
-    const pondBedShape = useMemo(() => createOrganicPondShape(1.36, 1.04), []);
-    const pondBankShape = useMemo(() => createOrganicPondShape(1.24, 0.94), []);
-    const pondWaterShape = useMemo(() => createOrganicPondShape(1.12, 0.84), []);
-    const streamBedShape = useMemo(() => createStreamShape(0.16), []);
-    const streamBankShape = useMemo(() => createStreamShape(0.08), []);
-    const streamWaterShape = useMemo(() => createStreamShape(0), []);
-
-    // 1. Stars (70 instances -> 1 draw call!)
-    const stars = useMemo(() => generateStarsData(), []);
-
-    // 2. Daytime Butterflies (4 fluttering companions over valley)
-    const butterflies = useMemo(() => generateButterfliesData(), []);
-
-    // 3. Dense Miniature Terrarium Forest: Core Trees + Procedural Small Trees Filling All Empty Map Areas!
-    const roundTrees = useMemo(() => generateRoundTreesData(), []);
-    const pineTrees = useMemo(() => generatePineTreesData(), []);
-
-    // 4. Cozy Rounded Shrubs / Mini Bushes filling empty meadow edges (1 draw call!)
-    const bushes = useMemo(() => generateBushesData(), []);
-
-    // 5. Rustic Wooden Garden Fence along left pasture & cottage garden (2 draw calls!)
-    const fenceSegments = useMemo(() => generateFenceSegmentsData(), []);
-
-    // 6. Lush Grass Blades across the whole valley & knolls (120 blades -> 1 draw call!)
-    const grassBlades = useMemo(() => generateGrassBladesData(), []);
-
-    // 6b. Dense Static Small Outer Grass Tufts Filling All Empty Surroundings (ZERO per-frame CPU cost!)
-    const outerGrassBlades = useMemo(() => generateOuterGrassBladesData(), []);
-
-    // 7. Tall Swaying Reeds along Pond & Stream Banks (18 blades -> 1 draw call!)
-    const reeds = useMemo(() => generateReedsData(), []);
-
-    // 8. Rocks, Scenic Boulders & River Pebbles (20 instances -> 1 draw call!)
-    const rocks = useMemo(() => generateRocksData(), []);
-
-    // 9. Cozy Stepping Stones Path connecting center, west hill, east hill & wooden bridge (10 stones -> 1 draw call!)
-    const steppingStones = useMemo(() => generateSteppingStonesData(), []);
-
-    // 10. Cute Forest Toadstool Mushrooms tucked near rocks, stumps & knolls (10 instances -> 2 draw calls!)
-    const mushrooms = useMemo(() => generateMushroomsData(), []);
-
-    // 11. Water shimmers (8 glints -> 1 draw call!)
-    const waterShimmers = useMemo(() => generateWaterShimmersData(), []);
-
-    // Populate static InstancedMesh transforms & per-instance colors on mount/theme change
-    useEffect(() => {
-      // Round trees
-      if (roundTreeTrunksInstRef.current && roundTreeCrownsInstRef.current) {
-        roundTrees.forEach((tr, i) => {
-          _dummy.position.set(tr.pos[0], tr.pos[1] + 0.24 * tr.scale, tr.pos[2]);
-          _dummy.rotation.set(0, 0, 0);
-          _dummy.scale.set(tr.scale, tr.scale, tr.scale);
-          _dummy.updateMatrix();
-          roundTreeTrunksInstRef.current!.setMatrixAt(i, _dummy.matrix);
-
-          _dummy.position.set(tr.pos[0], tr.pos[1] + 0.68 * tr.scale, tr.pos[2]);
-          _dummy.scale.set(tr.scale * 1.08, tr.scale * 0.96, tr.scale * 1.08);
-          _dummy.updateMatrix();
-          roundTreeCrownsInstRef.current!.setMatrixAt(i, _dummy.matrix);
-        });
-        roundTreeTrunksInstRef.current.instanceMatrix.needsUpdate = true;
-        roundTreeCrownsInstRef.current.instanceMatrix.needsUpdate = true;
+      // Animate flowing water surface caustics
+      if (textures.waterPixel) {
+        textures.waterPixel.offset.x = (state.clock.elapsedTime * 0.04) % 1;
+        textures.waterPixel.offset.y = (state.clock.elapsedTime * 0.035) % 1;
       }
 
-      // Pine trees
-      if (pineTrunksInstRef.current && pineLowerInstRef.current && pineUpperInstRef.current) {
-        pineTrees.forEach((tr, i) => {
-          _dummy.position.set(tr.pos[0], tr.pos[1] + 0.22 * tr.scale, tr.pos[2]);
-          _dummy.rotation.set(0, 0, 0);
-          _dummy.scale.set(tr.scale, tr.scale, tr.scale);
-          _dummy.updateMatrix();
-          pineTrunksInstRef.current!.setMatrixAt(i, _dummy.matrix);
-
-          _dummy.position.set(tr.pos[0], tr.pos[1] + 0.62 * tr.scale, tr.pos[2]);
-          _dummy.updateMatrix();
-          pineLowerInstRef.current!.setMatrixAt(i, _dummy.matrix);
-
-          _dummy.position.set(tr.pos[0], tr.pos[1] + 1.02 * tr.scale, tr.pos[2]);
-          _dummy.updateMatrix();
-          pineUpperInstRef.current!.setMatrixAt(i, _dummy.matrix);
-        });
-        pineTrunksInstRef.current.instanceMatrix.needsUpdate = true;
-        pineLowerInstRef.current.instanceMatrix.needsUpdate = true;
-        pineUpperInstRef.current.instanceMatrix.needsUpdate = true;
-      }
-
-      // Bushes
-      if (bushesInstRef.current) {
-        bushes.forEach((b, i) => {
-          _dummy.position.set(b.pos[0], b.pos[1], b.pos[2]);
-          _dummy.rotation.set(0, i * 0.7, 0);
-          _dummy.scale.set(b.scale[0], b.scale[1], b.scale[2]);
-          _dummy.updateMatrix();
-          bushesInstRef.current!.setMatrixAt(i, _dummy.matrix);
-        });
-        bushesInstRef.current.instanceMatrix.needsUpdate = true;
-      }
-
-      // Rustic Fence
-      if (fencePostsInstRef.current && fenceRailsInstRef.current) {
-        fenceSegments.forEach((seg, i) => {
-          _dummy.position.set(seg.x, BASE_GROUND_Y + 0.17, seg.z);
-          _dummy.rotation.set(0, seg.rotY, 0);
-          _dummy.scale.set(1, 1, 1);
-          _dummy.updateMatrix();
-          fencePostsInstRef.current!.setMatrixAt(i, _dummy.matrix);
-
-          _dummy.position.set(seg.x, BASE_GROUND_Y + 0.24, seg.z);
-          _dummy.rotation.set(0, seg.rotY, 0);
-          _dummy.scale.set(1, 1, 1);
-          _dummy.updateMatrix();
-          fenceRailsInstRef.current!.setMatrixAt(i, _dummy.matrix);
-        });
-        fencePostsInstRef.current.instanceMatrix.needsUpdate = true;
-        fenceRailsInstRef.current.instanceMatrix.needsUpdate = true;
-      }
-
-      // Rocks & pebbles
-      if (rocksInstRef.current) {
-        const shades = theme.isNight
-          ? ["#475569", "#334155", "#64748B"]
-          : ["#A8A29E", "#D6D3D1", "#78716C"];
-        rocks.forEach((rk, i) => {
-          _dummy.position.set(rk.pos[0], rk.pos[1], rk.pos[2]);
-          _dummy.rotation.set(0, rk.rotY, 0);
-          _dummy.scale.set(rk.scale[0], rk.scale[1], rk.scale[2]);
-          _dummy.updateMatrix();
-          rocksInstRef.current!.setMatrixAt(i, _dummy.matrix);
-          _color.set(shades[rk.shade]);
-          rocksInstRef.current!.setColorAt(i, _color);
-        });
-        rocksInstRef.current.instanceMatrix.needsUpdate = true;
-        if (rocksInstRef.current.instanceColor) {
-          rocksInstRef.current.instanceColor.needsUpdate = true;
+      // Animate swimming koi and ducks
+      for (let i = 0; i < kois.length; i++) {
+        const k = kois[i];
+        k.phase += delta * k.speed;
+        k.group.position.x = k.centerX + Math.cos(k.phase) * k.radiusX;
+        k.group.position.z = k.centerZ + Math.sin(k.phase) * k.radiusZ;
+        k.group.rotation.y = -k.phase - Math.PI / 2;
+        if (k.tail) {
+          k.tail.rotation.y = Math.sin(k.phase * 5.0) * 0.28;
         }
       }
 
-      // Stepping stones
-      if (steppingStonesInstRef.current) {
-        steppingStones.forEach((st, i) => {
-          _dummy.position.set(st.pos[0], st.pos[1], st.pos[2]);
-          _dummy.rotation.set(0, st.rotY, 0);
-          _dummy.scale.set(st.scale[0], st.scale[1], st.scale[2]);
-          _dummy.updateMatrix();
-          steppingStonesInstRef.current!.setMatrixAt(i, _dummy.matrix);
-        });
-        steppingStonesInstRef.current.instanceMatrix.needsUpdate = true;
+      // Animate rain & water ripples during rain
+      const isRaining = isRainingWeather(weather);
+      if (rain.mesh.visible !== isRaining) {
+        rain.mesh.visible = isRaining;
+        rain.ripples.forEach((r) => (r.visible = isRaining));
       }
 
-      // Static outer small grass blades (populated once -> 0ms CPU per frame!)
-      if (outerGrassInstRef.current) {
-        outerGrassBlades.forEach((g, i) => {
-          _dummy.position.set(g.x, g.y + g.h * 0.48, g.z);
-          _dummy.rotation.set(g.tiltX, g.rotY, g.tiltZ);
-          _dummy.scale.set(1, g.h / 0.18, 1);
+      if (isRaining) {
+        const pos = rain.positions;
+        const speeds = rain.speeds;
+        const count = rain.count;
+        for (let i = 0; i < count; i++) {
+          pos[i * 3 + 1] -= speeds[i] * delta;
+          if (pos[i * 3 + 1] < -0.3) {
+            pos[i * 3 + 1] = 16 + Math.random() * 4;
+          }
+          _dummy.position.set(pos[i * 3], pos[i * 3 + 1], pos[i * 3 + 2]);
           _dummy.updateMatrix();
-          outerGrassInstRef.current!.setMatrixAt(i, _dummy.matrix);
-        });
-        outerGrassInstRef.current.instanceMatrix.needsUpdate = true;
-      }
+          rain.mesh.setMatrixAt(i, _dummy.matrix);
+        }
+        rain.mesh.instanceMatrix.needsUpdate = true;
 
-      // Mushrooms
-      if (mushroomStemsInstRef.current && mushroomCapsInstRef.current) {
-        mushrooms.forEach((m, i) => {
-          _dummy.position.set(m.pos[0], m.pos[1] + 0.045 * m.scale, m.pos[2]);
-          _dummy.rotation.set(0, 0, 0);
-          _dummy.scale.set(m.scale, m.scale, m.scale);
-          _dummy.updateMatrix();
-          mushroomStemsInstRef.current!.setMatrixAt(i, _dummy.matrix);
-
-          _dummy.position.set(m.pos[0], m.pos[1] + 0.09 * m.scale, m.pos[2]);
-          _dummy.scale.set(m.scale * 1.15, m.scale * 0.72, m.scale * 1.15);
-          _dummy.updateMatrix();
-          mushroomCapsInstRef.current!.setMatrixAt(i, _dummy.matrix);
-          _color.set(m.capColor);
-          mushroomCapsInstRef.current!.setColorAt(i, _color);
-        });
-        mushroomStemsInstRef.current.instanceMatrix.needsUpdate = true;
-        mushroomCapsInstRef.current.instanceMatrix.needsUpdate = true;
-        if (mushroomCapsInstRef.current.instanceColor) {
-          mushroomCapsInstRef.current.instanceColor.needsUpdate = true;
+        for (let r = 0; r < rain.ripples.length; r++) {
+          rain.ripplePhases[r] += delta * 1.5;
+          if (rain.ripplePhases[r] > 1.0) rain.ripplePhases[r] = 0;
+          const s = 0.5 + rain.ripplePhases[r] * 1.2;
+          rain.ripples[r].scale.set(s, s, s);
+          const mat = rain.ripples[r].material as THREE.MeshBasicMaterial;
+          mat.opacity = (1 - rain.ripplePhases[r]) * 0.5;
         }
       }
-    }, [theme.isNight, roundTrees, pineTrees, bushes, fenceSegments, rocks, steppingStones, outerGrassBlades, mushrooms]);
 
-    // Lightweight per-frame animations (using scratch _dummy — zero allocations!)
-    useFrame((state) => {
-      const t = state.clock.getElapsedTime();
+      // Adjust lantern light intensity & bulb emissive based on weather / night
+      const normW = normalizeWeather(weather);
+      const isNight = normW === "malam" || (normW === "cerah" && theme.isNight);
+      const isSunset = normW === "senja";
+      const targetIntensity = isNight ? 3.0 : isSunset ? 1.9 : isRaining ? 1.5 : 0.2;
+      const targetEmissive = isNight ? 2.3 : isSunset ? 1.6 : isRaining ? 1.3 : 0.35;
 
-      if (cloudsGroupRef.current) {
-        cloudsGroupRef.current.rotation.y = t * 0.007;
-        cloudsGroupRef.current.position.y = Math.sin(t * 0.04) * 0.12;
-      }
-
-      // Twinkling stars at night
-      if (starsInstRef.current && theme.isNight) {
-        for (let i = 0; i < stars.length; i++) {
-          const st = stars[i];
-          const s = st.size * (0.65 + Math.sin(t * 3.0 + st.phase) * 0.35);
-          _dummy.position.set(st.pos[0], st.pos[1], st.pos[2]);
-          _dummy.rotation.set(0, 0, 0);
-          _dummy.scale.set(s, s, s);
-          _dummy.updateMatrix();
-          starsInstRef.current.setMatrixAt(i, _dummy.matrix);
-        }
-        starsInstRef.current.instanceMatrix.needsUpdate = true;
-      }
-
-      // Daytime butterflies
-      if (butterfliesGroupRef.current && !theme.isNight) {
-        butterfliesGroupRef.current.children.forEach((child, i) => {
-          const b = butterflies[i];
-          if (!b) return;
-          const angle = t * b.speed + b.phase;
-          child.position.set(
-            b.base[0] + Math.cos(angle) * b.radius,
-            b.base[1] + Math.sin(angle * 2.3) * 0.14,
-            b.base[2] + Math.sin(angle) * (b.radius * 0.7)
+      // Adjust lantern light intensity & bulb emissive only when transitioning
+      if (lanternLights.length > 0 && Math.abs(lanternLights[0].intensity - targetIntensity) > 0.01) {
+        for (let l = 0; l < lanternLights.length; l++) {
+          lanternLights[l].intensity = THREE.MathUtils.lerp(
+            lanternLights[l].intensity,
+            targetIntensity,
+            delta * 3.0
           );
-          child.rotation.y = -angle;
-          const wingFlap = Math.abs(Math.sin(t * 14 + b.phase)) * 0.7 + 0.3;
-          child.scale.set(wingFlap, 1, 1);
-        });
-      }
-
-      // Swaying grass blades across valley & knolls (1 draw call!)
-      if (grassInstRef.current) {
-        for (let i = 0; i < grassBlades.length; i++) {
-          const g = grassBlades[i];
-          const sway = Math.sin(t * 1.9 + g.phase) * 0.075;
-          _dummy.position.set(g.x, g.y + g.h * 0.48, g.z);
-          _dummy.rotation.set(g.tiltX, g.rotY, g.tiltZ + sway);
-          _dummy.scale.set(1, g.h / 0.18, 1);
-          _dummy.updateMatrix();
-          grassInstRef.current.setMatrixAt(i, _dummy.matrix);
         }
-        grassInstRef.current.instanceMatrix.needsUpdate = true;
-      }
-
-      // Swaying tall pond reeds
-      if (reedsInstRef.current) {
-        for (let i = 0; i < reeds.length; i++) {
-          const r = reeds[i];
-          const sway = Math.sin(t * 1.5 + r.phase) * 0.09;
-          _dummy.position.set(r.x, BASE_GROUND_Y + r.h * 0.48, r.z);
-          _dummy.rotation.set(0.05, 0, r.tilt + sway);
-          _dummy.scale.set(1, r.h / 0.4, 1);
-          _dummy.updateMatrix();
-          reedsInstRef.current.setMatrixAt(i, _dummy.matrix);
+        for (let b = 0; b < lanternBulbs.length; b++) {
+          const mat = lanternBulbs[b].material as THREE.MeshStandardMaterial;
+          if (mat) {
+            mat.emissiveIntensity = THREE.MathUtils.lerp(
+              mat.emissiveIntensity,
+              targetEmissive,
+              delta * 3.0
+            );
+          }
         }
-        reedsInstRef.current.instanceMatrix.needsUpdate = true;
       }
 
-      // Pond ripples
-      if (ripple1Ref.current) {
-        const p1 = (t * 0.32) % 1;
-        const s1 = 0.25 + p1 * 0.95;
-        ripple1Ref.current.scale.set(s1, s1, 1);
-        (ripple1Ref.current.material as THREE.MeshBasicMaterial).opacity = (1 - p1) * 0.42;
-      }
-      if (ripple2Ref.current) {
-        const p2 = (t * 0.32 + 0.5) % 1;
-        const s2 = 0.25 + p2 * 0.85;
-        ripple2Ref.current.scale.set(s2, s2, 1);
-        (ripple2Ref.current.material as THREE.MeshBasicMaterial).opacity = (1 - p2) * 0.36;
-      }
+      // Animate navigation visuals (breadcrumbs & destination beacon)
+      const nv = worldRef.current?.navVisuals;
+      if (nv) {
+        const hasDest = Boolean(walkCommand);
+        const juroPos = juroWorldPosRef?.current;
+        const destX = walkCommand?.x ?? 0;
+        const destZ = walkCommand?.z ?? 0;
+        const distToDest = juroPos ? Math.hypot(destX - juroPos.x, destZ - juroPos.z) : 999;
 
-      // Water shimmer glints
-      if (shimmerInstRef.current) {
-        for (let i = 0; i < waterShimmers.length; i++) {
-          const sh = waterShimmers[i];
-          const drift = Math.sin(t * 1.3 + sh.phase) * 0.09;
-          const pulse = 0.65 + Math.sin(t * 2.5 + sh.phase) * 0.35;
-          _dummy.position.set(sh.pos[0] + drift, sh.pos[1], sh.pos[2]);
-          _dummy.rotation.set(-Math.PI / 2, 0, -0.25);
-          _dummy.scale.set(sh.width * pulse, 0.045, 1);
-          _dummy.updateMatrix();
-          shimmerInstRef.current.setMatrixAt(i, _dummy.matrix);
+        if (hasDest && distToDest > 0.65) {
+          nv.beaconGroup.visible = true;
+          nv.beaconGroup.position.set(destX, walkableHeightAt(destX, destZ), destZ);
+
+          const elapsed = state.clock.elapsedTime;
+          const ringPulse = 0.88 + Math.sin(elapsed * 4.5) * 0.14;
+          nv.beaconRing.scale.set(ringPulse, ringPulse, 1);
+
+          // Update breadcrumbs along remaining route (Zero heap allocations per frame!)
+          if (routeWaypoints && routeWaypoints.length > 0 && juroPos) {
+            let sampleCount = 0;
+            let prevX = juroPos.x;
+            let prevZ = juroPos.z;
+            for (let p = 0; p < routeWaypoints.length; p++) {
+              const pt = routeWaypoints[p];
+              const segLen = Math.hypot(pt.x - prevX, pt.z - prevZ);
+              const count = Math.max(1, Math.floor(segLen / 1.15));
+              for (let i = 1; i <= count; i++) {
+                if (sampleCount >= nv.maxBreadcrumbs) break;
+                const t = i / count;
+                _crumbSamplesX[sampleCount] = prevX + (pt.x - prevX) * t;
+                _crumbSamplesZ[sampleCount] = prevZ + (pt.z - prevZ) * t;
+                sampleCount++;
+              }
+              prevX = pt.x;
+              prevZ = pt.z;
+            }
+
+            nv.breadcrumbs.count = sampleCount;
+            for (let i = 0; i < sampleCount; i++) {
+              const sx = _crumbSamplesX[i];
+              const sz = _crumbSamplesZ[i];
+              const y = walkableHeightAt(sx, sz) + 0.28;
+              _navV1.set(sx, y, sz);
+              _navEuler.set(0, i * 0.4, 0);
+              _navQuat.setFromEuler(_navEuler);
+              _navMat4.compose(_navV1, _navQuat, _navScale);
+              nv.breadcrumbs.setMatrixAt(i, _navMat4);
+            }
+            nv.breadcrumbs.instanceMatrix.needsUpdate = true;
+          } else {
+            nv.breadcrumbs.count = 0;
+          }
+        } else {
+          nv.beaconGroup.visible = false;
+          nv.breadcrumbs.count = 0;
         }
-        shimmerInstRef.current.instanceMatrix.needsUpdate = true;
       }
     });
 
-    const isLanternLit = theme.isNight || theme.phase === "sunset";
-    const woodColor = theme.isNight ? "#451A03" : "#92400E";
-    const woodDarkColor = theme.isNight ? "#2D1002" : "#78350F";
-    const cloudColor = weather === "rain" ? (theme.isNight ? "#1E293B" : "#94A3B8") : theme.cloudColor;
-    const cloudOpacity = weather === "rain" ? Math.min(0.98, theme.cloudOpacity + 0.12) : theme.cloudOpacity;
-
     return (
       <group>
-        {/* 1. Dynamic Sun or Crescent Moon */}
-        <group position={theme.celestialPos}>
-          <mesh>
-            <sphereGeometry args={[theme.isNight ? 0.46 : 0.6, 20, 20]} />
-            <meshBasicMaterial color={theme.celestialColor} />
-          </mesh>
-          <mesh>
-            <sphereGeometry args={[theme.isNight ? 0.72 : 0.92, 16, 16]} />
-            <meshBasicMaterial
-              color={theme.celestialColor}
-              transparent
-              opacity={theme.isNight ? 0.22 : 0.3}
-            />
-          </mesh>
-          {theme.isNight && (
-            <mesh position={[0.18, 0.08, 0.14]}>
-              <sphereGeometry args={[0.4, 16, 16]} />
-              <meshBasicMaterial color="#0D1736" />
-            </mesh>
-          )}
-        </group>
-
-        {/* 2. Twinkling Night Sky Stars */}
-        {theme.isNight && (
-          <instancedMesh ref={starsInstRef} args={[undefined, undefined, stars.length]} frustumCulled={false}>
-            <sphereGeometry args={[1, 6, 6]} />
-            <meshBasicMaterial color="#FFFFFF" />
-          </instancedMesh>
-        )}
-
-        {/* Luminous Meadow Fireflies (Kunang-Kunang Berpendar saat Malam) */}
-        <NightFireflies isNight={theme.isNight} />
-
-        {/* Dynamic Vertical Pixel Rain & River Water Ripples */}
-        <PixelRain isRaining={weather === "rain"} />
-
-        {/* 4. Instanced Forest Belt: Trees & Shrubs Framing the Valley */}
-        <instancedMesh ref={roundTreeTrunksInstRef} args={[undefined, undefined, roundTrees.length]}>
-          <cylinderGeometry args={[0.065, 0.095, 0.48, 7]} />
-          <meshLambertMaterial color={woodDarkColor} />
-        </instancedMesh>
-        <instancedMesh ref={roundTreeCrownsInstRef} args={[undefined, undefined, roundTrees.length]}>
-          <sphereGeometry args={[0.4, 12, 10]} />
-          <meshLambertMaterial color={theme.hillNearColor} />
-        </instancedMesh>
-
-        <instancedMesh ref={pineTrunksInstRef} args={[undefined, undefined, pineTrees.length]}>
-          <cylinderGeometry args={[0.055, 0.085, 0.44, 6]} />
-          <meshLambertMaterial color={woodDarkColor} />
-        </instancedMesh>
-        <instancedMesh ref={pineLowerInstRef} args={[undefined, undefined, pineTrees.length]}>
-          <coneGeometry args={[0.44, 0.68, 7]} />
-          <meshLambertMaterial color={theme.groundRimColor} />
-        </instancedMesh>
-        <instancedMesh ref={pineUpperInstRef} args={[undefined, undefined, pineTrees.length]}>
-          <coneGeometry args={[0.32, 0.58, 7]} />
-          <meshLambertMaterial color={theme.hillNearColor} />
-        </instancedMesh>
-
-        <instancedMesh ref={bushesInstRef} args={[undefined, undefined, bushes.length]}>
-          <sphereGeometry args={[1, 9, 8]} />
-          <meshLambertMaterial color={theme.grassTuftColor} />
-        </instancedMesh>
-
-        {/* 5. Rustic Wooden Garden Fences (2 Draw Calls) */}
-        <instancedMesh ref={fencePostsInstRef} args={[undefined, undefined, fenceSegments.length]}>
-          <boxGeometry args={[0.07, 0.34, 0.07]} />
-          <meshLambertMaterial color={woodDarkColor} />
-        </instancedMesh>
-        <instancedMesh ref={fenceRailsInstRef} args={[undefined, undefined, fenceSegments.length]}>
-          <boxGeometry args={[0.76, 0.05, 0.04]} />
-          <meshLambertMaterial color={woodColor} />
-        </instancedMesh>
-
-        {/* 6. High Majestic Fluffy Clouds (360° Living Sky Canopy Surrounding the Valley) */}
-        <group ref={cloudsGroupRef}>
-          {/* A. North Horizon Clouds (Lowered to y=2.3-2.9 so Sun/Moon at y=7.8-8.4 is completely clear!) */}
-          <FluffyCloud position={[-11.5, 2.9, -15.0]} scale={1.25} rotationY={0.15} cloudColor={cloudColor} cloudOpacity={cloudOpacity} />
-          <FluffyCloud position={[-7.2, 2.5, -14.2]} scale={1.0} rotationY={-0.12} cloudColor={cloudColor} cloudOpacity={cloudOpacity} />
-          <FluffyCloud position={[-2.2, 2.3, -14.5]} scale={0.88} rotationY={0.08} cloudColor={cloudColor} cloudOpacity={cloudOpacity * 0.9} />
-          <FluffyCloud position={[2.0, 2.4, -14.2]} scale={0.92} rotationY={-0.1} cloudColor={cloudColor} cloudOpacity={cloudOpacity * 0.9} />
-          <FluffyCloud position={[7.0, 2.6, -14.0]} scale={1.1} rotationY={0.18} cloudColor={cloudColor} cloudOpacity={cloudOpacity} />
-          <FluffyCloud position={[11.8, 2.9, -15.0]} scale={1.3} rotationY={-0.15} cloudColor={cloudColor} cloudOpacity={cloudOpacity} />
-
-          {/* B. West Sky Clouds (Langit Barat) */}
-          <FluffyCloud position={[-15.0, 4.0, -7.5]} scale={1.2} rotationY={Math.PI / 2 + 0.2} cloudColor={cloudColor} cloudOpacity={cloudOpacity} />
-          <FluffyCloud position={[-15.8, 4.4, 0.0]} scale={1.25} rotationY={Math.PI / 2} cloudColor={cloudColor} cloudOpacity={cloudOpacity} />
-          <FluffyCloud position={[-14.5, 4.1, 7.5]} scale={1.15} rotationY={Math.PI / 2 - 0.2} cloudColor={cloudColor} cloudOpacity={cloudOpacity} />
-
-          {/* C. East Sky Clouds (Langit Timur) */}
-          <FluffyCloud position={[14.5, 4.0, -7.5]} scale={1.15} rotationY={-Math.PI / 2 - 0.2} cloudColor={cloudColor} cloudOpacity={cloudOpacity} />
-          <FluffyCloud position={[15.5, 4.4, 0.0]} scale={1.25} rotationY={-Math.PI / 2} cloudColor={cloudColor} cloudOpacity={cloudOpacity} />
-          <FluffyCloud position={[14.8, 4.1, 7.5]} scale={1.15} rotationY={-Math.PI / 2 + 0.2} cloudColor={cloudColor} cloudOpacity={cloudOpacity} />
-
-          {/* D. South / Front Sky Clouds (Langit Depan, elevated high at y=6.2-7.0, z=15 so they never block the meadow) */}
-          <FluffyCloud position={[-10.2, 6.2, 15.2]} scale={1.3} rotationY={Math.PI} cloudColor={cloudColor} cloudOpacity={cloudOpacity * 0.9} />
-          <FluffyCloud position={[-3.8, 6.8, 16.0]} scale={1.15} rotationY={Math.PI - 0.15} cloudColor={cloudColor} cloudOpacity={cloudOpacity * 0.88} />
-          <FluffyCloud position={[3.5, 6.6, 15.8]} scale={1.2} rotationY={Math.PI + 0.1} cloudColor={cloudColor} cloudOpacity={cloudOpacity * 0.88} />
-          <FluffyCloud position={[10.5, 6.4, 15.0]} scale={1.3} rotationY={Math.PI} cloudColor={cloudColor} cloudOpacity={cloudOpacity * 0.9} />
-
-          {/* E. Overhead High Wisps (Langit Atas) */}
-          <FluffyCloud position={[-4.5, 9.0, -3.5]} scale={1.05} rotationY={0.4} puffiness={0.9} cloudColor={cloudColor} cloudOpacity={cloudOpacity * 0.75} />
-          <FluffyCloud position={[5.2, 9.4, 2.5]} scale={1.1} rotationY={-0.5} puffiness={0.9} cloudColor={cloudColor} cloudOpacity={cloudOpacity * 0.75} />
-          <FluffyCloud position={[-1.2, 9.6, 4.2]} scale={0.95} rotationY={0.8} puffiness={0.85} cloudColor={cloudColor} cloudOpacity={cloudOpacity * 0.72} />
-        </group>
-
-        {/* 7. Lush Grassy Valley Meadow Floor */}
-        <mesh
-          position={[0, BASE_GROUND_Y, 0]}
-          rotation={[-Math.PI / 2, 0, 0]}
-          onPointerDown={handleGroundPointerDown}
-          onClick={handleGroundClick}
-        >
-          <circleGeometry args={[27, 64]} />
-          <meshLambertMaterial color={theme.groundColor} />
-        </mesh>
-
-        {/* Central Valley Meadow Soft Sunny Glow */}
-        <mesh position={[0, BASE_GROUND_Y + 0.002, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-          <circleGeometry args={[4.8, 48]} />
-          <meshBasicMaterial color={theme.groundRimColor} opacity={0.16} transparent />
-        </mesh>
-
-        {/* Mushroom Trampoline Fairy Clearing Ring */}
-        <mesh
-          position={[JURO_TRAMPOLINE_POS.x, BASE_GROUND_Y + 0.003, JURO_TRAMPOLINE_POS.z]}
-          rotation={[-Math.PI / 2, 0, 0]}
-        >
-          <circleGeometry args={[0.74, 24]} />
-          <meshBasicMaterial color={theme.groundRimColor} opacity={0.2} transparent />
-        </mesh>
-
-        {/* 8. Jumpable Elevated Platforms, Grassy Knolls, Rock Ledge & Tree Stumps (Synced to MAP_PLATFORMS!) */}
-        <group onPointerDown={handleGroundPointerDown} onClick={handleGroundClick}>
-          {MAP_PLATFORMS.filter((p) => p.id !== "mushroom-trampoline").map((p) => {
-            if (p.kind === "terrace") {
-              const isEast = p.id === "east-knoll";
-              return (
-                <group key={p.id} position={[p.x, BASE_GROUND_Y, p.z]}>
-                  {/* Gentle Natural Mound Slope (Seamlessly Green with Meadow) */}
-                  <mesh position={[0, p.height * 0.48, 0]}>
-                    <cylinderGeometry
-                      args={[
-                        p.radius * 0.98,
-                        isEast ? p.radius * 1.15 : p.radius * 1.34,
-                        p.height * 0.96,
-                        36,
-                      ]}
-                    />
-                    <meshLambertMaterial color={theme.groundColor} />
-                  </mesh>
-
-                  {/* Upper Flat Plateau Rim for Bed / Bench */}
-                  <mesh position={[0, p.height + 0.003, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-                    <circleGeometry args={[p.radius * 0.96, 32]} />
-                    <meshBasicMaterial color={theme.groundRimColor} transparent opacity={0.22} />
-                  </mesh>
-                </group>
-              );
-            }
-            return null;
-          })}
-        </group>
-
-        {/* 9. Cozy Props atop the Knolls: Juro's Pet Sofa Bed (West) + Park Bench (East) */}
-        <PetSofaBed
-          theme={theme}
-          woodColor={woodColor}
-          woodDarkColor={woodDarkColor}
-          onBedClick={onBedClick}
-          onHoverChange={(hovered) => setHoveredLandmark(hovered ? "bed" : "none")}
+        {/* The 3D Storybook World Mesh Hierarchy */}
+        <primitive
+          object={group}
+          onClick={handleClick}
+          onPointerDown={handlePointerDown}
+          onPointerOver={handlePointerOver}
+          onPointerOut={handlePointerOut}
         />
 
-        {/* East Knoll Wooden Park Bench with Interactive "Duduk" (Sit) Trigger */}
-        <ParkBench
-          woodColor={woodColor}
-          woodDarkColor={woodDarkColor}
-          onBenchClick={onBenchClick}
-          onHoverChange={(hovered) => setHoveredLandmark(hovered ? "bench" : "none")}
-          isHovered={hoveredLandmark === "bench"}
-          isSitting={isSittingOnBench}
-          isMenuOpen={isBenchMenuOpen}
-          onSit={onSitOnBench}
-          onStand={onStandFromBench}
-          onCloseMenu={onCloseBenchMenu}
-        />
-
-        {/* Interactive Bouncy Mushroom Trampoline in Meadow Left of Shop */}
-        <BouncyMushroomTrampoline
-          position={[JURO_TRAMPOLINE_POS.x, BASE_GROUND_Y, JURO_TRAMPOLINE_POS.z]}
-          onTrampolineClick={onTrampolineClick}
-          onHoverChange={(hovered) => setHoveredLandmark(hovered ? "trampoline" : "none")}
-          isHovered={hoveredLandmark === "trampoline"}
-          isBouncing={isBouncingOnTrampoline}
-          isMenuOpen={isTrampolineMenuOpen}
-          onStartBounce={onStartBounce}
-          onStopBounce={onStopBounce}
-          onCloseMenu={onCloseTrampolineMenu}
-        />
-
-        {/* Interactive 3D Juro Shop Building ("TOKO") on Back-Right Hillside — Click to open /shop! */}
-        <ShopBuildingLandmark
-          theme={theme}
-          woodColor={woodColor}
-          woodDarkColor={woodDarkColor}
-          isLanternLit={isLanternLit}
-          isHovered={hoveredLandmark === "shop"}
-          shopSignTex={shopSignTex}
-          onPointerDown={handleLandmarkPointerDown}
-          onClick={handleShopClick}
-          onHoverChange={(hovered) => setHoveredLandmark(hovered ? "shop" : "none")}
-        />
-
-        {/* Interactive 3D Crystal Mine Cave ("TAMBANG") Straight North Across Bridge — Click to open /mine! */}
-        <MineCaveLandmark
-          theme={theme}
-          woodColor={woodColor}
-          woodDarkColor={woodDarkColor}
-          isLanternLit={isLanternLit}
-          isHovered={hoveredLandmark === "mine"}
-          mineSignTex={mineSignTex}
-          onPointerDown={handleLandmarkPointerDown}
-          onClick={handleMineClick}
-          onHoverChange={(hovered) => setHoveredLandmark(hovered ? "mine" : "none")}
-        />
-
-        {/* Animated Ground Walk Destination Marker Ring */}
+        {/* Animated Ground Destination Walk Marker Ring */}
         {walkCommand && (
           <WalkTargetMarker
             key={walkCommand.nonce}
@@ -744,166 +345,146 @@ export const OutdoorEnvironment: React.FC<OutdoorEnvironmentProps> = React.memo(
           />
         )}
 
-        {/* 10. Winding Brook & Cozy Lily Pond (Recessed Basin, Shoreline Bank & Crystal Surface) */}
-        <group>
-          {/* Stream Bed Depression / Earthen Basin */}
-          <mesh position={[0, -0.916, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-            <shapeGeometry args={[streamBedShape]} />
-            <meshLambertMaterial color={theme.isNight ? "#1E293B" : "#45382B"} />
-          </mesh>
-          <mesh position={[0, -0.912, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-            <shapeGeometry args={[streamBankShape]} />
-            <meshBasicMaterial color={theme.waterRimColor} transparent opacity={0.38} />
-          </mesh>
-          <mesh position={[0, -0.908, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-            <shapeGeometry args={[streamWaterShape]} />
-            <meshStandardMaterial
-              color={theme.waterColor}
-              roughness={0.14}
-              metalness={0.18}
-              emissive={theme.waterColor}
-              emissiveIntensity={theme.isNight ? 0.25 : 0.08}
-            />
-          </mesh>
+        {/* 3D Contextual Hover Badges for Landmarks */}
+        {hoveredLandmark === "shop" && (
+          <Html position={[JURO_SHOP_POS.x, 1.6, JURO_SHOP_POS.z]} center>
+            <div className="flex items-center gap-1.5 px-2.5 py-1 bg-warm-white/95 dark:bg-neutral-900/95 border-2 border-charcoal shadow-[2px_2px_0px_#171717] pixel-text text-[9px] font-bold text-amber-700 dark:text-amber-400 uppercase select-none pointer-events-none">
+              <ShoppingBag size={12} />
+              Toko Kafe
+            </div>
+          </Html>
+        )}
 
-          {/* Pond Bed Depression / Earthen Basin */}
-          <mesh position={[2.45, -0.915, -1.05]} rotation={[-Math.PI / 2, 0, 0]}>
-            <shapeGeometry args={[pondBedShape]} />
-            <meshLambertMaterial color={theme.isNight ? "#1E293B" : "#45382B"} />
-          </mesh>
-          <mesh position={[2.45, -0.911, -1.05]} rotation={[-Math.PI / 2, 0, 0]}>
-            <shapeGeometry args={[pondBankShape]} />
-            <meshBasicMaterial color={theme.waterRimColor} transparent opacity={0.42} />
-          </mesh>
-          <mesh position={[2.45, -0.906, -1.05]} rotation={[-Math.PI / 2, 0, 0]}>
-            <shapeGeometry args={[pondWaterShape]} />
-            <meshStandardMaterial
-              color={theme.waterColor}
-              roughness={0.12}
-              metalness={0.2}
-              emissive={theme.waterColor}
-              emissiveIntensity={theme.isNight ? 0.28 : 0.1}
-            />
-          </mesh>
+        {hoveredLandmark === "mine" && (
+          <Html position={[JURO_MINE_POS.x, 1.8, JURO_MINE_POS.z]} center>
+            <div className="flex items-center gap-1.5 px-2.5 py-1 bg-warm-white/95 dark:bg-neutral-900/95 border-2 border-charcoal shadow-[2px_2px_0px_#171717] pixel-text text-[9px] font-bold text-amber-600 dark:text-amber-400 uppercase select-none pointer-events-none">
+              <Pickaxe size={12} />
+              Tambang
+            </div>
+          </Html>
+        )}
 
-          <mesh ref={ripple1Ref} position={[2.3, -0.904, -1.0]} rotation={[-Math.PI / 2, 0, 0]}>
-            <ringGeometry args={[0.28, 0.32, 24]} />
-            <meshBasicMaterial color={theme.waterShimmerColor} transparent opacity={0.35} depthWrite={false} />
-          </mesh>
-          <mesh ref={ripple2Ref} position={[2.75, -0.904, -1.25]} rotation={[-Math.PI / 2, 0, 0]}>
-            <ringGeometry args={[0.2, 0.235, 20]} />
-            <meshBasicMaterial color={theme.waterShimmerColor} transparent opacity={0.3} depthWrite={false} />
-          </mesh>
 
-          <instancedMesh ref={shimmerInstRef} args={[undefined, undefined, waterShimmers.length]} frustumCulled={false}>
-            <planeGeometry args={[1, 1]} />
-            <meshBasicMaterial color={theme.waterShimmerColor} transparent opacity={0.32} depthWrite={false} />
-          </instancedMesh>
+        {hoveredLandmark === "bench" && (
+          <Html position={[JURO_BENCH_POS.x, JURO_BENCH_POS.seatY + 0.75, JURO_BENCH_POS.z]} center>
+            <div className="flex items-center gap-1.5 px-2.5 py-1 bg-warm-white/95 dark:bg-neutral-900/95 border-2 border-charcoal shadow-[2px_2px_0px_#171717] pixel-text text-[9px] font-bold text-emerald-700 dark:text-emerald-400 uppercase select-none pointer-events-none">
+              <Armchair size={12} />
+              Pos Pandang
+            </div>
+          </Html>
+        )}
 
-          <group position={[2.92, -0.902, -0.82]}>
-            <mesh rotation={[-Math.PI / 2, 0, 0.6]}>
-              <circleGeometry args={[0.21, 16, 0, Math.PI * 1.82]} />
-              <meshLambertMaterial color={theme.isNight ? "#15803D" : "#22C55E"} />
-            </mesh>
-            <mesh position={[0.02, 0.035, 0]} scale={[1.1, 0.75, 1.1]}>
-              <sphereGeometry args={[0.055, 8, 8]} />
-              <meshStandardMaterial color="#F472B6" roughness={0.4} emissive="#F472B6" emissiveIntensity={theme.isNight ? 0.28 : 0.05} />
-            </mesh>
-          </group>
-          <mesh position={[2.02, -0.902, -1.32]} rotation={[-Math.PI / 2, 0, 2.5]}>
-            <circleGeometry args={[0.145, 14, 0, Math.PI * 1.84]} />
-            <meshLambertMaterial color={theme.isNight ? "#166534" : "#16A34A"} />
-          </mesh>
+        {hoveredLandmark === "trampoline" && (
+          <Html position={[JURO_TRAMPOLINE_POS.x, JURO_TRAMPOLINE_POS.surfaceY + 0.75, JURO_TRAMPOLINE_POS.z]} center>
+            <div className="flex items-center gap-1.5 px-2.5 py-1 bg-warm-white/95 dark:bg-neutral-900/95 border-2 border-charcoal shadow-[2px_2px_0px_#171717] pixel-text text-[9px] font-bold text-rose-600 dark:text-rose-400 uppercase select-none pointer-events-none">
+              <ArrowBigUp size={12} />
+              Trampolin
+            </div>
+          </Html>
+        )}
 
-          {/* Animated Koi & River Fishes swimming smoothly through the brook and pond */}
-          <RiverFishes isNight={theme.isNight} />
-        </group>
+        {/* 3D Contextual Menu for Park Bench at Pos Pandang */}
+        {isBenchMenuOpen && (
+          <Html
+            position={[JURO_BENCH_POS.x, JURO_BENCH_POS.seatY + 0.7, JURO_BENCH_POS.z]}
+            center
+            zIndexRange={[80, 0]}
+            style={{ pointerEvents: "none" }}
+          >
+            <div
+              onPointerDown={(e) => e.stopPropagation()}
+              onClick={(e) => e.stopPropagation()}
+              className="animate-tray-enter relative flex flex-col gap-1.5 p-2 bg-warm-white/95 dark:bg-neutral-900/95 backdrop-blur-xs border-2 border-charcoal dark:border-neutral-600 shadow-[3px_3px_0px_#171717] dark:shadow-[3px_3px_0px_#000000] min-w-[140px] pointer-events-auto select-none"
+            >
+              <div className="flex items-center justify-between gap-2 border-b border-neutral-300 dark:border-neutral-700 pb-1">
+                <div className="flex items-center gap-1.5">
+                  <Armchair size={13} className="text-amber-600 dark:text-amber-400 shrink-0" />
+                  <span className="pixel-text text-[9px] uppercase font-bold text-charcoal dark:text-white">
+                    Pos Pandang
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={onCloseBenchMenu}
+                  className="text-neutral-400 hover:text-charcoal dark:hover:text-white cursor-pointer"
+                  aria-label="Tutup menu kursi"
+                >
+                  <X size={12} />
+                </button>
+              </div>
+              {isSittingOnBench ? (
+                <button
+                  type="button"
+                  onClick={onStandFromBench}
+                  className="w-full flex items-center justify-center gap-1.5 py-1.5 px-3 bg-amber-500 hover:bg-amber-600 text-white border-2 border-charcoal shadow-[2px_2px_0px_#171717] pixel-text text-[9px] uppercase font-bold cursor-pointer active:translate-x-[1px] active:translate-y-[1px] transition-all"
+                >
+                  <Footprints size={12} />
+                  Berdiri
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={onSitOnBench}
+                  className="w-full flex items-center justify-center gap-1.5 py-1.5 px-3 bg-emerald-600 hover:bg-emerald-700 text-white border-2 border-charcoal shadow-[2px_2px_0px_#171717] pixel-text text-[9px] uppercase font-bold cursor-pointer active:translate-x-[1px] active:translate-y-[1px] transition-all"
+                >
+                  <Armchair size={12} />
+                  Duduk
+                </button>
+              )}
+            </div>
+          </Html>
+        )}
 
-        {/* 11. Two Cozy Glowing Meadow Lantern Posts (North Brook & East Path) */}
-        {[
-          { pos: [-1.45, BASE_GROUND_Y, -1.65] as [number, number, number], rotY: 0.45 },
-          { pos: [2.75, BASE_GROUND_Y, 0.95] as [number, number, number], rotY: -2.2 },
-        ].map((lamp, idx) => (
-          <group key={idx} position={lamp.pos} rotation={[0, lamp.rotY, 0]}>
-            <mesh position={[0, 0.38, 0]}>
-              <boxGeometry args={[0.075, 0.76, 0.075]} />
-              <meshLambertMaterial color={woodDarkColor} />
-            </mesh>
-            <mesh position={[0.14, 0.72, 0]}>
-              <boxGeometry args={[0.32, 0.055, 0.055]} />
-              <meshLambertMaterial color={woodColor} />
-            </mesh>
-            <mesh position={[0.26, 0.65, 0]}>
-              <coneGeometry args={[0.1, 0.08, 4]} />
-              <meshLambertMaterial color="#1F2937" />
-            </mesh>
-            <mesh position={[0.26, 0.56, 0]}>
-              <boxGeometry args={[0.11, 0.13, 0.11]} />
-              <meshStandardMaterial
-                color={isLanternLit ? "#FEF08A" : "#E5E7EB"}
-                emissive={isLanternLit ? "#F59E0B" : "#000000"}
-                emissiveIntensity={isLanternLit ? 1.4 : 0}
-              />
-            </mesh>
-            {isLanternLit && (
-              <mesh position={[0.26, 0.56, 0]}>
-                <sphereGeometry args={[0.3, 12, 10]} />
-                <meshBasicMaterial color="#FDE047" transparent opacity={0.18} depthWrite={false} />
-              </mesh>
-            )}
-          </group>
-        ))}
-
-        {/* 13. Instanced Stepping Stones, Rocks & Pebbles */}
-        <instancedMesh ref={steppingStonesInstRef} args={[undefined, undefined, steppingStones.length]}>
-          <cylinderGeometry args={[1, 1.05, 1, 8]} />
-          <meshLambertMaterial color={theme.isNight ? "#475569" : "#D6D3D1"} />
-        </instancedMesh>
-        <instancedMesh ref={rocksInstRef} args={[undefined, undefined, rocks.length]}>
-          <sphereGeometry args={[1, 8, 7]} />
-          <meshLambertMaterial color="#FFFFFF" />
-        </instancedMesh>
-
-        {/* 14. Instanced Swaying Inner Grass, Static Outer Grass & Pond Reeds (3 Draw Calls Total!) */}
-        <instancedMesh ref={grassInstRef} args={[undefined, undefined, grassBlades.length]} frustumCulled={false}>
-          <coneGeometry args={[0.022, 0.18, 4]} />
-          <meshLambertMaterial color={theme.grassTuftColor} />
-        </instancedMesh>
-        <instancedMesh ref={outerGrassInstRef} args={[undefined, undefined, outerGrassBlades.length]}>
-          <coneGeometry args={[0.02, 0.18, 4]} />
-          <meshLambertMaterial color={theme.grassTuftColor} />
-        </instancedMesh>
-        <instancedMesh ref={reedsInstRef} args={[undefined, undefined, reeds.length]} frustumCulled={false}>
-          <coneGeometry args={[0.018, 0.4, 4]} />
-          <meshLambertMaterial color={theme.groundRimColor} />
-        </instancedMesh>
-
-        {/* 15. Instanced Forest Mushrooms */}
-        <instancedMesh ref={mushroomStemsInstRef} args={[undefined, undefined, mushrooms.length]}>
-          <cylinderGeometry args={[0.022, 0.028, 0.09, 6]} />
-          <meshLambertMaterial color="#FEF3C7" />
-        </instancedMesh>
-        <instancedMesh ref={mushroomCapsInstRef} args={[undefined, undefined, mushrooms.length]}>
-          <sphereGeometry args={[0.055, 8, 6, 0, Math.PI * 2, 0, Math.PI * 0.55]} />
-          <meshLambertMaterial color="#FFFFFF" />
-        </instancedMesh>
-
-        {/* 16. Daytime Butterflies */}
-        {!theme.isNight && (
-          <group ref={butterfliesGroupRef}>
-            {butterflies.map((b, idx) => (
-              <group key={idx} position={b.base}>
-                <mesh position={[-0.032, 0, 0]} rotation={[0.3, 0, 0.25]}>
-                  <planeGeometry args={[0.058, 0.044]} />
-                  <meshBasicMaterial color={b.color} side={THREE.DoubleSide} />
-                </mesh>
-                <mesh position={[0.032, 0, 0]} rotation={[0.3, 0, -0.25]}>
-                  <planeGeometry args={[0.058, 0.044]} />
-                  <meshBasicMaterial color={b.color} side={THREE.DoubleSide} />
-                </mesh>
-              </group>
-            ))}
-          </group>
+        {/* 3D Contextual Menu for Trampoline */}
+        {isTrampolineMenuOpen && (
+          <Html
+            position={[JURO_TRAMPOLINE_POS.x, JURO_TRAMPOLINE_POS.surfaceY + 0.7, JURO_TRAMPOLINE_POS.z]}
+            center
+            zIndexRange={[80, 0]}
+            style={{ pointerEvents: "none" }}
+          >
+            <div
+              onPointerDown={(e) => e.stopPropagation()}
+              onClick={(e) => e.stopPropagation()}
+              className="animate-tray-enter relative flex flex-col gap-1.5 p-2 bg-warm-white/95 dark:bg-neutral-900/95 backdrop-blur-xs border-2 border-charcoal dark:border-neutral-600 shadow-[3px_3px_0px_#171717] dark:shadow-[3px_3px_0px_#000000] min-w-[140px] pointer-events-auto select-none"
+            >
+              <div className="flex items-center justify-between gap-2 border-b border-neutral-300 dark:border-neutral-700 pb-1">
+                <div className="flex items-center gap-1.5">
+                  <ArrowBigUp size={14} className="text-rose-500 shrink-0" />
+                  <span className="pixel-text text-[9px] uppercase font-bold text-charcoal dark:text-white">
+                    Trampolin
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={onCloseTrampolineMenu}
+                  className="text-neutral-400 hover:text-charcoal dark:hover:text-white cursor-pointer"
+                  aria-label="Tutup menu trampolin"
+                >
+                  <X size={12} />
+                </button>
+              </div>
+              {isBouncingOnTrampoline ? (
+                <button
+                  type="button"
+                  onClick={onStopBounce}
+                  className="w-full flex items-center justify-center gap-1.5 py-1.5 px-3 bg-amber-500 hover:bg-amber-600 text-white border-2 border-charcoal shadow-[2px_2px_0px_#171717] pixel-text text-[9px] uppercase font-bold cursor-pointer active:translate-x-[1px] active:translate-y-[1px] transition-all"
+                >
+                  <Footprints size={12} />
+                  Selesai
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={onStartBounce}
+                  className="w-full flex items-center justify-center gap-1.5 py-1.5 px-3 bg-rose-500 hover:bg-rose-600 text-white border-2 border-charcoal shadow-[2px_2px_0px_#171717] pixel-text text-[9px] uppercase font-bold cursor-pointer active:translate-x-[1px] active:translate-y-[1px] transition-all"
+                >
+                  <ArrowBigUp size={12} />
+                  Lompat
+                </button>
+              )}
+            </div>
+          </Html>
         )}
       </group>
     );

@@ -50,7 +50,7 @@ export const JuroContextMenu: React.FC<JuroContextMenuProps> = ({
         left: `${x}px`,
         top: `${y}px`,
       }}
-      className={`absolute z-30 pointer-events-auto -translate-x-1/2 ${
+      className={`absolute z-40 pointer-events-auto -translate-x-1/2 ${
         isNearTop ? "translate-y-2" : "-translate-y-full"
       }`}
     >

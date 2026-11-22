@@ -3,7 +3,9 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 import {
   Settings,
   Sun,
+  Sunset,
   Moon,
+  CloudRain,
   Volume2,
   VolumeX,
   RotateCcw,
@@ -30,7 +32,7 @@ const NAV_LINKS = [
 export const Navbar: React.FC = () => {
   const location = useLocation();
   const navigate = useNavigate();
-  const { theme, soundEnabled, toggleTheme, toggleSound, triggerCameraReset } = useUIStore();
+  const { theme, soundEnabled, weather, toggleTheme, toggleSound, toggleWeather, triggerCameraReset } = useUIStore();
   const { myProfile, partnerProfile, openHubModal } = useCaregiverStore();
   const coins = useGameStore((s) => s.coins);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -88,6 +90,11 @@ export const Navbar: React.FC = () => {
   const handleToggleTheme = () => {
     soundEffects.playToggle(theme === "dark");
     toggleTheme();
+  };
+
+  const handleToggleWeather = () => {
+    soundEffects.playClick();
+    toggleWeather();
   };
 
   return (
@@ -189,9 +196,6 @@ export const Navbar: React.FC = () => {
             aria-label="Buka Pet Glance Desktop"
           >
             <AppWindow size={13} className="text-juro-orange shrink-0" />
-            <span className="pixel-text text-[9px] uppercase font-bold tracking-tight">
-              Glance
-            </span>
           </button>
 
           {/* Single Menu Dropdown Toggle Button */}
@@ -268,9 +272,6 @@ export const Navbar: React.FC = () => {
                     Pet Glance
                   </span>
                 </div>
-                <span className="pixel-text text-[7.5px] uppercase px-1.5 py-0.5 bg-juro-orange/15 text-juro-orange border border-charcoal/30">
-                  Mini
-                </span>
               </button>
 
               {/* Item 1: Reset Sudut Kamera */}
@@ -333,6 +334,39 @@ export const Navbar: React.FC = () => {
                     Tema Tampilan
                   </span>
                 </div>
+              </button>
+
+              {/* Item 3.5: Suasana Waktu & Cuaca (Siang, Sore, Malam, Hujan, Auto) */}
+              <button
+                type="button"
+                onClick={handleToggleWeather}
+                className="w-full flex items-center justify-between px-2.5 py-2 text-left bg-white dark:bg-neutral-800 hover:bg-amber-50 dark:hover:bg-neutral-700 border border-charcoal/20 hover:border-charcoal transition-colors cursor-pointer"
+              >
+                <div className="flex items-center gap-2.5 min-w-0">
+                  {weather === "senja" ? (
+                    <Sunset size={14} className="text-orange-500 shrink-0" />
+                  ) : weather === "malam" ? (
+                    <Moon size={14} className="text-blue-400 shrink-0" />
+                  ) : weather === "hujan" || weather === "rain" ? (
+                    <CloudRain size={14} className="text-sky-400 shrink-0" />
+                  ) : (
+                    <Sun size={14} className="text-amber-500 shrink-0" />
+                  )}
+                  <span className="pixel-text text-[9.5px] uppercase font-bold text-charcoal dark:text-white truncate">
+                    Waktu & Cuaca
+                  </span>
+                </div>
+                <span className="pixel-text text-[8px] uppercase font-bold px-1.5 py-0.5 border border-charcoal bg-amber-100 dark:bg-neutral-700 text-charcoal dark:text-amber-300">
+                  {weather === "auto"
+                    ? "AUTO"
+                    : weather === "cerah" || weather === "clear"
+                    ? "SIANG"
+                    : weather === "senja"
+                    ? "SORE"
+                    : weather === "malam"
+                    ? "MALAM"
+                    : "HUJAN"}
+                </span>
               </button>
 
               <div className="border-t border-charcoal/20 dark:border-neutral-700 my-0.5" />

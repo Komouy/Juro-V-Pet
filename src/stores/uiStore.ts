@@ -61,7 +61,20 @@ export const useUIStore = create<UIState>((set) => ({
     }),
   toggleWeather: () =>
     set((s) => ({
-      weather: s.weather === "clear" ? "rain" : "clear",
+      weather:
+        s.weather === "clear"
+          ? "rain"
+          : s.weather === "rain"
+          ? "clear"
+          : s.weather === "auto"
+          ? "cerah"
+          : s.weather === "cerah"
+          ? "senja"
+          : s.weather === "senja"
+          ? "malam"
+          : s.weather === "malam"
+          ? "hujan"
+          : "auto",
     })),
   setWeather: (weather) => set({ weather }),
   toggleSound: () => set((s) => ({ soundEnabled: !s.soundEnabled })),

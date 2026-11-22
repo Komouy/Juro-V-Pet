@@ -1,4 +1,4 @@
-import React, { Suspense, useRef, useState, useEffect, useCallback } from "react";
+import React, { Suspense, useRef, useState, useEffect, useCallback, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { Canvas } from "@react-three/fiber";
 import { OrbitControls } from "@react-three/drei";
@@ -12,7 +12,6 @@ import {
 } from "../../features/character/JuroModel";
 import { OutdoorEnvironment } from "./OutdoorEnvironment";
 import { ItemIllustration } from "../items/ItemIllustration";
-import { CloudRain, Sun, Moon } from "lucide-react";
 import { usePetStore } from "../../stores/petStore";
 import { useGameStore } from "../../stores/gameStore";
 import { useUIStore } from "../../stores/uiStore";
@@ -20,6 +19,7 @@ import { useCaregiverStore } from "../../stores/caregiverStore";
 import { CaregiverOnboardingModal } from "../caregiver/CaregiverOnboardingModal";
 import { SHOP_FOODS } from "../../data/economyCatalog";
 import { soundEffects } from "../../engine/audio/soundEffects";
+import { findPath, getGlobalNavGrid } from "../../engine/world/pathfinding";
 import {
   getTimePhaseFromDate,
   isBedtimeHour,
@@ -27,16 +27,23 @@ import {
   type TimePhase,
 } from "../../utils/timeOfDay";
 import {
+  JURO_BED_POS,
   JURO_BED_SLOT_1,
   JURO_BED_SLOT_2,
   JURO_BENCH_POS,
   JURO_TRAMPOLINE_POS,
   isWaterAt,
 } from "../../engine/world/mapTerrain";
+import {
+  normalizeWeather,
+  isRainingWeather,
+} from "../../types/ui";
 import { getCognitiveTier, computePetEmotionalState } from "../../engine/ai/cognitiveCore";
 import type { FoodItem, ToyItem } from "../../types/pet";
-import { ResponsiveCamera } from "./viewport/ResponsiveCamera";
+import { ResponsiveCamera, type CameraMode } from "./viewport/ResponsiveCamera";
 import { StatBars } from "./viewport/StatBars";
+import { MiniMap } from "./viewport/MiniMap";
+import { StorybookSky } from "./environment/StorybookSky";
 import { ActionTray, type DragPayload } from "./viewport/ActionTray";
 import { ActionDock } from "./viewport/ActionDock";
 import { JuroChatModal } from "./viewport/JuroChatModal";
@@ -54,6 +61,65 @@ import {
 
 type ActiveTray = "none" | "food" | "toy" | "bath";
 
+interface WeatherPalette {
+  sky: string;
+  fogDensity: number;
+  sunColor: string;
+  sunIntensity: number;
+  hemiSky: string;
+  hemiGround: string;
+  hemiIntensity: number;
+  fillIntensity: number;
+  isNight: boolean;
+}
+
+const WEATHER_PALETTES: Record<"cerah" | "hujan" | "senja" | "malam", WeatherPalette> = {
+  cerah: {
+    sky: "#b6dff2",
+    fogDensity: 0.0055,
+    sunColor: "#fff1d4",
+    sunIntensity: 1.35,
+    hemiSky: "#dff2ff",
+    hemiGround: "#7aa85c",
+    hemiIntensity: 0.68,
+    fillIntensity: 0.22,
+    isNight: false,
+  },
+  hujan: {
+    sky: "#83a3b8",
+    fogDensity: 0.011,
+    sunColor: "#cfe0ed",
+    sunIntensity: 0.82,
+    hemiSky: "#acc7d9",
+    hemiGround: "#527058",
+    hemiIntensity: 0.62,
+    fillIntensity: 0.18,
+    isNight: false,
+  },
+  senja: {
+    sky: "#e89e76",
+    fogDensity: 0.0085,
+    sunColor: "#ffa866",
+    sunIntensity: 1.25,
+    hemiSky: "#ffd0a6",
+    hemiGround: "#6b5254",
+    hemiIntensity: 0.56,
+    fillIntensity: 0.18,
+    isNight: false,
+  },
+  malam: {
+    sky: "#131f33",
+    fogDensity: 0.0135,
+    sunColor: "#7ca3eb",
+    sunIntensity: 0.45,
+    hemiSky: "#2d446e",
+    hemiGround: "#16241f",
+    hemiIntensity: 0.34,
+    fillIntensity: 0.1,
+    isNight: true,
+  },
+};
+
 interface DragVisualState {
   payload: DragPayload;
   moved: boolean;
@@ -65,6 +131,8 @@ export const PetViewport: React.FC = () => {
   const containerRef = useRef<HTMLDivElement>(null);
   const ghostRef = useRef<HTMLDivElement>(null);
   const controlsRef = useRef<OrbitControlsImpl>(null);
+  const isCameraDraggingRef = useRef(false);
+  const cameraDragEndTimeRef = useRef(0);
   const juroScreenPosRef = useRef<JuroScreenTarget>({ x: 300, y: 240, radiusPx: 110 });
 
   // Live 60fps bath state ref read directly by JuroModel useFrame (ZERO React re-renders during drag!)
@@ -94,15 +162,17 @@ export const PetViewport: React.FC = () => {
     recoverSleepEnergy,
     decayNightSleep,
     clean,
+    lastPosition,
   } = usePetStore();
   const { addLog, addCoins, foodInventory, ownedToys, consumeFood } = useGameStore();
   const weather = useUIStore((s) => s.weather);
-  const toggleWeather = useUIStore((s) => s.toggleWeather);
   const showToast = useUIStore((s) => s.showToast);
   const actionMenuStyle = useUIStore((s) => s.actionMenuStyle);
   const hasRegisteredName = useCaregiverStore((s) => s.hasRegisteredName);
   const partnerPet = useCaregiverStore((s) => s.partnerPet);
 
+  const juroYawRef = useRef<number>(0);
+  const [routeWaypoints, setRouteWaypoints] = useState<Array<{ x: number; z: number }>>([]);
   const [activeTray, setActiveTray] = useState<ActiveTray>("none");
   const [showStatDetails, setShowStatDetails] = useState(false);
   const [isChatOpen, setIsChatOpen] = useState(false);
@@ -171,6 +241,7 @@ export const PetViewport: React.FC = () => {
   const isHeadingToBedRef = useRef<boolean>(false);
   const wakeCooldownUntilRef = useRef<number>(0);
   const isDizzyRef = useRef<boolean>(false);
+  const [cameraMode] = useState<CameraMode>("follow");
 
   // Bench sitting interaction state & refs
   const [isBenchMenuOpen, setIsBenchMenuOpen] = useState(false);
@@ -187,8 +258,32 @@ export const PetViewport: React.FC = () => {
   const [soapBadgePercent, setSoapBadgePercent] = useState(0);
   const [walkCommand, setWalkCommand] = useState<WalkCommand | null>(null);
 
+  const handleBedArrival = useCallback(() => {
+    isHeadingToBedRef.current = false;
+    if (usePetStore.getState().currentState !== "sleep") {
+      sleep();
+      soundEffects.playSleep();
+      addLog("sleep", "Juro sampai di sofa tidurnya dan mulai tidur lelap.");
+      useCaregiverStore.getState().recordAction(
+        "sleep",
+        "Menidurkan Juro di sofa empuk untuk beristirahat.",
+        { energy: 35 }
+      );
+    }
+  }, [sleep, addLog]);
+
   const handleWalkPointSelect = useCallback(
     (x: number, z: number) => {
+      // Guard: Ignore if camera was actively being dragged/rotated (or within 250ms release buffer)
+      if (isCameraDraggingRef.current || Date.now() - cameraDragEndTimeRef.current < 250) {
+        return;
+      }
+
+      // Guard: Do not interrupt sleep with ground clicks (preserves restful sleep)
+      if (currentState === "sleep") {
+        return;
+      }
+
       if (isSittingOnBench) {
         setIsSittingOnBench(false);
       }
@@ -208,9 +303,57 @@ export const PetViewport: React.FC = () => {
       setJuroMenu((prev) => ({ ...prev, open: false }));
       setActiveTray("none");
       setShowStatDetails(false);
-      setWalkCommand({ x, z, nonce: Date.now() });
+
+      const startPt = juroWorldPosRef.current
+        ? { x: juroWorldPosRef.current.x, z: juroWorldPosRef.current.z }
+        : { x: lastPosition?.x ?? 0, z: lastPosition?.z ?? 0 };
+
+      // Check if clicked target is at or near the bed terrace / Bukit Santai
+      const distToBed = Math.hypot(x - JURO_BED_POS.x, z - JURO_BED_POS.z);
+      const isBedTarget = distToBed < 2.0;
+
+      let targetX = x;
+      let targetZ = z;
+
+      if (isBedTarget) {
+        isHeadingToBedRef.current = true;
+        targetX = JURO_BED_SLOT_1.x;
+        targetZ = JURO_BED_SLOT_1.z;
+
+        // If Juro is already resting at or near the sofa bed (<0.85m), immediately trigger sleep!
+        const currentDistToBed = Math.hypot(startPt.x - JURO_BED_POS.x, startPt.z - JURO_BED_POS.z);
+        if (currentDistToBed < 0.85) {
+          handleBedArrival();
+          return;
+        }
+        addLog("sleep", "Juro melompat menuju kasur untuk tidur lelap.");
+        useCaregiverStore.getState().recordAction(
+          "sleep",
+          "Menuntun Juro menuju tempat tidur di Bukit Santai.",
+          { energy: 35 }
+        );
+      } else {
+        isHeadingToBedRef.current = false;
+        // If Juro is sleeping and user taps elsewhere, wake up and walk!
+        if (usePetStore.getState().currentState === "sleep") {
+          wakeUp();
+          soundEffects.playWakeUp();
+          addLog("interaction", "Juro bangun dari kasur dan melangkah menuju tujuan baru.");
+          useCaregiverStore.getState().recordAction(
+            "wake",
+            "Membangunkan Juro dari kasur untuk menjelajah.",
+            {}
+          );
+          wakeCooldownUntilRef.current = Date.now() + 180_000;
+        }
+      }
+
+      const navPath = findPath(getGlobalNavGrid(), startPt, { x: targetX, z: targetZ });
+      const finalWaypoints = navPath.length > 0 ? navPath : [{ x: targetX, z: targetZ }];
+      setRouteWaypoints(finalWaypoints);
+      setWalkCommand({ x: targetX, z: targetZ, nonce: Date.now() });
     },
-    [isSittingOnBench, isBouncingOnTrampoline, isBenchMenuOpen, isTrampolineMenuOpen, setActiveTray, setShowStatDetails]
+    [isSittingOnBench, isBouncingOnTrampoline, isBenchMenuOpen, isTrampolineMenuOpen, setActiveTray, setShowStatDetails, lastPosition, handleBedArrival, addLog, wakeUp, currentState]
   );
 
   const handleOpenShopFromMap = useCallback(() => {
@@ -271,7 +414,14 @@ export const PetViewport: React.FC = () => {
     (isSpontaneous = false): PetChatContext => {
       const petState = usePetStore.getState();
       const currentHour = new Date().getHours();
-      const isNight = currentHour >= 18 || currentHour < 6;
+      const normW = normalizeWeather(weather);
+      const isNight =
+        normW === "malam" ||
+        (normW === "cerah"
+          ? false
+          : normW === "senja"
+          ? false
+          : currentHour >= 19 || currentHour < 6);
       const isNightSleepy = isBedtimeHour();
       const isDizzy = isDizzyRef.current;
       const isSleeping = petState.currentState === "sleep";
@@ -305,7 +455,7 @@ export const PetViewport: React.FC = () => {
           isPlaying,
           isSittingOnBench,
           isInWater: inWater,
-          isRaining: weather === "rain",
+          isRaining: isRainingWeather(weather),
           isNight,
           isNightSleepy,
           level: petState.level,
@@ -348,7 +498,7 @@ export const PetViewport: React.FC = () => {
       });
 
       const ambient = computePetEnvironment({
-        isRaining: weather === "rain",
+        isRaining: isRainingWeather(weather),
         isNight,
         isNightSleepy,
       });
@@ -558,16 +708,23 @@ export const PetViewport: React.FC = () => {
 
   const handlePetClick = useCallback(
     (screenPos?: { x: number; y: number }) => {
-      // Dismiss active speech bubble if already visible
-      if (speechBubble.visible) {
-        if (speechTimerRef.current) {
-          clearTimeout(speechTimerRef.current);
-          speechTimerRef.current = null;
-        }
-        setSpeechBubble((s) => ({ ...s, visible: false }));
+      // Guard: Ignore if camera was actively being dragged/rotated (or within 250ms release buffer)
+      if (isCameraDraggingRef.current || Date.now() - cameraDragEndTimeRef.current < 250) {
+        return;
       }
 
-      // If Juro is sleeping, clicking Juro wakes Juro up cleanly
+      // Stop any active walking so Juro pauses and interacts with player
+      setWalkCommand(null);
+      setRouteWaypoints([]);
+
+      // Dismiss active speech bubble immediately so menu takes priority
+      if (speechTimerRef.current) {
+        clearTimeout(speechTimerRef.current);
+        speechTimerRef.current = null;
+      }
+      setSpeechBubble({ visible: false, text: "", isLoading: false });
+
+      // If Juro is sleeping, wake Juro up cleanly AND continue to open the menu
       if (currentState === "sleep") {
         wakeUp();
         soundEffects.playWakeUp();
@@ -575,7 +732,6 @@ export const PetViewport: React.FC = () => {
         useCaregiverStore.getState().recordAction("wake", "Membangunkan Juro dari tidurnya.", {});
         wakeCooldownUntilRef.current = Date.now() + 180_000;
         isHeadingToBedRef.current = false;
-        return;
       }
 
       if (actionMenuStyle === "floating") {
@@ -629,7 +785,7 @@ export const PetViewport: React.FC = () => {
         soundEffects.playPop();
       }
     },
-    [actionMenuStyle, speechBubble.visible, juroMenu.open, currentState, wakeUp, addLog]
+    [actionMenuStyle, juroMenu.open, currentState, wakeUp, addLog]
   );
 
   // Keep Juro Context Menu smoothly anchored above Juro's head during animations/walking
@@ -783,20 +939,44 @@ export const PetViewport: React.FC = () => {
     };
   }, [speechBubble.visible]);
 
-  // Dismiss bench menu, trampoline menu & Juro menu when user rotates or zooms camera with OrbitControls
+  // Dismiss bench menu, trampoline menu & Juro menu when user actively rotates or zooms camera with OrbitControls
   useEffect(() => {
     const controls = controlsRef.current;
     if (!controls) return;
+
+    let didCameraMove = false;
+
     const onOrbitStart = () => {
+      didCameraMove = false;
+    };
+
+    const onOrbitChange = () => {
+      didCameraMove = true;
+      isCameraDraggingRef.current = true;
+      cameraDragEndTimeRef.current = Date.now();
       setIsBenchMenuOpen(false);
       setIsTrampolineMenuOpen(false);
-      if (juroMenu.open) {
-        setJuroMenu((prev) => ({ ...prev, open: false }));
-      }
+      setJuroMenu((prev) => (prev.open ? { ...prev, open: false } : prev));
     };
+
+    const onOrbitEnd = () => {
+      if (didCameraMove) {
+        cameraDragEndTimeRef.current = Date.now();
+      }
+      isCameraDraggingRef.current = false;
+      didCameraMove = false;
+    };
+
     controls.addEventListener("start", onOrbitStart);
-    return () => controls.removeEventListener("start", onOrbitStart);
-  }, [juroMenu.open]);
+    controls.addEventListener("change", onOrbitChange);
+    controls.addEventListener("end", onOrbitEnd);
+
+    return () => {
+      controls.removeEventListener("start", onOrbitStart);
+      controls.removeEventListener("change", onOrbitChange);
+      controls.removeEventListener("end", onOrbitEnd);
+    };
+  }, []);
 
   // Imperative drag tracking refs (zero allocations, zero layout thrash, zero re-renders)
   const dragMetaRef = useRef<{
@@ -874,8 +1054,14 @@ export const PetViewport: React.FC = () => {
     return () => clearInterval(timer);
   }, [isNightSleep, currentState, decayNightSleep]);
 
-  const activePhase: TimePhase = getTimePhaseFromDate(now);
+  const normalizedWeather = normalizeWeather(weather);
+  const activePhase: TimePhase = useMemo(() => {
+    if (normalizedWeather === "malam") return "night";
+    if (normalizedWeather === "senja") return "sunset";
+    return getTimePhaseFromDate(now);
+  }, [normalizedWeather, now]);
   const activeTheme = TIME_THEMES[activePhase];
+  const activePalette = WEATHER_PALETTES[normalizedWeather];
 
   const triggerFeed = useCallback(
     (food: FoodItem) => {
@@ -1208,20 +1394,6 @@ export const PetViewport: React.FC = () => {
     }
   }, [cameraResetNonce]);
 
-  const handleBedArrival = useCallback(() => {
-    isHeadingToBedRef.current = false;
-    if (usePetStore.getState().currentState !== "sleep") {
-      sleep();
-      soundEffects.playSleep();
-      addLog("sleep", "Juro sampai di sofa tidurnya dan mulai tidur lelap.");
-      useCaregiverStore.getState().recordAction(
-        "sleep",
-        "Menidurkan Juro di sofa empuk untuk beristirahat.",
-        { energy: 35 }
-      );
-    }
-  }, [sleep, addLog]);
-
   const handleBenchArrival = useCallback(() => {
     isHeadingToBenchRef.current = false;
     setIsSittingOnBench(true);
@@ -1282,8 +1454,8 @@ export const PetViewport: React.FC = () => {
     setIsSittingOnBench(false);
     isHeadingToBenchRef.current = false;
     soundEffects.playPlop();
-    // Walk to clear ground slightly in front of the bench
-    setWalkCommand({ x: 3.15, z: 1.25, nonce: Date.now() });
+    // Walk to clear terrace ground directly in front of the bench
+    setWalkCommand({ x: 6.0, z: 18.2, nonce: Date.now() });
     addLog("interaction", "Juro berdiri dari kursi taman dan kembali menjelajah.");
   }, [addLog]);
 
@@ -1365,42 +1537,10 @@ export const PetViewport: React.FC = () => {
     setIsBouncingOnTrampoline(false);
     isHeadingToTrampolineRef.current = false;
     soundEffects.playPlop();
-    // Walk to clear open meadow grass safely in front of the trampoline
-    setWalkCommand({ x: JURO_TRAMPOLINE_POS.x, z: JURO_TRAMPOLINE_POS.z + 0.65, nonce: Date.now() });
+    // Walk to clear open meadow trail safely in front of the trampoline
+    setWalkCommand({ x: JURO_TRAMPOLINE_POS.x, z: JURO_TRAMPOLINE_POS.z + 1.35, nonce: Date.now() });
     addLog("interaction", "Juro selesai bermain trampolin dan melangkah kembali ke padang rumput.");
   }, [addLog]);
-
-  const handleBedClick = useCallback(() => {
-    soundEffects.playClick();
-    if (isSittingOnBench) setIsSittingOnBench(false);
-    if (isBouncingOnTrampoline) setIsBouncingOnTrampoline(false);
-    isHeadingToBenchRef.current = false;
-    isHeadingToTrampolineRef.current = false;
-    setIsBenchMenuOpen(false);
-    setIsTrampolineMenuOpen(false);
-    if (currentState === "sleep") {
-      wakeUp();
-      soundEffects.playWakeUp();
-      addLog("interaction", "Juro dibangunkan dari sofa tidurnya.");
-      useCaregiverStore.getState().recordAction(
-        "wake",
-        "Membangunkan Juro dari sofa tidurnya.",
-        {}
-      );
-      wakeCooldownUntilRef.current = Date.now() + 180_000;
-      isHeadingToBedRef.current = false;
-    } else {
-      isHeadingToBedRef.current = true;
-      setWalkCommand({ x: JURO_BED_SLOT_1.x, z: JURO_BED_SLOT_1.z, nonce: Date.now() });
-      addLog("sleep", "Juro berjalan menuju sofa untuk tidur lelap.");
-      useCaregiverStore.getState().recordAction(
-        "sleep",
-        "Menuntun Juro tidur di sofa empuk.",
-        { energy: 35 }
-      );
-      soundEffects.playClick();
-    }
-  }, [currentState, wakeUp, addLog, isSittingOnBench, isBouncingOnTrampoline]);
 
   const handleToggleSleep = useCallback(() => {
     if (isSittingOnBench) setIsSittingOnBench(false);
@@ -1433,9 +1573,23 @@ export const PetViewport: React.FC = () => {
         { energy: 35 }
       );
       soundEffects.playClick();
+      // If Juro is already resting or near the sofa bed (<0.85m), immediately trigger sleep!
+      if (juroWorldPosRef.current) {
+        const distToSlot = Math.hypot(
+          juroWorldPosRef.current.x - JURO_BED_SLOT_1.x,
+          juroWorldPosRef.current.z - JURO_BED_SLOT_1.z
+        );
+        const distToCenter = Math.hypot(
+          juroWorldPosRef.current.x - JURO_BED_POS.x,
+          juroWorldPosRef.current.z - JURO_BED_POS.z
+        );
+        if (distToSlot < 0.85 || distToCenter < 0.85) {
+          handleBedArrival();
+        }
+      }
     }
     setActiveTray("none");
-  }, [currentState, wakeUp, addLog, isSittingOnBench, isBouncingOnTrampoline]);
+  }, [currentState, wakeUp, addLog, isSittingOnBench, isBouncingOnTrampoline, handleBedArrival, isNightSleep, energy, showToast]);
 
   const handleMenuAction = useCallback(
     (action: "food" | "toy" | "sleep" | "bath") => {
@@ -1469,23 +1623,9 @@ export const PetViewport: React.FC = () => {
     [isSittingOnBench, isBouncingOnTrampoline, handleToggleSleep]
   );
 
-  const handleToggleWeather = useCallback(() => {
-    const nextWeather = weather === "clear" ? "rain" : "clear";
-    soundEffects.playWeatherChange(nextWeather === "rain");
-    toggleWeather();
-    if (nextWeather === "rain") {
-      addLog(
-        "interaction",
-        "Langit menurunkan rintik hujan yang menyejukkan. Juro memakai daun kecil sebagai payung!"
-      );
-    } else {
-      addLog("interaction", "Awan hujan berlalu, cuaca kembali cerah dan hangat.");
-    }
-  }, [weather, toggleWeather, addLog]);
-
   // Gentle ambient raindrop sound while pixel rain is falling
   useEffect(() => {
-    if (weather !== "rain") return;
+    if (!isRainingWeather(weather)) return;
     const interval = setInterval(() => {
       soundEffects.playRainDrop();
     }, 2800);
@@ -1555,8 +1695,21 @@ export const PetViewport: React.FC = () => {
           ? `Stat tidur Juro hampir habis (${Math.round(energy)}%). Juro butuh tidur penuh dan kembali ke kasur.`
           : `Waktu malam telah tiba (pukul ${now.getHours()}:00). Juro berjalan menuju sofa tidurnya untuk tidur pulas.`
       );
+      if (juroWorldPosRef.current) {
+        const distToSlot = Math.hypot(
+          juroWorldPosRef.current.x - JURO_BED_SLOT_1.x,
+          juroWorldPosRef.current.z - JURO_BED_SLOT_1.z
+        );
+        const distToCenter = Math.hypot(
+          juroWorldPosRef.current.x - JURO_BED_POS.x,
+          juroWorldPosRef.current.z - JURO_BED_POS.z
+        );
+        if (distToSlot < 0.85 || distToCenter < 0.85) {
+          handleBedArrival();
+        }
+      }
     }
-  }, [isNightSleep, currentState, now, wakeUp, addLog]);
+  }, [isNightSleep, currentState, now, wakeUp, addLog, handleBedArrival, energy]);
 
   const getDraggedIllustrationId = (payload: DragPayload): string => {
     switch (payload.kind) {
@@ -1578,7 +1731,7 @@ export const PetViewport: React.FC = () => {
   return (
     <div
       ref={containerRef}
-      style={{ background: activeTheme.skyGradient }}
+      style={{ background: activePalette.sky }}
       className={`relative flex-1 min-h-0 w-full overflow-hidden select-none touch-none transition-all duration-700 ${
         isDraggingPet ? "cursor-grabbing" : "cursor-default"
       }`}
@@ -1597,102 +1750,105 @@ export const PetViewport: React.FC = () => {
         onToggleStatDetails={() => setShowStatDetails((prev) => !prev)}
       />
 
-      {/* Atmospheric Weather Indicator & Toggle Pill (Clear <-> Pixel Rain) */}
-      <div className="absolute top-3 right-3 z-20 pointer-events-auto">
-        <button
-          type="button"
-          onClick={handleToggleWeather}
-          aria-label={`Ganti cuaca (saat ini: ${weather === "rain" ? "Hujan" : "Cerah"})`}
-          className="h-10 inline-flex items-center gap-1.5 sm:gap-2 px-3 bg-warm-white/95 dark:bg-neutral-900/90 backdrop-blur-xs border-2 border-charcoal dark:border-neutral-600 shadow-[2px_2px_0px_#171717] dark:shadow-[2px_2px_0px_#000000] hover:border-juro-orange transition-all active:translate-x-[1px] active:translate-y-[1px] cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-juro-orange"
-        >
-          {weather === "rain" ? (
-            <>
-              <CloudRain size={14} className="text-sky-500 animate-bounce shrink-0" />
-              <span className="pixel-text text-[9px] sm:text-[10px] font-bold text-sky-600 dark:text-sky-400 uppercase">
-                Hujan
-              </span>
-            </>
-          ) : activeTheme.isNight ? (
-            <>
-              <Moon size={14} className="text-amber-300 shrink-0" />
-              <span className="pixel-text text-[9px] sm:text-[10px] font-bold text-amber-500 dark:text-amber-300 uppercase">
-                Malam
-              </span>
-            </>
-          ) : (
-            <>
-              <Sun size={14} className="text-amber-500 shrink-0" />
-              <span className="pixel-text text-[9px] sm:text-[10px] font-bold text-amber-600 dark:text-amber-400 uppercase">
-                Cerah
-              </span>
-            </>
-          )}
-        </button>
+      {/* Floating Retro Radar MiniMap Widget (Top-Right, docked neatly below navbar) */}
+      <div className="absolute top-2 sm:top-2.5 right-2 sm:right-3 z-30 pointer-events-auto">
+        <MiniMap
+          playerX={lastPosition?.x ?? 0}
+          playerZ={lastPosition?.z ?? 0}
+          routeWaypoints={routeWaypoints}
+          activeDestination={walkCommand ? { x: walkCommand.x, z: walkCommand.z } : null}
+          onNavigatePoint={(x, z) => handleWalkPointSelect(x, z)}
+          juroWorldPosRef={juroWorldPosRef}
+          juroYawRef={juroYawRef}
+        />
       </div>
 
       {/* Partner Pet Presence Pill in 2-Player Shared Meadow */}
       {partnerPet && (
-        <div className="absolute top-14 right-3 z-20 pointer-events-auto flex items-center gap-1.5 px-2.5 py-1 bg-warm-white/95 dark:bg-neutral-900/90 backdrop-blur-xs border-2 border-charcoal dark:border-neutral-600 shadow-[2px_2px_0px_#171717] dark:shadow-[2px_2px_0px_#000000]">
-          <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse shrink-0" />
+        <div className="absolute top-[104px] sm:top-[114px] right-2 sm:right-3 z-20 pointer-events-auto flex items-center gap-1.5 px-2.5 py-1 bg-warm-white/95 dark:bg-neutral-900/90 backdrop-blur-xs border-2 border-charcoal dark:border-neutral-600 shadow-[2px_2px_0px_#171717] dark:shadow-[2px_2px_0px_#000000]">
+          <span
+            className={`w-2 h-2 rounded-full shrink-0 ${
+              partnerPet.isOnline ? "bg-emerald-500 animate-pulse" : "bg-neutral-400"
+            }`}
+          />
           <span className="pixel-text text-[9px] text-charcoal dark:text-neutral-200">
-            {partnerPet.name} ({partnerPet.ownerName}) · Lv.{partnerPet.level}
+            {partnerPet.name} ({partnerPet.ownerName}) · Lv.{partnerPet.level} {partnerPet.isOnline ? "(Online)" : "(Istirahat)"}
           </span>
         </div>
       )}
 
-      {/* 3D Canvas (Full Stage — Mobile-Optimized DPR & GPU Settings) */}
+      {/* 3D Canvas with Realistic Soft Shadows, Atmospheric Sky & Fog */}
       <Canvas
-        camera={{ position: [0, 1.95, 6.2], fov: 38 }}
-        dpr={[1, 1.5]}
+        shadows={{ type: THREE.PCFSoftShadowMap }}
+        camera={{ position: [11.5, 13.5, 13.5], fov: 42, near: 0.5, far: 180 }}
+        dpr={[1, Math.min(typeof window !== "undefined" ? window.devicePixelRatio : 1.5, 1.5)]}
+        performance={{ min: 0.75, max: 1.5 }}
         gl={{
           antialias: true,
-          alpha: true,
+          alpha: false,
           powerPreference: "high-performance",
           toneMapping: THREE.ACESFilmicToneMapping,
+          toneMappingExposure: 0.88,
+          stencil: false,
+          depth: true,
         }}
       >
         <Suspense fallback={null}>
-          {/* Adaptive Responsive Camera Following Juro Across Valley */}
-          <ResponsiveCamera controlsRef={controlsRef} targetPosRef={juroWorldPosRef} />
+          {/* Seamless Atmospheric Sky & Horizon Fog */}
+          <color attach="background" args={[activePalette.sky]} />
+          <fogExp2 attach="fog" args={[activePalette.sky, activePalette.fogDensity]} />
 
-          {/* Dynamic Lighting Synced to User's Time of Day */}
-          <ambientLight
-            color={activeTheme.ambientColor}
-            intensity={activeTheme.ambientIntensity}
+          {/* Living Storybook Sky: Sun, Moon, Twinkling Stars & Drifting Fluffy Clouds */}
+          <StorybookSky weather={normalizedWeather} isNight={activePalette.isNight} />
+
+          {/* Adaptive Responsive Camera Following Juro Across Valley */}
+          <ResponsiveCamera
+            controlsRef={controlsRef}
+            targetPosRef={juroWorldPosRef}
+            cameraMode={cameraMode}
+          />
+
+          {/* 3-Point Warm/Cool Storybook Lighting Rig */}
+          <hemisphereLight
+            args={[activePalette.hemiSky, activePalette.hemiGround, activePalette.hemiIntensity]}
           />
           <directionalLight
-            position={activeTheme.keyLightPos}
-            color={activeTheme.keyLightColor}
-            intensity={activeTheme.keyLightIntensity}
+            position={[22, 30, 14]}
+            color={activePalette.sunColor}
+            intensity={activePalette.sunIntensity}
+            castShadow
+            shadow-mapSize={[1024, 1024]}
+            shadow-camera-near={4}
+            shadow-camera-far={80}
+            shadow-camera-left={-28}
+            shadow-camera-right={28}
+            shadow-camera-top={28}
+            shadow-camera-bottom={-28}
+            shadow-bias={-0.0005}
+            shadow-normalBias={0.02}
           />
-          {/* Soft Front Face Fill so Juro stays bright & adorable even at night */}
+          <directionalLight
+            position={[-20, 14, -18]}
+            color="#9ec8ff"
+            intensity={activePalette.fillIntensity}
+          />
+          {/* Soft Front Face Fill so Juro stays bright & adorable */}
           <directionalLight
             position={[-2.5, 2.0, 3.5]}
-            intensity={activeTheme.isNight ? 0.65 : 0.7}
+            intensity={activePalette.isNight ? 0.35 : 0.45}
             color="#FFF5EA"
           />
-          {/* Rim Backlight */}
-          <directionalLight
-            position={[-3.5, 4, -3.5]}
-            intensity={activeTheme.rimLightIntensity}
-            color={activeTheme.rimLightColor}
-          />
-          {/* Warm Bottom Bounce Glow */}
-          <pointLight
-            position={[0, -1.6, 1.4]}
-            intensity={activeTheme.isNight ? 0.55 : 0.4}
-            color={activeTheme.isNight ? "#FDE047" : "#F97316"}
-          />
 
-          {/* Outdoor Nature Environment (Memoized, Clickable Map, Interactive Shop & Mine Cave!) */}
+          {/* Outdoor Nature Environment (Clickable Map, Interactive Shop & Mine Cave!) */}
           <OutdoorEnvironment
             theme={activeTheme}
-            weather={weather}
+            weather={normalizedWeather}
             onWalkPointSelect={handleWalkPointSelect}
             walkCommand={walkCommand}
+            routeWaypoints={routeWaypoints}
+            juroWorldPosRef={juroWorldPosRef}
             onOpenShop={handleOpenShopFromMap}
             onOpenMine={handleOpenMineFromMap}
-            onBedClick={handleBedClick}
             isBenchMenuOpen={isBenchMenuOpen}
             onBenchClick={handleBenchClick}
             onSitOnBench={handleSitOnBench}
@@ -1713,6 +1869,7 @@ export const PetViewport: React.FC = () => {
             bathStateRef={bathStateRef}
             juroScreenPosRef={juroScreenPosRef}
             juroWorldPosRef={juroWorldPosRef}
+            juroYawRef={juroYawRef}
             walkCommand={walkCommand}
             onPetClick={handlePetClick}
             isHeadingToBedRef={isHeadingToBedRef}
@@ -1746,33 +1903,39 @@ export const PetViewport: React.FC = () => {
               customSkin={partnerPet.activeSkin}
               customHat={partnerPet.activeHat}
               level={partnerPet.level}
+              partnerState={partnerPet.currentState as any}
+              isPartnerOnline={partnerPet.isOnline}
               initialPosition={JURO_BED_SLOT_2}
               partnerName={partnerPet.name}
               isRaining={weather === "rain"}
               onPetClick={() => {
                 soundEffects.playPop();
-                showToast(`Mengelus ${partnerPet.name} milik ${partnerPet.ownerName}!`, "info");
+                showToast(`Menyapa ${partnerPet.name} milik ${partnerPet.ownerName}!`, "info");
                 useCaregiverStore.getState().recordAction(
-                  "pet",
-                  `Mengelus ${partnerPet.name} milik ${partnerPet.ownerName} yang sedang berkunjung di lembah.`,
+                  "interaction",
+                  `Menyapa ${partnerPet.name} milik ${partnerPet.ownerName} yang sedang berkunjung di lembah.`,
                   { affection: 5, happiness: 5 }
                 );
               }}
             />
           )}
 
-          {/* Wide Diorama Orbit Controls — centered on Juro */}
+          {/* Wide Diorama Orbit Controls — centered on Juro with cameraMode integration */}
           <OrbitControls
             ref={controlsRef}
             enabled={orbitEnabled}
-            enablePan={false}
+            enablePan={cameraMode === "free"}
             enableZoom={true}
-            minDistance={2.2}
-            maxDistance={12.5}
-            minPolarAngle={Math.PI / 5.5}
-            maxPolarAngle={Math.PI / 2.08}
-            minAzimuthAngle={-Math.PI * 0.78}
-            maxAzimuthAngle={Math.PI * 0.78}
+            enableRotate={cameraMode !== "isometric"}
+            mouseButtons={{
+              LEFT: THREE.MOUSE.ROTATE,
+              MIDDLE: THREE.MOUSE.DOLLY,
+              RIGHT: cameraMode === "free" ? THREE.MOUSE.PAN : THREE.MOUSE.ROTATE,
+            }}
+            minDistance={4.0}
+            maxDistance={45.0}
+            minPolarAngle={Math.PI * 0.12}
+            maxPolarAngle={Math.PI * 0.44}
           />
         </Suspense>
       </Canvas>
@@ -1882,7 +2045,7 @@ export const PetViewport: React.FC = () => {
       {/* Mode Melayang di Juro (Klasik): Balon menu aksi & obrolan muncul di atas tubuh Juro saat diklik */}
       {actionMenuStyle === "floating" && (
         <JuroContextMenu
-          open={juroMenu.open && !speechBubble.visible}
+          open={juroMenu.open}
           x={juroMenu.x}
           y={juroMenu.y}
           isNearTop={juroMenu.isNearTop}

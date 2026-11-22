@@ -40,6 +40,19 @@ export const DesktopPetGlance: React.FC = () => {
     }
   }, []);
 
+  // 0. Render Native Android Picture-in-Picture full-viewport overlay
+  if (desktopGlanceService.isNativePipActive()) {
+    return (
+      <div className="fixed inset-0 z-[9999] bg-warm-white dark:bg-neutral-900 flex flex-col items-center justify-center p-2 overflow-hidden select-none">
+        <PetGlanceCard
+          isDetachedWindow={true}
+          onClose={handleCloseGlance}
+          onOpenValley3D={handleOpenValley3D}
+        />
+      </div>
+    );
+  }
+
   // 1. Render directly into Desktop Picture-in-Picture window if active
   const pipContainer = desktopGlanceService.getPipContainer();
   if (desktopGlanceService.isPipActive() && pipContainer) {

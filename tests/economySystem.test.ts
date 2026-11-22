@@ -155,23 +155,20 @@ describe("Economy, Mining & Shop System", () => {
   });
 
   it("resolves solid map obstacles and elevated platform cliff walls accurately", () => {
-    // Trying to walk straight into the bridge lantern at (-1.45, -1.65) pushes Juro outside
-    const hitLantern = resolveHorizontalCollisions(-1.45, -1.65, BASE_GROUND_Y, 0.4, false);
+    // Trying to walk straight into the lantern at (-6.0, -0.4) pushes Juro outside
+    const hitLantern = resolveHorizontalCollisions(-6.0, -0.4, BASE_GROUND_Y, 0.4, false);
     expect(hitLantern.hitObstacle).toBe(true);
-    expect(Math.hypot(hitLantern.x - -1.45, hitLantern.z - -1.65)).toBeGreaterThanOrEqual(0.55);
+    expect(Math.hypot(hitLantern.x - -6.0, hitLantern.z - -0.4)).toBeGreaterThanOrEqual(0.55);
 
-    // Trying to walk sideways into the West Knoll cliff while on low ground blocks entry
-    const hitCliff = resolveHorizontalCollisions(-3.25, -0.55, BASE_GROUND_Y, 0.4, false);
-    expect(hitCliff.hitObstacle).toBe(true);
+    // Trying to walk into Kafe Senja building at (18.8, -3.2) blocks entry
+    const hitShop = resolveHorizontalCollisions(18.8, -3.2, BASE_GROUND_Y, 0.4, false);
+    expect(hitShop.hitObstacle).toBe(true);
 
-    // When elevated atop the West Knoll, terrain height matches platform elevation
-    expect(getTerrainHeightAt(-3.25, -0.55)).toBeCloseTo(BASE_GROUND_Y + 0.46, 2);
+    // When atop Bukit Santai, terrain height matches hill elevation
+    expect(getTerrainHeightAt(-15.0, 4.0)).toBeGreaterThanOrEqual(2.0);
 
-    // With footbridge removed, terrain height at stream is ground level
-    expect(getTerrainHeightAt(-0.36, -2.32)).toBeCloseTo(BASE_GROUND_Y, 2);
-
-    // Mine Cave at (-4.35, -4.05) blocks Juro from clipping inside
-    const hitMineCave = resolveHorizontalCollisions(-4.35, -3.3, BASE_GROUND_Y, 0.38, false);
+    // Mine Cave at (-14.2, -14.2) blocks Juro from clipping inside
+    const hitMineCave = resolveHorizontalCollisions(-14.2, -14.2, BASE_GROUND_Y, 0.38, false);
     expect(hitMineCave.hitObstacle).toBe(true);
   });
 

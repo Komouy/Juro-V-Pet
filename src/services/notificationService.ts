@@ -1,10 +1,24 @@
 import { Capacitor } from "@capacitor/core";
 import { LocalNotifications } from "@capacitor/local-notifications";
 
-interface CriticalNeeds {
+export interface CriticalNeeds {
   hunger: number;
   energy: number;
   cleanliness: number;
+}
+
+export const NOTIF_CHANNEL_ID = "juro_care_channel";
+export const NOTIF_ID_HUNGER = 101;
+export const NOTIF_ID_BEDTIME = 102;
+export const NOTIF_ID_CLEANLINESS = 103;
+export const NOTIF_ID_GREETING = 104;
+
+export interface BackgroundNotificationPlan {
+  id: number;
+  title: string;
+  body: string;
+  triggerAt: Date;
+  channelId: string;
 }
 
 const STORAGE_KEY_ENABLED = "juro_notifications_enabled";
@@ -13,6 +27,7 @@ const CRITICAL_COOLDOWN_MS = 45 * 60 * 1000; // 45 menit cooldown agar tidak spa
 
 class NotificationService {
   private lastCriticalTimes: Record<string, number> = {};
+  private isChannelInitialized = false;
 
   constructor() {
     this.loadLastCriticalTimes();
@@ -62,6 +77,25 @@ class NotificationService {
     }
   }
 
+  async initNotificationChannel(): Promise<void> {
+    if (this.isChannelInitialized) return;
+    if (Capacitor.isNativePlatform()) {
+      try {
+        await LocalNotifications.createChannel({
+          id: NOTIF_CHANNEL_ID,
+          name: "Perawatan Juro",
+          description: "Notifikasi kebutuhan vital dan pengingat pet virtual Juro",
+          importance: 4, // IMPORTANCE_HIGH
+          visibility: 1, // VISIBILITY_PUBLIC
+          vibration: true,
+        });
+        this.isChannelInitialized = true;
+      } catch (err) {
+        console.warn("Gagal membuat channel notifikasi native:", err);
+      }
+    }
+  }
+
   async hasPermission(): Promise<boolean> {
     if (Capacitor.isNativePlatform()) {
       try {
@@ -84,6 +118,7 @@ class NotificationService {
 
     if (Capacitor.isNativePlatform()) {
       try {
+        await this.initNotificationChannel();
         const result = await LocalNotifications.requestPermissions();
         const granted = result.display === "granted";
         if (granted) this.setEnabled(true);
@@ -109,7 +144,11 @@ class NotificationService {
     return false;
   }
 
-  async sendNotification(title: string, body: string, id = Math.floor(Math.random() * 100000)) {
+  async sendNotification(
+    title: string,
+    body: string,
+    id = Math.floor(Math.random() * 100000)
+  ) {
     if (!this.isEnabled()) return;
 
     if (Capacitor.isNativePlatform()) {
@@ -117,6 +156,7 @@ class NotificationService {
         const hasPerm = await this.hasPermission();
         if (!hasPerm) return;
 
+        await this.initNotificationChannel();
         await LocalNotifications.schedule({
           notifications: [
             {
@@ -124,6 +164,7 @@ class NotificationService {
               title,
               body,
               smallIcon: "ic_stat_name",
+              channelId: NOTIF_CHANNEL_ID,
               sound: undefined,
             },
           ],
@@ -148,10 +189,130 @@ class NotificationService {
     }
   }
 
+  calculateBackgroundSchedules(
+    needs: CriticalNeeds,
+    petName = "Juro",
+    now = Date.now()
+  ): BackgroundNotificationPlan[] {
+    const plans: BackgroundNotificationPlan[] = [];
+
+    // 1. Jadwal Pengingat Kelaparan
+    if (needs.hunger <= 25) {
+      plans.push({
+        id: NOTIF_ID_HUNGER,
+        title: `${petName} Sedang Kelaparan!`,
+        body: `Perut ${petName} keroncongan. Yuk berikan camilan atau buah segar!`,
+        triggerAt: new Date(now + 15 * 60 * 1000), // 15 menit ke depan
+        channelId: NOTIF_CHANNEL_ID,
+      });
+    } else {
+      // Hitung estimasi waktu hingga rasa lapar menyentuh 25
+      const hoursToDecay = (needs.hunger - 25) / 2; // ~2 poin per jam
+      const minutesToDecay = Math.max(30, Math.min(24 * 60, Math.round(hoursToDecay * 60)));
+      plans.push({
+        id: NOTIF_ID_HUNGER,
+        title: `${petName} Mulai Lapar!`,
+        body: `${petName} sudah mulai lapar di lembah. Sempatkan beri makan ya!`,
+        triggerAt: new Date(now + minutesToDecay * 60 * 1000),
+        channelId: NOTIF_CHANNEL_ID,
+      });
+    }
+
+    // 2. Jadwal Pengingat Tidur / Energi
+    if (needs.energy <= 20) {
+      plans.push({
+        id: NOTIF_ID_BEDTIME,
+        title: `${petName} Sangat Mengantuk!`,
+        body: `Energi ${petName} hampir habis. Waktunya taruh ${petName} di tempat tidur.`,
+        triggerAt: new Date(now + 20 * 60 * 1000),
+        channelId: NOTIF_CHANNEL_ID,
+      });
+    } else {
+      // Jadwalkan jam tidur malam pukul 21:30
+      const bedtimeTarget = new Date(now);
+      bedtimeTarget.setHours(21, 30, 0, 0);
+      if (bedtimeTarget.getTime() <= now) {
+        bedtimeTarget.setDate(bedtimeTarget.getDate() + 1);
+      }
+      plans.push({
+        id: NOTIF_ID_BEDTIME,
+        title: `Waktu Istirahat ${petName}`,
+        body: `Malam telah tiba di lembah. Antarkan ${petName} ke ranjang empuknya yuk!`,
+        triggerAt: bedtimeTarget,
+        channelId: NOTIF_CHANNEL_ID,
+      });
+    }
+
+    // 3. Jadwal Sapaan Kangen (Jika tidak membuka app selama 6 jam)
+    plans.push({
+      id: NOTIF_ID_GREETING,
+      title: `${petName} Menunggumu di Lembah`,
+      body: `${petName} sedang santai di lembah dan kangen bermain denganmu.`,
+      triggerAt: new Date(now + 6 * 60 * 60 * 1000),
+      channelId: NOTIF_CHANNEL_ID,
+    });
+
+    return plans;
+  }
+
+  async scheduleBackgroundAlerts(
+    needs: CriticalNeeds,
+    petName = "Juro"
+  ): Promise<boolean> {
+    if (!this.isEnabled()) return false;
+
+    if (Capacitor.isNativePlatform()) {
+      try {
+        const hasPerm = await this.hasPermission();
+        if (!hasPerm) return false;
+
+        await this.initNotificationChannel();
+        await this.cancelScheduledAlerts();
+
+        const plans = this.calculateBackgroundSchedules(needs, petName);
+        const notifications = plans.map((p) => ({
+          id: p.id,
+          title: p.title,
+          body: p.body,
+          schedule: {
+            at: p.triggerAt,
+            allowWhileIdle: true,
+          },
+          channelId: NOTIF_CHANNEL_ID,
+          smallIcon: "ic_stat_name",
+        }));
+
+        await LocalNotifications.schedule({ notifications });
+        return true;
+      } catch (err) {
+        console.warn("Gagal menjadwalkan notifikasi latar belakang native:", err);
+        return false;
+      }
+    }
+
+    return false;
+  }
+
+  async cancelScheduledAlerts(): Promise<void> {
+    if (Capacitor.isNativePlatform()) {
+      try {
+        await LocalNotifications.cancel({
+          notifications: [
+            { id: NOTIF_ID_HUNGER },
+            { id: NOTIF_ID_BEDTIME },
+            { id: NOTIF_ID_CLEANLINESS },
+            { id: NOTIF_ID_GREETING },
+          ],
+        });
+      } catch {
+        // Abaikan jika tidak ada jadwal tertunda
+      }
+    }
+  }
+
   async notifyPartnerAction(partnerName: string, actionDescription: string) {
     if (!this.isEnabled()) return;
 
-    // Munculkan notifikasi jika tab sedang di latar belakang atau jika di native app
     const isBackground = typeof document !== "undefined" ? document.hidden : true;
     if (Capacitor.isNativePlatform() || isBackground) {
       await this.sendNotification(
@@ -180,7 +341,7 @@ class NotificationService {
         await this.sendNotification(
           "Juro Sedang Kelaparan!",
           "Perut Juro keroncongan. Yuk berikan camilan atau buah segar!",
-          101
+          NOTIF_ID_HUNGER
         );
         return;
       }
@@ -195,7 +356,7 @@ class NotificationService {
         await this.sendNotification(
           "Juro Sangat Mengantuk!",
           "Energi Juro hampir habis. Waktunya taruh Juro di tempat tidur.",
-          102
+          NOTIF_ID_BEDTIME
         );
         return;
       }
@@ -210,7 +371,7 @@ class NotificationService {
         await this.sendNotification(
           "Juro Butuh Mandi Segar!",
           "Tubuh Juro mulai kotor. Sabuni dan bilas dengan ember air yuk!",
-          103
+          NOTIF_ID_CLEANLINESS
         );
       }
     }

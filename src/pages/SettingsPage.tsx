@@ -23,6 +23,10 @@ import {
   Copy,
   MessageSquare,
   LayoutGrid,
+  Sun,
+  Sunset,
+  Moon,
+  CloudRain,
 } from "lucide-react";
 
 export const SettingsPage: React.FC = () => {
@@ -31,9 +35,11 @@ export const SettingsPage: React.FC = () => {
     theme,
     soundEnabled,
     actionMenuStyle,
+    weather,
     toggleTheme,
     toggleSound,
     setActionMenuStyle,
+    setWeather,
     showToast,
   } = useUIStore();
   const [draftName, setDraftName] = useState<string | null>(null);
@@ -242,6 +248,46 @@ export const SettingsPage: React.FC = () => {
               checked={soundEnabled}
               onChange={toggleSound}
             />
+            <div className="border-t border-charcoal/10 dark:border-neutral-700" />
+            <div className="space-y-2">
+              <span className="pixel-text text-[9px] uppercase font-bold text-charcoal dark:text-neutral-200">
+                Waktu & Suasana Lembah
+              </span>
+              <div className="grid grid-cols-2 sm:grid-cols-5 gap-1.5 pt-1">
+                {[
+                  { id: "auto", label: "Otomatis", icon: Sliders },
+                  { id: "cerah", label: "Siang", icon: Sun },
+                  { id: "senja", label: "Sore", icon: Sunset },
+                  { id: "malam", label: "Malam", icon: Moon },
+                  { id: "hujan", label: "Hujan", icon: CloudRain },
+                ].map((item) => {
+                  const isSelected =
+                    weather === item.id ||
+                    (item.id === "cerah" && weather === "clear") ||
+                    (item.id === "hujan" && weather === "rain");
+                  const Icon = item.icon;
+                  return (
+                    <button
+                      key={item.id}
+                      type="button"
+                      onClick={() => {
+                        soundEffects.playClick();
+                        setWeather(item.id as any);
+                        showToast(`Suasana diubah ke ${item.label}`, "success");
+                      }}
+                      className={`flex flex-col items-center justify-center p-2 border-2 border-charcoal dark:border-neutral-600 transition-all cursor-pointer ${
+                        isSelected
+                          ? "bg-juro-orange text-white shadow-[2px_2px_0px_#171717] dark:shadow-[2px_2px_0px_#000000] font-bold"
+                          : "bg-white dark:bg-neutral-800 text-charcoal dark:text-neutral-200 hover:bg-amber-50 dark:hover:bg-neutral-700"
+                      }`}
+                    >
+                      <Icon size={14} className="mb-1" />
+                      <span className="pixel-text text-[8px] uppercase">{item.label}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
           </div>
         </Card>
 

@@ -4,7 +4,7 @@ export interface ElevatedPlatform {
   x: number;
   z: number;
   radius: number;
-  height: number; // elevation above BASE_GROUND_Y
+  height: number;
   label: string;
 }
 
@@ -12,279 +12,628 @@ export interface SolidObstacle {
   x: number;
   z: number;
   radius: number;
-  topY: number; // world Y above which Juro could jump/fly over it
+  topY: number;
   tag?: "bed-frame" | "bench" | "trampoline";
 }
 
-export const BASE_GROUND_Y = -0.92;
+export interface Landmark {
+  id: string;
+  name: string;
+  subtitle: string;
+  category: "portal" | "lounge" | "bridge" | "cafe" | "nature" | "overlook";
+  position: { x: number; z: number };
+  entryPoint: { x: number; z: number };
+  color: string;
+  description: string;
+}
 
-// Solid world props inside & bordering Juro's walkable valley so Juro NEVER clips through them
-export const MAP_OBSTACLES: SolidObstacle[] = [
-  // Trees on knolls & bordering meadow
-  { x: -3.9, z: -1.35, radius: 0.38, topY: 1.4 },
-  { x: 4.25, z: 1.40, radius: 0.26, topY: 1.4 },
-  { x: -4.4, z: -4.5, radius: 0.45, topY: 1.4 },
-  { x: 3.2, z: -4.2, radius: 0.45, topY: 1.4 },
-  { x: -2.8, z: -4.8, radius: 0.42, topY: 1.4 },
-  { x: 1.55, z: -4.7, radius: 0.42, topY: 1.4 },
-  { x: -4.8, z: 2.2, radius: 0.42, topY: 1.4 },
-  { x: 4.9, z: 2.35, radius: 0.42, topY: 1.4 },
-  // Pine trees bordering meadow
-  { x: -3.6, z: -5.3, radius: 0.45, topY: 1.4 },
-  { x: -1.4, z: -5.4, radius: 0.45, topY: 1.4 },
-  { x: 0.55, z: -5.4, radius: 0.45, topY: 1.4 },
-  { x: 2.4, z: -5.0, radius: 0.45, topY: 1.4 },
-  { x: 4.8, z: -4.9, radius: 0.45, topY: 1.4 },
+export interface TreeSpec {
+  x: number;
+  z: number;
+  kind: "pine" | "round";
+  scale: number;
+  rotation: number;
+  tintIndex: number;
+}
 
-  // Miniature Juro Shop Building & Porch Counter
-  { x: 4.55, z: -2.55, radius: 0.88, topY: 1.5 },
-  { x: 4.35, z: -2.08, radius: 0.52, topY: 1.1 },
+export interface RockSpec {
+  x: number;
+  z: number;
+  scale: number;
+  rotation: number;
+}
 
-  // Crystal Mine Cave Portal & Side Rock Mounds at West River Headwaters
-  { x: -4.35, z: -4.05, radius: 1.15, topY: 1.6 },
-  { x: -4.80, z: -3.50, radius: 0.85, topY: 1.3 },
-  { x: -4.10, z: -4.75, radius: 0.85, topY: 1.3 },
+export interface StumpSpec {
+  x: number;
+  z: number;
+  scale: number;
+  rotation: number;
+}
 
-  // Wooden Park Bench atop East Knoll (3 overlapping circles along bench length)
-  { x: 3.46, z: 0.97, radius: 0.24, topY: BASE_GROUND_Y + 0.82, tag: "bench" },
-  { x: 3.65, z: 1.15, radius: 0.24, topY: BASE_GROUND_Y + 0.82, tag: "bench" },
-  { x: 3.84, z: 1.33, radius: 0.24, topY: BASE_GROUND_Y + 0.82, tag: "bench" },
+export interface FenceSpec {
+  x: number;
+  z: number;
+  rotation: number;
+  panels: number;
+}
 
-  // Bouncy Mushroom Trampoline in Meadow Left of Shop
-  { x: 2.50, z: -2.80, radius: 0.50, topY: BASE_GROUND_Y + 0.38, tag: "trampoline" },
+export interface SteppingStone {
+  x: number;
+  z: number;
+  radius: number;
+  rotation: number;
+}
 
-  // West Knoll Sofa Bed Frame (Backrest, Armrests & Nightstand)
-  { x: -3.88, z: -0.52, radius: 0.24, topY: BASE_GROUND_Y + 0.85, tag: "bed-frame" }, // Nightstand & Lamp
-  { x: -3.37, z: -0.82, radius: 0.28, topY: BASE_GROUND_Y + 0.78, tag: "bed-frame" }, // Backrest
-  { x: -3.60, z: -0.38, radius: 0.22, topY: BASE_GROUND_Y + 0.72, tag: "bed-frame" }, // Left Armrest
-  { x: -2.87, z: -0.65, radius: 0.22, topY: BASE_GROUND_Y + 0.72, tag: "bed-frame" }, // Right Armrest
+export const WORLD_SIZE = 72;
+export const HALF_WORLD = WORLD_SIZE / 2;
+export const GRID_RES = 72;
+export const BASE_GROUND_Y = 0.0;
 
-  // Two Glowing Meadow Lantern Posts
-  { x: -1.45, z: -1.65, radius: 0.18, topY: 0.5 },
-  { x: 2.75, z: 0.95, radius: 0.18, topY: 0.5 },
-
-  // Bushes inside & bordering valley
-  { x: -5.1, z: -1.7, radius: 0.36, topY: BASE_GROUND_Y + 0.4 },
-  { x: -4.8, z: 0.85, radius: 0.34, topY: BASE_GROUND_Y + 0.4 },
-  { x: -4.2, z: -0.95, radius: 0.32, topY: BASE_GROUND_Y + 0.35 },
-  { x: -2.1, z: -3.95, radius: 0.34, topY: BASE_GROUND_Y + 0.4 },
-  { x: 0.85, z: -4.1, radius: 0.36, topY: BASE_GROUND_Y + 0.4 },
-  { x: 2.5, z: -3.8, radius: 0.34, topY: BASE_GROUND_Y + 0.4 },
-  { x: 4.2, z: -3.3, radius: 0.36, topY: BASE_GROUND_Y + 0.4 },
-  { x: 5.2, z: -1.4, radius: 0.34, topY: BASE_GROUND_Y + 0.4 },
-  { x: 5.0, z: 0.45, radius: 0.32, topY: BASE_GROUND_Y + 0.4 },
-  { x: 4.1, z: 1.85, radius: 0.30, topY: BASE_GROUND_Y + 0.35 },
-  { x: -3.9, z: 2.35, radius: 0.34, topY: BASE_GROUND_Y + 0.4 },
-  { x: 3.8, z: 2.55, radius: 0.32, topY: BASE_GROUND_Y + 0.4 },
-  { x: -1.48, z: -4.05, radius: 0.32, topY: BASE_GROUND_Y + 0.4 },
-  { x: 5.5, z: -2.65, radius: 0.34, topY: BASE_GROUND_Y + 0.4 },
-  { x: -5.6, z: -3.4, radius: 0.36, topY: BASE_GROUND_Y + 0.4 },
-
-  // Fences
-  { x: -5.2, z: 1.5, radius: 0.26, topY: BASE_GROUND_Y + 0.45 },
-  { x: -5.05, z: 0.8, radius: 0.26, topY: BASE_GROUND_Y + 0.45 },
-  { x: -4.95, z: 0.1, radius: 0.26, topY: BASE_GROUND_Y + 0.45 },
-  { x: -4.85, z: -0.6, radius: 0.26, topY: BASE_GROUND_Y + 0.45 },
-  { x: -4.65, z: -1.3, radius: 0.26, topY: BASE_GROUND_Y + 0.45 },
-  { x: 3.4, z: -2.95, radius: 0.26, topY: BASE_GROUND_Y + 0.45 },
-  { x: 4.1, z: -3.05, radius: 0.26, topY: BASE_GROUND_Y + 0.45 },
-  { x: 4.8, z: -3.1, radius: 0.26, topY: BASE_GROUND_Y + 0.45 },
-  { x: 5.5, z: -2.95, radius: 0.26, topY: BASE_GROUND_Y + 0.45 },
-
-  // Rocks & scenic boulders in walkable meadow zone (river water rocks removed for clear pristine stream)
-  { x: 1.56, z: -0.62, radius: 0.16, topY: BASE_GROUND_Y + 0.18 },
-  { x: 2.95, z: -0.45, radius: 0.22, topY: BASE_GROUND_Y + 0.24 },
-  { x: 3.22, z: -0.64, radius: 0.18, topY: BASE_GROUND_Y + 0.20 },
-  { x: -4.65, z: -1.75, radius: 0.38, topY: BASE_GROUND_Y + 0.35 },
-  { x: -4.32, z: -1.52, radius: 0.26, topY: BASE_GROUND_Y + 0.28 },
-  { x: -2.65, z: 1.75, radius: 0.26, topY: BASE_GROUND_Y + 0.26 },
-  { x: 2.25, z: 1.95, radius: 0.24, topY: BASE_GROUND_Y + 0.25 },
-  { x: 1.15, z: -3.25, radius: 0.34, topY: BASE_GROUND_Y + 0.34 },
-  { x: -3.45, z: 2.25, radius: 0.30, topY: BASE_GROUND_Y + 0.30 },
-  { x: 5.15, z: 1.55, radius: 0.36, topY: BASE_GROUND_Y + 0.35 },
-  { x: -1.80, z: 0.35, radius: 0.22, topY: BASE_GROUND_Y + 0.22 },
-  { x: 2.05, z: 0.85, radius: 0.22, topY: BASE_GROUND_Y + 0.22 },
-  { x: -2.10, z: -1.60, radius: 0.24, topY: BASE_GROUND_Y + 0.24 },
+// Landmarks definition matching the Storybook world map
+export const LANDMARKS: Landmark[] = [
+  {
+    id: "tunnel",
+    name: "Gerbang Terowongan",
+    subtitle: "Hulu Kanal Utara (Tambang)",
+    category: "portal",
+    position: { x: -14.2, z: -14.2 },
+    entryPoint: { x: -10.5, z: -10.5 },
+    color: "#e6a23c",
+    description: "Pintu batu kuno tempat aliran kanal dimulai dan gerbang masuk tambang kristal.",
+  },
+  {
+    id: "lounge",
+    name: "Bukit Santai",
+    subtitle: "Tebing Terakota (Kasur Tidur)",
+    category: "lounge",
+    position: { x: -15.0, z: 4.0 },
+    entryPoint: { x: -11.5, z: 4.0 },
+    color: "#eb8352",
+    description: "Tebing rumput bertingkat dengan pelataran batu pasir dan sofa tidur santai Juro.",
+  },
+  {
+    id: "bridge",
+    name: "Jembatan Kayu",
+    subtitle: "Penyeberangan Kanal",
+    category: "bridge",
+    position: { x: -3.2, z: -3.2 },
+    entryPoint: { x: -3.2, z: -3.2 },
+    color: "#cf924a",
+    description: "Jembatan papan kayu hangat yang menghubungkan jalur setapak lembah.",
+  },
+  {
+    id: "cafe",
+    name: "Kafe Senja & Kios Jamur",
+    subtitle: "Alun-Alun Timur (Toko)",
+    category: "cafe",
+    position: { x: 16.5, z: -2.2 },
+    entryPoint: { x: 13.4, z: -0.6 },
+    color: "#e56b55",
+    description: "Kafe beratap pastel terakota dengan kios payung jamur merah dan konter belanja makanan/mainan.",
+  },
+  {
+    id: "pond",
+    name: "Kolam Bebek & Teratai",
+    subtitle: "Taman Air (Mandi & Segar)",
+    category: "nature",
+    position: { x: 9.5, z: 9.5 },
+    entryPoint: { x: 4.0, z: 11.8 },
+    color: "#4baee8",
+    description: "Kolam biru jernih dengan batu alam, daun teratai, ikan koi, dan bebek kuning.",
+  },
+  {
+    id: "overlook",
+    name: "Pos Pandang Selatan",
+    subtitle: "Tebing Teleskop (Tempat Duduk)",
+    category: "overlook",
+    position: { x: 6.0, z: 20.0 },
+    entryPoint: { x: 6.0, z: 17.6 },
+    color: "#73bd48",
+    description: "Puncak tebing selatan dengan bangku kayu, papan arah, dan teleskop pemandangan.",
+  },
 ];
 
-// Wide explorable valley bounds for Juro
+export const STEPPING_STONES: SteppingStone[] = [
+  { x: -10.5, z: 8.5, radius: 0.95, rotation: 0.2 },
+  { x: -7.5, z: 9.8, radius: 0.85, rotation: -0.3 },
+  { x: -4.4, z: 10.6, radius: 0.95, rotation: 0.5 },
+  { x: -1.3, z: 11.4, radius: 0.85, rotation: -0.1 },
+  { x: 1.7, z: 12.0, radius: 0.95, rotation: 0.4 },
+  { x: 4.4, z: 13.6, radius: 0.9, rotation: -0.2 },
+];
+
+export const STUMP_SPECS: StumpSpec[] = [
+  { x: 0.8, z: 22.8, scale: 0.95, rotation: 0.4 },
+  { x: -8.6, z: 14.5, scale: 1.05, rotation: -0.6 },
+  { x: 11.8, z: 15.2, scale: 0.9, rotation: 1.1 },
+  { x: -5.4, z: -17.5, scale: 0.92, rotation: -0.4 },
+  { x: 10.6, z: -21.2, scale: 1.0, rotation: 0.8 },
+];
+
+export const FENCE_SPECS: FenceSpec[] = [
+  { x: -2.5, z: 16.2, rotation: -0.35, panels: 2 },
+  { x: 9.8, z: 4.2, rotation: 0.85, panels: 2 },
+  { x: 4.2, z: -16.8, rotation: -0.55, panels: 2 },
+];
+
+// Winding S-curve storybook sandy trail waypoints
+export const TRAIL_POINTS: Array<[number, number]> = [
+  [12.0, 29.0],
+  [3.0, 25.5],
+  [-3.5, 21.0],
+  [5.2, 16.8],
+  [2.5, 11.5],
+  [-6.8, 8.2],
+  [-11.2, 4.2],
+  [-7.0, 0.2],
+  [-3.2, -3.2],
+  [1.2, -6.5],
+  [8.5, -5.2],
+  [13.4, -0.8],
+  [10.2, -8.5],
+  [2.0, -13.5],
+  [-7.5, -11.5],
+  [-10.2, -10.0],
+];
+
+export const TRAIL_EXTRA: Array<[number, number]> = [
+  [2.0, -13.5],
+  [-1.5, -19.5],
+  [6.5, -24.5],
+  [14.0, -30.0],
+];
+
+export function mulberry32(seed: number): () => number {
+  let a = seed >>> 0;
+  return function () {
+    a |= 0;
+    a = (a + 0x6d2b79f5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+function smoothstep(edge0: number, edge1: number, x: number): number {
+  const t = Math.max(0, Math.min(1, (x - edge0) / (edge1 - edge0)));
+  return t * t * (3 - 2 * t);
+}
+
+function distToPolyline(x: number, z: number, pts: Array<[number, number]>): number {
+  let minDist = Infinity;
+  for (let i = 0; i < pts.length - 1; i++) {
+    const [ax, az] = pts[i];
+    const [bx, bz] = pts[i + 1];
+    const vx = bx - ax;
+    const vz = bz - az;
+    const lenSq = vx * vx + vz * vz;
+    const t = Math.max(0, Math.min(1, ((x - ax) * vx + (z - az) * vz) / lenSq));
+    const px = ax + t * vx;
+    const pz = az + t * vz;
+    const d = Math.hypot(x - px, z - pz);
+    if (d < minDist) minDist = d;
+  }
+  return minDist;
+}
+
+export function distanceToTrail(x: number, z: number): number {
+  return Math.min(
+    distToPolyline(x, z, TRAIL_POINTS),
+    distToPolyline(x, z, TRAIL_EXTRA)
+  );
+}
+
+export function isOnTrail(x: number, z: number): boolean {
+  return distanceToTrail(x, z) < 1.68;
+}
+
+export function distanceToCanalAxis(x: number, z: number): { dist: number; t: number } {
+  const ax = -13.5;
+  const az = -13.5;
+  const bx = 7.5;
+  const bz = 7.5;
+  const vx = bx - ax;
+  const vz = bz - az;
+  const lenSq = vx * vx + vz * vz;
+  const t = Math.max(0, Math.min(1, ((x - ax) * vx + (z - az) * vz) / lenSq));
+  const px = ax + t * vx;
+  const pz = az + t * vz;
+  return { dist: Math.hypot(x - px, z - pz), t };
+}
+
+export function isBridgeDeck(x: number, z: number): boolean {
+  const dx = x - -3.2;
+  const dz = z - -3.2;
+  const along = (dx - dz) * Math.SQRT1_2;
+  const across = (dx + dz) * Math.SQRT1_2;
+  return Math.abs(along) <= 3.7 && Math.abs(across) <= 1.75;
+}
+
+export function isInCanalOrPond(x: number, z: number): boolean {
+  const { dist } = distanceToCanalAxis(x, z);
+  const pondDist = Math.hypot(x - 9.5, z - 9.5);
+  return dist < 2.35 || pondDist < 5.35;
+}
+
+export function isOnCobblePath(x: number, z: number): boolean {
+  const cafeDist = Math.hypot((x - 14.5) * 0.85, z + 1.4);
+  if (cafeDist < 5.2) return true;
+  const pierDist = Math.hypot(x - 4.0, z - 11.8);
+  if (pierDist < 1.35) return true;
+  return false;
+}
+
+export function grassPatchFactor(x: number, z: number): number {
+  const patches: Array<[number, number, number]> = [
+    [-15, 4, 9.2],
+    [6, 20, 7.8],
+    [9.5, 9.5, 8.2],
+    [-4, 15, 4.2],
+    [14, -2, 8.2],
+    [-12, -12, 7.5],
+    [13, 19, 5.2],
+    [-19, 17, 5.8],
+    [18, -16, 6.2],
+  ];
+  let best = 0;
+  for (const [px, pz, r] of patches) {
+    const d = Math.hypot(x - px, z - pz);
+    const f = 1 - smoothstep(r * 0.55, r, d);
+    if (f > best) best = f;
+  }
+  return best;
+}
+
+export function groundHeightAt(x: number, z: number): number {
+  let h = 0;
+
+  const gentleNoise =
+    Math.sin(x * 0.12) * Math.cos(z * 0.12) * 0.16 +
+    Math.sin((x - z) * 0.07) * 0.1;
+
+  // Hill 1: Bukit Santai (West Hilltop Cliff Ledge) centered at (-15, 4)
+  const dLounge = Math.hypot(x + 15.0, z - 4.0);
+  const hillLounge = (1 - smoothstep(4.5, 8.2, dLounge)) * 2.3;
+
+  // Hill 2: Pos Pandang Selatan (South Cliff Ledge) centered at (6, 20)
+  const dOverlook = Math.hypot(x - 6.0, z - 20.0);
+  const hillOverlook = (1 - smoothstep(3.6, 6.9, dOverlook)) * 1.75;
+
+  // Hill 3: North-East Scenic Cliff Ledge at (19, -15)
+  const dEastLedge = Math.hypot(x - 19.5, z + 15.5);
+  const hillEastLedge = (1 - smoothstep(3.0, 5.8, dEastLedge)) * 1.9;
+
+  // Hill 4: Tunnel cliff mound behind (-16.5, -16.5)
+  const dTunnelMound = Math.hypot(x + 16.5, z + 16.5);
+  const tunnelMound = (1 - smoothstep(2.8, 7.0, dTunnelMound)) * 4.1;
+  const { dist: canalDist } = distanceToCanalAxis(x, z);
+  const mouthCarve = canalDist < 3.4 && x > -14.8 && z > -14.8 ? 0 : 1;
+
+  // Gentle outer rim
+  const edgeDist = Math.max(Math.abs(x), Math.abs(z));
+  const rimLift = smoothstep(28.5, 36.5, edgeDist) * 1.6;
+
+  h += gentleNoise + hillLounge + hillOverlook + hillEastLedge + tunnelMound * mouthCarve + rimLift;
+
+  // Keep sandy trail smoothly graded so character walks cleanly
+  const tDist = distanceToTrail(x, z);
+  if (tDist < 2.8) {
+    const trailFlatten = 1 - smoothstep(1.2, 2.8, tDist);
+    h = h * (1 - trailFlatten * 0.35);
+  }
+
+  // Flatten plaza around Kafe Senja & Kios Jamur
+  const dCafePlaza = Math.hypot(x - 15.0, z + 1.5);
+  const cafeFlatten = smoothstep(5.8, 9.2, dCafePlaza);
+  h = h * cafeFlatten + 0.06 * (1 - cafeFlatten);
+
+  // Carve canal & lotus pond basin
+  const pondDist = Math.hypot(x - 9.5, z - 9.5);
+  const canalFactor = 1 - smoothstep(1.9, 3.05, canalDist);
+  const pondFactor = 1 - smoothstep(4.6, 6.2, pondDist);
+  const waterCarve = Math.max(canalFactor, pondFactor);
+  if (waterCarve > 0) {
+    h = h * (1 - waterCarve) + -1.02 * waterCarve;
+  }
+
+  return h;
+}
+
+export function walkableHeightAt(x: number, z: number): number {
+  if (isBridgeDeck(x, z)) {
+    const dx = x + 3.2;
+    const dz = z + 3.2;
+    const along = (dx - dz) * Math.SQRT1_2;
+    const arch = Math.cos((along / 3.8) * (Math.PI * 0.5)) * 0.42;
+    return 0.52 + Math.max(0, arch);
+  }
+  return groundHeightAt(x, z);
+}
+
+export function getTerrainHeightAt(x: number, z: number): number {
+  return walkableHeightAt(x, z);
+}
+
+export function getBridgeElevation(x: number, z: number): number | null {
+  if (isBridgeDeck(x, z)) {
+    const dx = x + 3.2;
+    const dz = z + 3.2;
+    const along = (dx - dz) * Math.SQRT1_2;
+    const arch = Math.cos((along / 3.8) * (Math.PI * 0.5)) * 0.42;
+    return 0.52 + Math.max(0, arch);
+  }
+  return null;
+}
+
+export function isWaterAt(x: number, z: number): boolean {
+  if (isBridgeDeck(x, z)) return false;
+  for (const st of STEPPING_STONES) {
+    if (Math.hypot(x - st.x, z - st.z) < st.radius) return false;
+  }
+  return isInCanalOrPond(x, z);
+}
+
+export function isNearWater(x: number, z: number, buffer = 0.6): boolean {
+  const { dist: canalDist } = distanceToCanalAxis(x, z);
+  const pondDist = Math.hypot(x - 9.5, z - 9.5);
+  return canalDist < 2.35 + buffer || pondDist < 5.35 + buffer;
+}
+
+export function generateWorldProps(): { trees: TreeSpec[]; rocks: RockSpec[] } {
+  const rand = mulberry32(20261122);
+  const trees: TreeSpec[] = [];
+  const rocks: RockSpec[] = [];
+
+  const isReserved = (x: number, z: number, pad = 2.4): boolean => {
+    if (Math.abs(x) > 33.5 || Math.abs(z) > 33.5) return true;
+    const { dist } = distanceToCanalAxis(x, z);
+    if (dist < 3.5 + pad * 0.35) return true;
+    if (Math.hypot(x - 9.5, z - 9.5) < 6.7 + pad * 0.35) return true;
+    if (isBridgeDeck(x, z)) return true;
+    if (isOnCobblePath(x, z)) return true;
+    if (distanceToTrail(x, z) < 2.65) return true;
+
+    for (const lm of LANDMARKS) {
+      const clearRadius = lm.id === "cafe" ? 6.4 : lm.id === "lounge" ? 5.6 : 4.4;
+      if (Math.hypot(x - lm.position.x, z - lm.position.z) < clearRadius) return true;
+      if (Math.hypot(x - lm.entryPoint.x, z - lm.entryPoint.z) < 2.5) return true;
+    }
+
+    for (const st of STEPPING_STONES) {
+      if (Math.hypot(x - st.x, z - st.z) < 2.1) return true;
+    }
+
+    for (const stump of STUMP_SPECS) {
+      if (Math.hypot(x - stump.x, z - stump.z) < 2.0) return true;
+    }
+
+    for (const fence of FENCE_SPECS) {
+      if (Math.hypot(x - fence.x, z - fence.z) < 2.6) return true;
+    }
+
+    if (Math.hypot(x + 16.5, z + 16.5) < 5.6) return true;
+    return false;
+  };
+
+  trees.push({
+    x: 19.5,
+    z: -15.8,
+    kind: "pine",
+    scale: 1.12,
+    rotation: 0.4,
+    tintIndex: 0,
+  });
+
+  for (let attempt = 0; attempt < 900 && trees.length < 155; attempt++) {
+    const x = (rand() * 2 - 1) * 32.5;
+    const z = (rand() * 2 - 1) * 32.5;
+    if (isReserved(x, z)) continue;
+
+    const edgeBias = Math.max(Math.abs(x), Math.abs(z)) / 32.5;
+    const keepChance = edgeBias > 0.65 ? 0.85 : 0.3;
+    if (rand() > keepChance) continue;
+
+    let tooClose = false;
+    for (const t of trees) {
+      if (Math.hypot(x - t.x, z - t.z) < 2.65) {
+        tooClose = true;
+        break;
+      }
+    }
+    if (tooClose) continue;
+
+    trees.push({
+      x,
+      z,
+      kind: rand() > 0.35 ? "pine" : "round",
+      scale: 0.86 + rand() * 0.32,
+      rotation: rand() * Math.PI * 2,
+      tintIndex: Math.floor(rand() * 4),
+    });
+  }
+
+  for (let attempt = 0; attempt < 220 && rocks.length < 32; attempt++) {
+    const x = (rand() * 2 - 1) * 30.5;
+    const z = (rand() * 2 - 1) * 30.5;
+    if (isReserved(x, z, 1.5)) continue;
+
+    let tooClose = false;
+    for (const t of trees) {
+      if (Math.hypot(x - t.x, z - t.z) < 1.9) {
+        tooClose = true;
+        break;
+      }
+    }
+    if (tooClose) continue;
+
+    rocks.push({
+      x,
+      z,
+      scale: 0.65 + rand() * 0.55,
+      rotation: rand() * Math.PI * 2,
+    });
+  }
+
+  return { trees, rocks };
+}
+
+// Wide explorable map bounds
 export const MAP_BOUNDS = {
-  minX: -4.1,
-  maxX: 4.1,
-  minZ: -3.2,
-  maxZ: 2.35,
+  minX: -26.0,
+  maxX: 26.0,
+  minZ: -26.0,
+  maxZ: 26.0,
 } as const;
 
-// Cozy sleep bed location atop the West Knoll
+// Cozy sleep bed location atop the Bukit Santai terrace
 export const JURO_BED_POS = {
-  x: -3.24,
-  z: -0.52,
-  platformId: "west-knoll",
+  x: -15.35,
+  z: 4.0,
+  platformId: "bukit-santai",
 } as const;
 
-// Dual Pet Sleep Slots on the expanded Twin Luxury Sofa Bed:
+// Dual Pet Sleep Slots on the Bukit Santai Twin Terracotta Sofa:
 export const JURO_BED_SLOT_1 = {
-  x: -3.50,
-  z: -0.42,
-  platformId: "west-knoll",
+  x: -15.35,
+  z: 3.2,
+  platformId: "bukit-santai",
   label: "Slot Tidur Pet 1 (Kiri)",
 } as const;
 
 export const JURO_BED_SLOT_2 = {
-  x: -2.98,
-  z: -0.61,
-  platformId: "west-knoll",
+  x: -15.35,
+  z: 4.8,
+  platformId: "bukit-santai",
   label: "Slot Tidur Pet 2 (Kanan)",
 } as const;
 
-// Cozy wooden park bench atop East Knoll where Juro can sit and look over the meadow
+// Cozy wooden park bench atop Pos Pandang Selatan overlooking the valley
 export const JURO_BENCH_POS = {
-  x: 3.65,
-  z: 1.15,
-  seatY: BASE_GROUND_Y + 0.42 + 0.175,
-  rotY: -0.75,
-  platformId: "east-knoll",
+  x: 6.0,
+  z: 20.6,
+  seatY: 2.27,
+  rotY: Math.PI,
+  platformId: "pos-pandang",
 } as const;
 
-// Interactive bouncy mushroom trampoline in Meadow Left of Shop
+// Interactive bouncy mushroom trampoline in meadow clearing (front of mine, left of trail)
 export const JURO_TRAMPOLINE_POS = {
-  x: 2.50,
-  z: -2.80,
-  surfaceY: BASE_GROUND_Y + 0.42,
+  x: 4.2,
+  z: -9.8,
+  surfaceY: 0.72,
   label: "Trampolin Jamur",
 } as const;
 
-// Elevated platforms, terraces, rock ledges & tree stumps Juro can climb/jump onto!
+// Interactive shop counter at Kafe Senja & Kios Jamur
+export const JURO_SHOP_POS = {
+  x: 13.4,
+  z: -0.6,
+  label: "Kafe Senja & Kios Jamur",
+} as const;
+
+// Interactive mine entrance at Gerbang Terowongan
+export const JURO_MINE_POS = {
+  x: -10.5,
+  z: -10.5,
+  label: "Gerbang Terowongan (Tambang)",
+} as const;
+
+// Elevated platforms Juro can climb / rest on
 export const MAP_PLATFORMS: ElevatedPlatform[] = [
   {
-    id: "west-knoll",
+    id: "bukit-santai",
     kind: "terrace",
-    x: -3.25,
-    z: -0.55,
-    radius: 1.55,
-    height: 0.46,
-    label: "Ranjang Tidur Juro",
+    x: -15.35,
+    z: 4.0,
+    radius: 2.8,
+    height: 2.1,
+    label: "Bukit Santai (Kasur)",
   },
   {
-    id: "east-knoll",
+    id: "pos-pandang",
     kind: "terrace",
-    x: 3.65,
-    z: 1.15,
-    radius: 1.25,
-    height: 0.42,
-    label: "Bukit Santai Timur",
+    x: 6.0,
+    z: 20.0,
+    radius: 2.6,
+    height: 1.75,
+    label: "Pos Pandang Selatan (Tempat Duduk)",
   },
   {
     id: "mushroom-trampoline",
     kind: "terrace",
-    x: 2.50,
-    z: -2.80,
-    radius: 0.50,
-    height: 0.42,
+    x: JURO_TRAMPOLINE_POS.x,
+    z: JURO_TRAMPOLINE_POS.z,
+    radius: 1.05,
+    height: 0.72,
     label: "Trampolin Jamur",
+  },
+  {
+    id: "wooden-bridge",
+    kind: "terrace",
+    x: -3.2,
+    z: -3.2,
+    radius: 2.2,
+    height: 0.65,
+    label: "Jembatan Kayu",
+  },
+  {
+    id: "cafe-plaza",
+    kind: "terrace",
+    x: 14.8,
+    z: -1.6,
+    radius: 3.5,
+    height: 0.12,
+    label: "Kafe Senja & Kios Jamur",
   },
 ];
 
-// Check if (x, z) is on any bridge (kept for backward-compatibility, footbridge removed as Juro walks through water)
-export function getBridgeElevation(_x: number, _z: number): number | null {
-  return null;
-}
+// Solid world obstacles so Juro never clips through props
+export const MAP_OBSTACLES: SolidObstacle[] = [
+  // Kafe Senja Main Building
+  { x: 18.8, z: -3.2, radius: 2.8, topY: 4.2 },
 
-const BROOK_SEGMENTS = [
-  [-4.15, -3.95, 0.42],
-  [-2.2, -3.0, 0.46],
-  [-0.45, -2.35, 0.48],
-  [0.95, -1.85, 0.46],
-  [1.75, -1.40, 0.42],
-  [2.45, -1.05, 0.25],
+  // Gerbang Terowongan Stone Arch & Mountain Rocks
+  { x: -14.2, z: -14.2, radius: 2.6, topY: 4.5 },
+  { x: -16.5, z: -12.5, radius: 1.8, topY: 3.5 },
+  { x: -12.5, z: -16.5, radius: 1.8, topY: 3.5 },
+
+  // Bukit Santai Sofa Bed Frame (Backrest, Lengthened Armrests & Bedside Table)
+  { x: -16.55, z: 4.0, radius: 0.75, topY: 3.2, tag: "bed-frame" }, // Backrest
+  { x: -15.45, z: 1.92, radius: 0.65, topY: 3.0, tag: "bed-frame" }, // Left Armrest
+  { x: -15.45, z: 6.08, radius: 0.65, topY: 3.0, tag: "bed-frame" }, // Right Armrest
+  { x: -15.35, z: 1.35, radius: 0.55, topY: 2.9, tag: "bed-frame" }, // Bedside Table & Lamp
+
+  // Pos Pandang Selatan Park Bench & Telescope
+  { x: 6.0, z: 20.6, radius: 0.75, topY: 2.8, tag: "bench" },
+  { x: 4.15, z: 19.6, radius: 0.38, topY: 2.5 },
+  { x: 8.0, z: 19.7, radius: 0.3, topY: 2.5 },
+
+  // Bouncy Mushroom Trampoline (Front of mine, left of trail)
+  { x: 4.2, z: -9.8, radius: 0.85, topY: 1.2, tag: "trampoline" },
+
+  // Footbridge Railings (Left and Right)
+  { x: -4.8, z: -1.6, radius: 0.38, topY: 1.8 },
+  { x: -1.6, z: -4.8, radius: 0.38, topY: 1.8 },
+
+  // Lantern posts
+  { x: -6.0, z: -0.4, radius: 0.22, topY: 2.2 },
+  { x: -0.4, z: -6.0, radius: 0.22, topY: 2.2 },
+  { x: 14.2, z: 2.6, radius: 0.22, topY: 2.2 },
+  { x: 8.1, z: 18.8, radius: 0.22, topY: 2.2 },
+
+  // Rustic Fences
+  { x: -2.5, z: 16.2, radius: 1.25, topY: 1.8 },
+  { x: 9.8, z: 4.2, radius: 1.25, topY: 1.8 },
+  { x: 4.2, z: -16.8, radius: 1.25, topY: 1.8 },
+
+  // Tree Stumps
+  { x: 0.8, z: 22.8, radius: 0.55, topY: 2.4 },
+  { x: -8.6, z: 14.5, radius: 0.6, topY: 1.2 },
+  { x: 11.8, z: 15.2, radius: 0.55, topY: 1.2 },
+  { x: -5.4, z: -17.5, radius: 0.55, topY: 1.2 },
+  { x: 10.6, z: -21.2, radius: 0.58, topY: 1.2 },
 ];
 
-// Check if (x, z) is inside the lily pond or winding brook (Juro can swim/glide over water!)
-export function isWaterAt(x: number, z: number): boolean {
-  // Stumps and platforms are elevated dry land above water
-  for (let i = 0; i < MAP_PLATFORMS.length; i++) {
-    const p = MAP_PLATFORMS[i];
-    if (Math.hypot(x - p.x, z - p.z) <= p.radius * 0.98) {
-      return false;
-    }
-  }
-
-  // Small Lake (Danau Kecil) oval centered at (2.45, -1.05)
-  const pdx = (x - 2.45) / 1.35;
-  const pdz = (z - -1.05) / 0.95;
-  if (pdx * pdx + pdz * pdz < 1.0) return true;
-
-  // Brook stream from mine headwaters (-4.15, -3.95) down to the small lake (2.45, -1.05)
-  for (let i = 0; i < BROOK_SEGMENTS.length - 1; i++) {
-    const p1 = BROOK_SEGMENTS[i];
-    const p2 = BROOK_SEGMENTS[i + 1];
-    const dx = p2[0] - p1[0];
-    const dz = p2[1] - p1[1];
-    const segLenSq = dx * dx + dz * dz;
-    const t = Math.max(0, Math.min(1, ((x - p1[0]) * dx + (z - p1[1]) * dz) / segLenSq));
-    const projX = p1[0] + t * dx;
-    const projZ = p1[1] + t * dz;
-    const halfWidth = p1[2] + t * (p2[2] - p1[2]);
-    if (Math.hypot(x - projX, z - projZ) < halfWidth) {
-      return true;
-    }
-  }
-
-  return false;
-}
-
-// Check if (x, z) is in or near water within a safety buffer margin (used by vegetation generators)
-export function isNearWater(x: number, z: number, buffer = 0.6): boolean {
-  const pdx = (x - 2.45) / (1.15 + buffer);
-  const pdz = (z - -1.05) / (0.8 + buffer);
-  if (pdx * pdx + pdz * pdz < 1.0) return true;
-
-  for (let i = 0; i < BROOK_SEGMENTS.length - 1; i++) {
-    const p1 = BROOK_SEGMENTS[i];
-    const p2 = BROOK_SEGMENTS[i + 1];
-    const dx = p2[0] - p1[0];
-    const dz = p2[1] - p1[1];
-    const segLenSq = dx * dx + dz * dz;
-    const t = Math.max(0, Math.min(1, ((x - p1[0]) * dx + (z - p1[1]) * dz) / segLenSq));
-    const projX = p1[0] + t * dx;
-    const projZ = p1[1] + t * dz;
-    const halfWidth = p1[2] + t * (p2[2] - p1[2]) + buffer;
-    if (Math.hypot(x - projX, z - projZ) < halfWidth) {
-      return true;
-    }
-  }
-
-  return false;
-}
-
-// Compute exact walkable terrain surface Y at any (x, z) across the entire map
-export function getTerrainHeightAt(x: number, z: number): number {
-  let maxY = BASE_GROUND_Y;
-
-  // Check wooden bridge arch
-  const bridgeElev = getBridgeElevation(x, z);
-  if (bridgeElev !== null) {
-    maxY = Math.max(maxY, BASE_GROUND_Y + bridgeElev);
-  }
-
-  // Check elevated terraces, rock ledges & tree stumps
-  for (let i = 0; i < MAP_PLATFORMS.length; i++) {
-    const p = MAP_PLATFORMS[i];
-    const dist = Math.hypot(x - p.x, z - p.z);
-    if (dist <= p.radius * 0.96) {
-      maxY = Math.max(maxY, BASE_GROUND_Y + p.height);
-    } else if (dist <= p.radius * 1.35 && p.kind === "terrace") {
-      // Smooth organic slope connecting the knoll plateau to the meadow
-      const t = (dist - p.radius * 0.96) / (p.radius * 0.39);
-      const slopeT = 1 - t * t * (3 - 2 * t);
-      maxY = Math.max(maxY, BASE_GROUND_Y + p.height * Math.max(0, slopeT));
-    }
-  }
-
-  return maxY;
-}
-
-// Check if (x, z) collides with any solid world obstacle
 export function isInsideObstacle(
   x: number,
   z: number,
@@ -295,33 +644,42 @@ export function isInsideObstacle(
 ): boolean {
   for (let i = 0; i < MAP_OBSTACLES.length; i++) {
     const obs = MAP_OBSTACLES[i];
-    if (isSleepingOrHeading && (obs.tag === "bed-frame" || Math.hypot(obs.x - JURO_BED_POS.x, obs.z - JURO_BED_POS.z) < 1.25)) {
+    if (
+      isSleepingOrHeading &&
+      (obs.tag === "bed-frame" || Math.hypot(obs.x - JURO_BED_POS.x, obs.z - JURO_BED_POS.z) < 2.35)
+    ) {
       continue;
     }
-    if (isSittingOrHeadingToBench && (obs.tag === "bench" || Math.hypot(obs.x - JURO_BENCH_POS.x, obs.z - JURO_BENCH_POS.z) < 0.65)) {
+    if (
+      isSittingOrHeadingToBench &&
+      (obs.tag === "bench" || Math.hypot(obs.x - JURO_BENCH_POS.x, obs.z - JURO_BENCH_POS.z) < 0.75)
+    ) {
       continue;
     }
-    if (isBouncingOrHeadingToTrampoline && (obs.tag === "trampoline" || Math.hypot(obs.x - JURO_TRAMPOLINE_POS.x, obs.z - JURO_TRAMPOLINE_POS.z) < 0.65)) {
+    if (
+      isBouncingOrHeadingToTrampoline &&
+      (obs.tag === "trampoline" || Math.hypot(obs.x - JURO_TRAMPOLINE_POS.x, obs.z - JURO_TRAMPOLINE_POS.z) < 0.75)
+    ) {
       continue;
     }
     if (Math.hypot(x - obs.x, z - obs.z) < obs.radius + pad) {
       return true;
     }
   }
-  // Check bed mattress
-  if (!isSleepingOrHeading && Math.hypot(x - JURO_BED_POS.x, z - JURO_BED_POS.z) < 0.44 + pad) {
+
+  // Check bed mattress while awake
+  if (!isSleepingOrHeading && Math.hypot(x - JURO_BED_POS.x, z - JURO_BED_POS.z) < 0.55 + pad) {
     return true;
   }
   return false;
 }
 
-// Resolve horizontal collisions against all solid props, water pond & steep un-jumped platform cliffs
 export function resolveHorizontalCollisions(
   x: number,
   z: number,
   bottomY: number,
   petRadius = 0.38,
-  allowClimbing = false,
+  _allowClimbing = false,
   isSleepingOrHeadingToBed = false,
   isSittingOrHeadingToBench = false,
   isBouncingOrHeadingToTrampoline = false
@@ -330,30 +688,29 @@ export function resolveHorizontalCollisions(
   let rz = Math.max(MAP_BOUNDS.minZ, Math.min(MAP_BOUNDS.maxZ, z));
   let hitObstacle = false;
 
-  // 2 solver passes ensure clean resolution when wedged between two nearby objects
   for (let pass = 0; pass < 2; pass++) {
-    // 1. Push out of solid props (trees, bench, sofa bed frame, lanterns, boulders, shop, mine, bushes, fences)
     for (let i = 0; i < MAP_OBSTACLES.length; i++) {
       const obs = MAP_OBSTACLES[i];
       if (
         isSleepingOrHeadingToBed &&
-        (obs.tag === "bed-frame" || Math.hypot(obs.x - JURO_BED_POS.x, obs.z - JURO_BED_POS.z) < 1.25)
+        (obs.tag === "bed-frame" || Math.hypot(obs.x - JURO_BED_POS.x, obs.z - JURO_BED_POS.z) < 2.35)
       ) {
         continue;
       }
       if (
         isSittingOrHeadingToBench &&
-        (obs.tag === "bench" || Math.hypot(obs.x - JURO_BENCH_POS.x, obs.z - JURO_BENCH_POS.z) < 0.65)
+        (obs.tag === "bench" || Math.hypot(obs.x - JURO_BENCH_POS.x, obs.z - JURO_BENCH_POS.z) < 0.75)
       ) {
         continue;
       }
       if (
         isBouncingOrHeadingToTrampoline &&
-        (obs.tag === "trampoline" || Math.hypot(obs.x - JURO_TRAMPOLINE_POS.x, obs.z - JURO_TRAMPOLINE_POS.z) < 0.65)
+        (obs.tag === "trampoline" || Math.hypot(obs.x - JURO_TRAMPOLINE_POS.x, obs.z - JURO_TRAMPOLINE_POS.z) < 0.75)
       ) {
         continue;
       }
       if (bottomY >= obs.topY) continue;
+
       const dx = rx - obs.x;
       const dz = rz - obs.z;
       const dist = Math.hypot(dx, dz);
@@ -367,42 +724,43 @@ export function resolveHorizontalCollisions(
       }
     }
 
-    // 1b. Sofa Bed Mattress (impenetrable barrier while awake so Juro walks around it on the knoll grass)
+    // Sofa Bed Mattress: awake pet cannot penetrate mattress
     if (!isSleepingOrHeadingToBed) {
       const dx = rx - JURO_BED_POS.x;
       const dz = rz - JURO_BED_POS.z;
       const dist = Math.hypot(dx, dz);
-      const minDist = 0.44 + petRadius;
-      if (dist >= 0.22 && dist < minDist) {
-        const nx = dx / dist;
-        const nz = dz / dist;
+      const minDist = 0.55 + petRadius;
+      if (dist < minDist) {
+        const nx = dist > 0.0001 ? dx / dist : 1;
+        const nz = dist > 0.0001 ? dz / dist : 0;
         rx = JURO_BED_POS.x + nx * minDist;
         rz = JURO_BED_POS.z + nz * minDist;
         hitObstacle = true;
       }
     }
 
-    // 2. Prevent clipping sideways into elevated terrace/stump/rock walls
-    for (let i = 0; i < MAP_PLATFORMS.length; i++) {
-      const p = MAP_PLATFORMS[i];
-      if (isSleepingOrHeadingToBed && p.id === "west-knoll") continue;
-      if (isSittingOrHeadingToBench && p.id === "east-knoll") continue;
-      if (isBouncingOrHeadingToTrampoline && p.id === "mushroom-trampoline") continue;
-      const platformTopY = BASE_GROUND_Y + p.height;
-      // If Juro's bottom is below the platform top rim, treat the wall as solid even during early jump arc
-      const threshold = allowClimbing ? platformTopY - 0.06 : platformTopY - 0.14;
-      if (bottomY < threshold) {
-        const dx = rx - p.x;
-        const dz = rz - p.z;
-        const dist = Math.hypot(dx, dz);
-        const minDist = p.radius * 1.02 + petRadius * 0.72;
-        if (dist < minDist) {
-          const nx = dist > 0.0001 ? dx / dist : 1;
-          const nz = dist > 0.0001 ? dz / dist : 0;
-          rx = p.x + nx * minDist;
-          rz = p.z + nz * minDist;
-          hitObstacle = true;
-        }
+    // Water barrier: Juro CANNOT walk or swim in water!
+    // Must cross using the Wooden Bridge (where isWaterAt returns false).
+    if (isWaterAt(rx, rz)) {
+      const canal = distanceToCanalAxis(rx, rz);
+      const pondDist = Math.hypot(rx - 9.5, rz - 9.5);
+      if (pondDist < 5.45) {
+        const pdx = rx - 9.5;
+        const pdz = rz - 9.5;
+        const pdist = Math.hypot(pdx, pdz);
+        const nx = pdist > 0.0001 ? pdx / pdist : 1;
+        const nz = pdist > 0.0001 ? pdz / pdist : 0;
+        rx = 9.5 + nx * (5.45 + petRadius);
+        rz = 9.5 + nz * (5.45 + petRadius);
+        hitObstacle = true;
+      } else if (canal.dist < 2.55) {
+        const signedPerp = (rx - rz) * Math.SQRT1_2;
+        const sign = signedPerp >= 0 ? 1 : -1;
+        const targetPerp = sign * (2.65 + petRadius);
+        const shift = targetPerp - signedPerp;
+        rx += shift * Math.SQRT1_2;
+        rz -= shift * Math.SQRT1_2;
+        hitObstacle = true;
       }
     }
   }
@@ -414,92 +772,46 @@ export function resolveHorizontalCollisions(
   };
 }
 
-// Pick a scenic, walkable waypoint anywhere on the wide map (meadow, hills, water, stumps!)
 export function pickScenicWaypoint(bias?: "water" | "bed" | "food" | "bench" | "trampoline"): { x: number; z: number } {
-  // If specific need bias is given, strongly prioritize that area of the living meadow
-  if (bias === "water") {
-    // 80% chance to target the clear water stream/brook for a refreshing splash or wash
-    if (Math.random() < 0.8) {
-      const brookX = -2.5 + Math.random() * 3.5;
-      const t = (brookX + 4.15) / 6.4;
-      const brookZ = -3.95 + t * 2.7 + Math.sin(t * Math.PI) * 0.35;
-      if (!isInsideObstacle(brookX, brookZ, 0.45)) {
-        return { x: brookX, z: brookZ };
-      }
-    }
-  } else if (bias === "bed") {
-    // Grassy area beside West Knoll sofa bed
-    const bedX = -2.6 + (Math.random() - 0.5) * 0.4;
-    const bedZ = -0.15 + (Math.random() - 0.5) * 0.4;
-    if (!isInsideObstacle(bedX, bedZ, 0.45)) {
-      return { x: bedX, z: bedZ };
-    }
-  } else if (bias === "bench") {
-    // Grassy area in front of the eastern park bench
-    const benchX = 3.15 + (Math.random() - 0.5) * 0.6;
-    const benchZ = 1.25 + (Math.random() - 0.5) * 0.5;
-    if (!isInsideObstacle(benchX, benchZ, 0.45)) {
-      return { x: benchX, z: benchZ };
-    }
-  } else if (bias === "trampoline") {
-    // Clear meadow path in front of the bouncy mushroom trampoline left of shop
-    const tx = 2.50 + (Math.random() - 0.5) * 0.3;
-    const tz = -2.15 + (Math.random() - 0.5) * 0.3;
-    if (!isInsideObstacle(tx, tz, 0.45)) {
-      return { x: tx, z: tz };
-    }
-  } else if (bias === "food") {
-    // Sunny foreground meadow where berries & picnics happen
-    for (let attempt = 0; attempt < 10; attempt++) {
-      const fx = -1.4 + Math.random() * 2.8;
-      const fz = 0.5 + Math.random() * 1.0;
-      if (!isInsideObstacle(fx, fz, 0.45)) {
-        return { x: fx, z: fz };
-      }
-    }
-  }
+  for (let attempt = 0; attempt < 35; attempt++) {
+    let candidate: { x: number; z: number };
 
-  // 35% chance to specifically visit an elevated platform or stump
-  const roll = Math.random();
-  if (roll < 0.35) {
-    const eligiblePlatforms = MAP_PLATFORMS.filter((p) => p.id !== "mushroom-trampoline");
-    const platform = eligiblePlatforms[Math.floor(Math.random() * eligiblePlatforms.length)];
-    for (let attempt = 0; attempt < 12; attempt++) {
+    if (bias === "water") {
+      // Target lotus pond shore or canal bank on dry land (NOT in water!)
       const angle = Math.random() * Math.PI * 2;
-      const r = Math.random() * platform.radius * 0.55;
-      const px = platform.x + Math.cos(angle) * r;
-      const pz = platform.z + Math.sin(angle) * r;
-      if (!isInsideObstacle(px, pz, 0.45)) {
-        return { x: px, z: pz };
-      }
+      const r = 5.65 + Math.random() * 1.5;
+      candidate = { x: 9.5 + Math.cos(angle) * r, z: 9.5 + Math.sin(angle) * r };
+    } else if (bias === "bed") {
+      // Bukit Santai lounge entry or terrace
+      candidate = { x: -11.5 + (Math.random() - 0.5) * 0.8, z: 4.0 + (Math.random() - 0.5) * 0.8 };
+    } else if (bias === "bench") {
+      // Pos Pandang overlook terrace in front of bench
+      candidate = { x: 6.0 + (Math.random() - 0.5) * 0.8, z: 18.5 + (Math.random() - 0.5) * 0.8 };
+    } else if (bias === "trampoline") {
+      // Clear meadow in front of trampoline
+      candidate = { x: 4.2 + (Math.random() - 0.5) * 0.4, z: -8.8 + (Math.random() - 0.5) * 0.4 };
+    } else if (bias === "food") {
+      // Kafe Senja plaza
+      candidate = { x: 13.4 + (Math.random() - 0.5) * 1.5, z: -0.6 + (Math.random() - 0.5) * 1.5 };
+    } else if (Math.random() < 0.4) {
+      // Pick a point along the scenic sandy trail
+      const idx = Math.floor(Math.random() * TRAIL_POINTS.length);
+      const [tx, tz] = TRAIL_POINTS[idx];
+      const offset = (Math.random() - 0.5) * 0.8;
+      candidate = { x: tx + offset, z: tz + offset };
+    } else {
+      // Clear spot across the meadow
+      candidate = {
+        x: -20.0 + Math.random() * 40.0,
+        z: -20.0 + Math.random() * 40.0,
+      };
     }
-    // If west-knoll, return a clear spot on the grassy rim rather than inside the bed
-    if (platform.id === "west-knoll") {
-      return { x: -2.6, z: -0.15 };
-    }
-    if (!isInsideObstacle(platform.x, platform.z, 0.45)) {
-      return { x: platform.x, z: platform.z };
+
+    if (!isInsideObstacle(candidate.x, candidate.z, 0.35) && !isWaterAt(candidate.x, candidate.z)) {
+      return candidate;
     }
   }
 
-  // 15% chance to visit the cool winding brook stream or lily pond for a splash!
-  if (roll < 0.5) {
-    const brookX = -2.5 + Math.random() * 3.5;
-    const t = (brookX + 5.5) / 7.7;
-    const brookZ = -4.9 + t * 3.7 + Math.sin(t * Math.PI) * 0.35;
-    if (!isInsideObstacle(brookX, brookZ, 0.45)) {
-      return { x: brookX, z: brookZ };
-    }
-  }
-
-  // Otherwise pick any clear spot across the wide valley
-  for (let attempt = 0; attempt < 30; attempt++) {
-    const x = MAP_BOUNDS.minX + Math.random() * (MAP_BOUNDS.maxX - MAP_BOUNDS.minX);
-    const z = MAP_BOUNDS.minZ + Math.random() * (MAP_BOUNDS.maxZ - MAP_BOUNDS.minZ);
-    if (!isInsideObstacle(x, z, 0.45)) {
-      return { x, z };
-    }
-  }
-
-  return { x: 0, z: 0.2 };
+  // Safe fallback point on clear path near bridge entry
+  return { x: -5.0, z: -1.0 };
 }

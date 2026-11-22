@@ -6,6 +6,7 @@ import {
   push,
   onValue,
   off,
+  onDisconnect,
   type DataSnapshot,
 } from "firebase/database";
 import { getFirebaseDatabaseInstance, isFirebaseConfigured } from "./firebaseConfig";
@@ -39,6 +40,11 @@ export interface SyncCallbacks {
  */
 export class JuroRealtimeSyncService {
   private activeRoomListener: { path: string; callback: (snapshot: DataSnapshot) => void } | null = null;
+  private activePresenceListener: {
+    path: string;
+    callback: (snapshot: DataSnapshot) => void;
+    myPresencePath: string;
+  } | null = null;
 
   /**
    * Mengecek apakah layanan sinkronisasi cloud siap dipakai
@@ -81,6 +87,24 @@ export class JuroRealtimeSyncService {
         description: `${caregiver.name} (${caregiver.roleTitle}) membuat kamar asuh Juro! Kode pairing: ${roomCode}`,
       };
 
+      const myInitialPet: PartnerPetState = {
+        ownerCaregiverId: caregiver.id,
+        ownerName: caregiver.name,
+        ownerRoleTitle: caregiver.roleTitle,
+        name: initialJuro.name,
+        level: initialJuro.level,
+        hunger: initialJuro.hunger,
+        energy: initialJuro.energy,
+        cleanliness: initialJuro.cleanliness,
+        happiness: initialJuro.happiness,
+        affection: initialJuro.affection,
+        currentState: initialJuro.currentState,
+        activeSkin: initialJuro.activeSkin,
+        activeHat: initialJuro.activeHat,
+        isOnline: true,
+        lastUpdated: Date.now(),
+      };
+
       const roomData: JuroPairingRoomData = {
         roomCode,
         createdAt: Date.now(),
@@ -92,6 +116,9 @@ export class JuroRealtimeSyncService {
         caregivers: {
           caregiver1: caregiver,
           caregiver2: null,
+        },
+        pets: {
+          [caregiver.id]: myInitialPet,
         },
         activityLogs: {
           [initialLogId]: initialLog,
@@ -158,8 +185,27 @@ export class JuroRealtimeSyncService {
           description: `${caregiver.name} (${caregiver.roleTitle}) resmi bergabung menjadi perawat kedua Juro!`,
         };
 
+        const myInitialPet: PartnerPetState = {
+          ownerCaregiverId: caregiver.id,
+          ownerName: caregiver.name,
+          ownerRoleTitle: caregiver.roleTitle,
+          name: room.juro?.name || "Juro",
+          level: room.juro?.level || 1,
+          hunger: room.juro?.hunger || 80,
+          energy: room.juro?.energy || 80,
+          cleanliness: room.juro?.cleanliness || 80,
+          happiness: room.juro?.happiness || 80,
+          affection: room.juro?.affection || 50,
+          currentState: "idle",
+          activeSkin: "classic-orange",
+          activeHat: "hat-none",
+          isOnline: true,
+          lastUpdated: Date.now(),
+        };
+
         await update(ref(db, `rooms/${cleanCode}`), {
           "caregivers/caregiver2": caregiver,
+          [`pets/${caregiver.id}`]: myInitialPet,
           lastUpdatedAt: Date.now(),
           [`activityLogs/${joinLog.id}`]: joinLog,
         });
@@ -191,6 +237,31 @@ export class JuroRealtimeSyncService {
     // Lepas listener sebelumnya jika ada
     this.unsubscribe();
 
+    // 0. Setup Presensi Realtime (Online/Offline) via .info/connected & onDisconnect
+    try {
+      const connectedRef = ref(db, ".info/connected");
+      const presencePath = `rooms/${cleanCode}/pets/${myCaregiverId}/isOnline`;
+      const presenceRef = ref(db, presencePath);
+      const disconnectRef = onDisconnect(presenceRef);
+      disconnectRef.set(false).catch(() => {});
+
+      const presenceListener = (snap: DataSnapshot) => {
+        if (snap.val() === true) {
+          disconnectRef.set(false).catch(() => {});
+          set(presenceRef, true).catch(() => {});
+        }
+      };
+
+      onValue(connectedRef, presenceListener);
+      this.activePresenceListener = {
+        path: ".info/connected",
+        callback: presenceListener,
+        myPresencePath: presencePath,
+      };
+    } catch {
+      // Mock mode / offline fallback
+    }
+
     let lastKnownLogsCount = 0;
 
     const listener = (snapshot: DataSnapshot) => {
@@ -201,7 +272,7 @@ export class JuroRealtimeSyncService {
 
       const data = snapshot.val() as JuroPairingRoomData;
 
-      // 1. Sync Juro State jika diubah oleh perawat lain
+      // 1. Sync Juro State (memori atau snapshot umum)
       if (data.juro) {
         callbacks.onJuroStateSync(data.juro);
       }
@@ -284,7 +355,7 @@ export class JuroRealtimeSyncService {
   }
 
   /**
-   * Mendorong aksi pengasuhan dan stat Juro terbaru ke Firebase
+   * Mendorong aksi pengasuhan dan stat pet terbaru secara atomik ke Firebase
    */
   public async pushCareAction(
     roomCode: string,
@@ -316,12 +387,34 @@ export class JuroRealtimeSyncService {
         [`rooms/${cleanCode}/lastUpdatedAt`]: Date.now(),
       };
 
-      // Tambahkan update stat Juro yang berubah
-      for (const [key, val] of Object.entries(updatedJuro)) {
-        updates[`rooms/${cleanCode}/juro/${key}`] = val;
+      // Di mode Dual-Pet, sinkronkan status pet pemilik aksi ke rooms/{roomCode}/pets/{caregiverId}
+      const myPetUpdate: Record<string, unknown> = {
+        ownerCaregiverId: caregiver.id,
+        ownerName: caregiver.name,
+        ownerRoleTitle: caregiver.roleTitle,
+        lastUpdated: Date.now(),
+        isOnline: true,
+      };
+
+      if (updatedJuro.name !== undefined) myPetUpdate.name = updatedJuro.name;
+      if (updatedJuro.level !== undefined) myPetUpdate.level = updatedJuro.level;
+      if (updatedJuro.hunger !== undefined) myPetUpdate.hunger = updatedJuro.hunger;
+      if (updatedJuro.energy !== undefined) myPetUpdate.energy = updatedJuro.energy;
+      if (updatedJuro.cleanliness !== undefined) myPetUpdate.cleanliness = updatedJuro.cleanliness;
+      if (updatedJuro.happiness !== undefined) myPetUpdate.happiness = updatedJuro.happiness;
+      if (updatedJuro.affection !== undefined) myPetUpdate.affection = updatedJuro.affection;
+      if (updatedJuro.currentState !== undefined) myPetUpdate.currentState = updatedJuro.currentState;
+      if (updatedJuro.activeSkin !== undefined) myPetUpdate.activeSkin = updatedJuro.activeSkin;
+      if (updatedJuro.activeHat !== undefined) myPetUpdate.activeHat = updatedJuro.activeHat;
+
+      for (const [key, val] of Object.entries(myPetUpdate)) {
+        updates[`rooms/${cleanCode}/pets/${caregiver.id}/${key}`] = val;
       }
-      updates[`rooms/${cleanCode}/juro/updatedByCaregiverId`] = caregiver.id;
-      updates[`rooms/${cleanCode}/juro/lastUpdated`] = Date.now();
+
+      // Simpan memori bersama jika ada
+      if (updatedJuro.memories) {
+        updates[`rooms/${cleanCode}/juro/memories`] = updatedJuro.memories;
+      }
 
       await update(ref(db), updates);
       return true;
@@ -389,14 +482,29 @@ export class JuroRealtimeSyncService {
   }
 
   /**
-   * Melepas listener realtime yang sedang aktif
+   * Melepas listener realtime yang sedang aktif dan memperbarui status offline
    */
   public unsubscribe(): void {
-    if (this.activeRoomListener) {
-      const db = getFirebaseDatabaseInstance();
-      if (db) {
+    const db = getFirebaseDatabaseInstance();
+
+    if (this.activePresenceListener && db) {
+      try {
+        const connectedRef = ref(db, this.activePresenceListener.path);
+        off(connectedRef, "value", this.activePresenceListener.callback);
+        const presenceRef = ref(db, this.activePresenceListener.myPresencePath);
+        set(presenceRef, false).catch(() => {});
+      } catch {
+        // Abaikan
+      }
+      this.activePresenceListener = null;
+    }
+
+    if (this.activeRoomListener && db) {
+      try {
         const roomRef = ref(db, this.activeRoomListener.path);
         off(roomRef, "value", this.activeRoomListener.callback);
+      } catch {
+        // Abaikan
       }
       this.activeRoomListener = null;
     }

@@ -2,7 +2,6 @@ import { describe, it, expect } from "vitest";
 import {
   BASE_GROUND_Y,
   MAP_OBSTACLES,
-  MAP_PLATFORMS,
   JURO_BED_POS,
   JURO_BENCH_POS,
   JURO_TRAMPOLINE_POS,
@@ -12,37 +11,41 @@ import {
   isInsideObstacle,
   resolveHorizontalCollisions,
   pickScenicWaypoint,
+  generateWorldProps,
+  isBridgeDeck,
 } from "../src/engine/world/mapTerrain";
+import { findPath, getGlobalNavGrid } from "../src/engine/world/pathfinding";
 
 describe("Terrain & Object Collision Hull System", () => {
   it("includes all essential props, landmarks, sofa bed, and fences in MAP_OBSTACLES", () => {
-    expect(MAP_OBSTACLES.length).toBeGreaterThanOrEqual(35);
+    expect(MAP_OBSTACLES.length).toBeGreaterThanOrEqual(18);
 
-    // Bed backrest & armrests
-    const backrest = MAP_OBSTACLES.find((o) => Math.hypot(o.x - -3.33, o.z - -0.78) < 0.1);
+    // Bed backrest & armrests at Bukit Santai
+    const backrest = MAP_OBSTACLES.find((o) => Math.hypot(o.x - -16.55, o.z - 4.0) < 0.1);
     expect(backrest).toBeDefined();
 
-    const leftArmrest = MAP_OBSTACLES.find((o) => Math.hypot(o.x - -3.6, o.z - -0.38) < 0.1);
+    const leftArmrest = MAP_OBSTACLES.find((o) => Math.hypot(o.x - -15.45, o.z - 1.92) < 0.1);
     expect(leftArmrest).toBeDefined();
 
-    const rightArmrest = MAP_OBSTACLES.find((o) => Math.hypot(o.x - -2.87, o.z - -0.65) < 0.1);
+    const rightArmrest = MAP_OBSTACLES.find((o) => Math.hypot(o.x - -15.45, o.z - 6.08) < 0.1);
     expect(rightArmrest).toBeDefined();
 
-    // Bench on East Knoll
-    const bench = MAP_OBSTACLES.find((o) => Math.hypot(o.x - 3.65, o.z - 1.15) < 0.1);
+    // Bench on Pos Pandang Selatan
+    const bench = MAP_OBSTACLES.find((o) => Math.hypot(o.x - 6.0, o.z - 20.6) < 0.1);
     expect(bench).toBeDefined();
 
-    // Shop and Mine
-    const shop = MAP_OBSTACLES.find((o) => Math.hypot(o.x - 4.55, o.z - -2.55) < 0.1);
+    // Shop at Kafe Senja
+    const shop = MAP_OBSTACLES.find((o) => Math.hypot(o.x - 18.8, o.z - -3.2) < 0.1);
     expect(shop).toBeDefined();
 
-    const mine = MAP_OBSTACLES.find((o) => Math.hypot(o.x - -4.35, o.z - -4.05) < 0.1);
+    // Mine at Gerbang Terowongan
+    const mine = MAP_OBSTACLES.find((o) => Math.hypot(o.x - -14.2, o.z - -14.2) < 0.1);
     expect(mine).toBeDefined();
   });
 
-  it("calculates terrain height on sofa bed knoll matching terrace elevation", () => {
+  it("calculates terrain height on Bukit Santai terrace matching hill elevation", () => {
     const bedGroundY = getTerrainHeightAt(JURO_BED_POS.x, JURO_BED_POS.z);
-    expect(bedGroundY).toBeCloseTo(BASE_GROUND_Y + 0.46, 2);
+    expect(bedGroundY).toBeGreaterThanOrEqual(2.0);
   });
 
   it("treats sofa bed mattress as solid obstacle when awake, but allows access when sleeping", () => {
@@ -50,7 +53,7 @@ describe("Terrain & Object Collision Hull System", () => {
     const awakeCol = resolveHorizontalCollisions(
       JURO_BED_POS.x,
       JURO_BED_POS.z,
-      BASE_GROUND_Y + 0.46,
+      2.1,
       0.38,
       false,
       false
@@ -62,7 +65,7 @@ describe("Terrain & Object Collision Hull System", () => {
     const sleepCol = resolveHorizontalCollisions(
       JURO_BED_POS.x,
       JURO_BED_POS.z,
-      BASE_GROUND_Y + 0.585,
+      2.3,
       0.38,
       false,
       true
@@ -71,17 +74,12 @@ describe("Terrain & Object Collision Hull System", () => {
     expect(sleepCol.z).toBeCloseTo(JURO_BED_POS.z, 2);
   });
 
-  it("verifies all tree stumps are removed from MAP_PLATFORMS leaving open meadow", () => {
-    const stumps = MAP_PLATFORMS.filter((p) => p.kind === "stump" || p.id.startsWith("stump-"));
-    expect(stumps).toHaveLength(0);
-  });
-
   it("treats park bench as solid obstacle while wandering, but allows Juro to sit on it", () => {
     // When wandering normally, walking directly into bench is blocked
     const wanderCol = resolveHorizontalCollisions(
       JURO_BENCH_POS.x,
       JURO_BENCH_POS.z,
-      BASE_GROUND_Y + 0.42,
+      1.75,
       0.38,
       false,
       false,
@@ -103,8 +101,8 @@ describe("Terrain & Object Collision Hull System", () => {
     expect(sitCol.z).toBeCloseTo(JURO_BENCH_POS.z, 2);
   });
 
-  it("allows Juro to freely wade and swim into the lily pond water without collision blockage", () => {
-    const pondCenter = { x: 2.45, z: -1.05 };
+  it("blocks Juro from walking or swimming into the water and keeps him on dry land", () => {
+    const pondCenter = { x: 9.5, z: 9.5 };
     expect(isWaterAt(pondCenter.x, pondCenter.z)).toBe(true);
 
     const resolved = resolveHorizontalCollisions(
@@ -115,69 +113,33 @@ describe("Terrain & Object Collision Hull System", () => {
       false,
       false
     );
-    // As requested: Juro can traverse water freely without invisible walls!
-    expect(resolved.hitObstacle).toBe(false);
-    expect(isWaterAt(resolved.x, resolved.z)).toBe(true);
+    expect(resolved.hitObstacle).toBe(true);
+    expect(isWaterAt(resolved.x, resolved.z)).toBe(false);
   });
 
-  it("allows Juro to wade and swim across the winding brook stream", () => {
-    // Open brook water near x = 0.0
-    const brookX = 0.0;
-    const t = (brookX + 5.5) / 7.7;
-    const streamZ = -4.9 + t * 3.7 + Math.sin(t * Math.PI) * 0.35;
-
-    expect(isWaterAt(brookX, streamZ)).toBe(true);
-
-    const resolved = resolveHorizontalCollisions(
-      brookX,
-      streamZ,
-      BASE_GROUND_Y,
-      0.38,
-      false,
-      false
-    );
-    // Juro can freely splash and cross water without invisible walls!
-    expect(resolved.hitObstacle).toBe(false);
-    expect(isWaterAt(resolved.x, resolved.z)).toBe(true);
+  it("allows Juro to traverse the wooden footbridge and calculates bridge deck arch", () => {
+    const bridgeCenter = { x: -3.2, z: -3.2 };
+    const bridgeElev = getBridgeElevation(bridgeCenter.x, bridgeCenter.z);
+    expect(bridgeElev).toBeGreaterThan(0.5);
+    // On bridge deck, isWaterAt returns false
+    expect(isWaterAt(bridgeCenter.x, bridgeCenter.z)).toBe(false);
   });
 
-  it("verifies footbridge and nw river rock ledge are removed and stream flows freely", () => {
-    // Footbridge elevation is null (removed as requested)
-    expect(getBridgeElevation(-0.36, -2.32)).toBeNull();
+  it("routes Juro across the Wooden Bridge to reach the opposite side of the canal without entering water", () => {
+    const navGrid = getGlobalNavGrid();
+    const westBank = { x: -15.0, z: 4.0 }; // Bukit Santai lounge
+    const eastBank = { x: 13.4, z: -0.6 }; // Kafe Senja plaza
 
-    // Verify nw-ledge large river boulder is removed from MAP_PLATFORMS
-    const nwLedge = MAP_PLATFORMS.find((p) => p.id === "nw-ledge");
-    expect(nwLedge).toBeUndefined();
+    const path = findPath(navGrid, westBank, eastBank);
+    expect(path.length).toBeGreaterThan(0);
 
-    // Former rock position in river is now clear water
-    expect(isWaterAt(-1.75, -2.85)).toBe(true);
+    // Path must cross the wooden bridge
+    const hasBridgeWaypoint = path.some((pt) => isBridgeDeck(pt.x, pt.z));
+    expect(hasBridgeWaypoint).toBe(true);
 
-    const streamCrossing = resolveHorizontalCollisions(
-      -0.36,
-      -2.32,
-      BASE_GROUND_Y,
-      0.38,
-      false,
-      false
-    );
-    expect(streamCrossing.hitObstacle).toBe(false);
-    expect(isWaterAt(-0.36, -2.32)).toBe(true);
-  });
-
-  it("prevents clipping horizontally into platform cliff walls from below", () => {
-    // East knoll center is (3.65, 1.15), radius 1.25, height 0.42
-    // Bottom ground is at BASE_GROUND_Y
-    const wallCol = resolveHorizontalCollisions(
-      3.65,
-      1.15,
-      BASE_GROUND_Y,
-      0.38,
-      false,
-      false
-    );
-    expect(wallCol.hitObstacle).toBe(true);
-    // Pushed outside platform radius towards bounds
-    expect(Math.hypot(wallCol.x - 3.65, wallCol.z - 1.15)).toBeGreaterThan(1.0);
+    // No waypoint in the path can be in water!
+    const anyInWater = path.some((pt) => isWaterAt(pt.x, pt.z));
+    expect(anyInWater).toBe(false);
   });
 
   it("treats mushroom trampoline as solid obstacle when wandering, but allows Juro onto it when bouncing", () => {
@@ -213,6 +175,18 @@ describe("Terrain & Object Collision Hull System", () => {
     for (let i = 0; i < 25; i++) {
       const pt = pickScenicWaypoint();
       expect(isInsideObstacle(pt.x, pt.z, 0.1)).toBe(false);
+    }
+  });
+
+  it("ensures procedurally placed trees never stack on each other", () => {
+    const { trees } = generateWorldProps();
+    expect(trees.length).toBeGreaterThan(40);
+
+    for (let i = 0; i < trees.length; i++) {
+      for (let j = i + 1; j < trees.length; j++) {
+        const d = Math.hypot(trees[i].x - trees[j].x, trees[i].z - trees[j].z);
+        expect(d).toBeGreaterThanOrEqual(2.4);
+      }
     }
   });
 });

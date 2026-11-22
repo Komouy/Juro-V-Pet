@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import { BASE_GROUND_Y, MAP_PLATFORMS, isWaterAt, isNearWater } from "../../../engine/world/mapTerrain";
+import { BASE_GROUND_Y, MAP_PLATFORMS, isWaterAt, isNearWater, getTerrainHeightAt } from "../../../engine/world/mapTerrain";
 
 // Crisp pixel-styled wooden signboard CanvasTexture for interactive 3D landmarks
 export function createSignTexture(
@@ -159,145 +159,168 @@ export function generateButterfliesData() {
   ];
 }
 
-export function generateRoundTreesData() {
-  const list: { pos: [number, number, number]; scale: number }[] = [
-    { pos: [-6.4, -0.82, -3.6], scale: 1.05 },
-    { pos: [-5.8, -0.82, -2.4], scale: 0.95 },
-    { pos: [-2.8, -0.84, -4.8], scale: 0.82 },
-    { pos: [1.55, -0.85, -4.7], scale: 0.8 },
-    { pos: [3.2, -0.82, -4.2], scale: 0.95 },
-    { pos: [5.9, -0.82, -4.2], scale: 1.05 },
-    { pos: [-5.9, -0.82, -1.6], scale: 1.05 },
-    { pos: [-5.5, -0.82, 0.25], scale: 0.92 },
-    { pos: [-4.8, -0.84, 2.2], scale: 0.85 },
-    { pos: [-3.9, -0.44, -1.35], scale: 0.78 },
-    { pos: [6.2, -0.82, -1.6], scale: 1.0 },
-    { pos: [5.6, -0.82, 0.85], scale: 0.95 },
-    { pos: [4.9, -0.84, 2.35], scale: 0.82 },
-    { pos: [4.85, -0.82, 1.55], scale: 0.85 },
-    // Western & South-Western Horizon Tree Belt (Framing West Knoll & Horizon Hills)
-    { pos: [-6.8, -0.82, -0.6], scale: 0.98 },
-    { pos: [-6.4, -0.82, 0.95], scale: 1.02 },
-    { pos: [-5.7, -0.82, 1.85], scale: 0.92 },
-    { pos: [-5.4, -0.82, 3.2], scale: 0.88 },
-    { pos: [-4.2, -0.84, 3.8], scale: 0.85 },
-    { pos: [-2.6, -0.84, 4.8], scale: 0.92 },
-    { pos: [-7.5, -0.82, 1.2], scale: 1.05 },
+const FENCE_WORLD_POINTS: [number, number][] = [
+  [-5.2, 1.5],
+  [-5.05, 0.8],
+  [-4.95, 0.1],
+  [-4.85, -0.6],
+  [-4.65, -1.3],
+  [3.4, -2.95],
+  [4.1, -3.05],
+  [4.8, -3.1],
+  [5.5, -2.95],
+];
+
+export function isNearFence(x: number, z: number, clearance = 1.35): boolean {
+  for (const [fx, fz] of FENCE_WORLD_POINTS) {
+    if (Math.hypot(x - fx, z - fz) < clearance) return true;
+  }
+  return false;
+}
+
+export function isTreePositionValid(
+  x: number,
+  z: number,
+  existingTrees: { pos: [number, number, number] }[],
+  minSpacing = 1.55
+): boolean {
+  // 1. Keep central playable valley completely clear & walkable
+  if (Math.abs(x) < 4.5 && z > -3.4 && z < 2.6) return false;
+  if (Math.abs(x) < 3.3 && z >= 2.6 && z < 3.9) return false;
+
+  // 2. Water stream & lake clearances
+  if (isWaterAt(x, z) || isNearWater(x, z, 0.95)) return false;
+
+  // 3. Fences clearance (ensures no trunks or crowns clip into wooden fence posts/rails)
+  if (isNearFence(x, z, 1.35)) return false;
+
+  // 4. Landmark clearances
+  if (Math.hypot(x - 4.55, z - -2.55) < 2.5) return false; // Shop building
+  if (Math.hypot(x - -4.35, z - -4.05) < 2.6) return false; // Mine cave
+  if (Math.hypot(x - 3.65, z - 1.15) < 1.9) return false; // East knoll bench
+  if (Math.hypot(x - -3.24, z - -0.52) < 2.2) return false; // West knoll twin sofa bed
+  if (Math.hypot(x - 2.50, z - -2.80) < 1.85) return false; // Trampoline left of shop
+
+  // 5. Anti-stacking / Anti-penetration against existing trees
+  for (const tree of existingTrees) {
+    if (Math.hypot(x - tree.pos[0], z - tree.pos[2]) < minSpacing) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+export function generateRoundTreesData(): { pos: [number, number, number]; scale: number }[] {
+  const candidateInitial: { x: number; z: number; scale: number }[] = [
+    { x: -6.4, z: -3.6, scale: 1.05 },
+    { x: -5.8, z: -2.4, scale: 0.95 },
+    { x: -2.8, z: -4.8, scale: 0.82 },
+    { x: 1.55, z: -4.7, scale: 0.8 },
+    { x: 3.2, z: -4.2, scale: 0.95 },
+    { x: 5.9, z: -4.2, scale: 1.05 },
+    { x: -5.9, z: -1.6, scale: 1.05 },
+    { x: -6.4, z: 0.25, scale: 0.92 },
+    { x: -5.8, z: 2.3, scale: 0.85 },
+    { x: -3.9, z: -1.35, scale: 0.78 },
+    { x: 6.2, z: -1.6, scale: 1.0 },
+    { x: 5.6, z: 0.85, scale: 0.95 },
+    { x: 4.9, z: 2.35, scale: 0.82 },
+    { x: 4.85, z: 1.55, scale: 0.85 },
+    { x: -6.8, z: -0.6, scale: 0.98 },
+    { x: -6.5, z: 0.95, scale: 1.02 },
+    { x: -6.1, z: 1.85, scale: 0.92 },
+    { x: -5.6, z: 3.2, scale: 0.88 },
+    { x: -4.2, z: 3.8, scale: 0.85 },
+    { x: -2.6, z: 4.8, scale: 0.92 },
+    { x: -7.5, z: 1.2, scale: 1.05 },
   ];
 
-  // Dense multi-layered woodland canopy spanning the entire terrain out to radius 24.8
+  const list: { pos: [number, number, number]; scale: number }[] = [];
+
+  for (const item of candidateInitial) {
+    if (isTreePositionValid(item.x, item.z, list, 1.45)) {
+      list.push({
+        pos: [item.x, getTerrainHeightAt(item.x, item.z), item.z],
+        scale: item.scale,
+      });
+    }
+  }
+
+  // Woodland canopy spanning outer perimeter without overlapping
   for (let i = 0; i < 350; i++) {
     const angle = seeded(i * 19 + 1) * Math.PI * 2;
     const radius = 4.8 + seeded(i * 19 + 2) * 20.0;
     const x = Math.cos(angle) * radius * 1.08;
     const z = Math.sin(angle) * radius * 0.92;
 
-    // Keep central playable valley completely clear & walkable
-    if (Math.abs(x) < 4.4 && z > -3.3 && z < 2.5) continue;
-    if (Math.abs(x) < 3.2 && z >= 2.5 && z < 3.8) continue;
-    // Water stream & lake clearances
-    if (isWaterAt(x, z) || isNearWater(x, z, 0.72)) continue;
-    // Landmark clearances
-    if (Math.hypot(x - 4.55, z - -2.55) < 2.0) continue; // Shop
-    if (Math.hypot(x - -4.35, z - -4.05) < 2.35) continue; // Mine
-    if (Math.hypot(x - 3.65, z - 1.15) < 1.65) continue; // East knoll bench
-    if (Math.hypot(x - -3.24, z - -0.52) < 1.55) continue; // West knoll bed
-    if (Math.hypot(x - 2.50, z - -2.80) < 1.45) continue; // Trampoline left of shop
+    if (!isTreePositionValid(x, z, list, 1.55)) continue;
 
     const scale = 0.52 + seeded(i * 19 + 3) * 0.58;
-    list.push({ pos: [x, -0.86, z], scale });
+    list.push({
+      pos: [x, getTerrainHeightAt(x, z), z],
+      scale,
+    });
   }
+
   return list;
 }
 
-export function generatePineTreesData() {
-  const list: { pos: [number, number, number]; scale: number }[] = [
-    { pos: [-6.2, -0.84, -5.6], scale: 1.05 },
-    { pos: [-3.6, -0.85, -5.3], scale: 0.9 },
-    { pos: [-1.4, -0.86, -5.4], scale: 0.84 },
-    { pos: [0.55, -0.86, -5.4], scale: 0.88 },
-    { pos: [2.4, -0.84, -5.0], scale: 0.96 },
-    { pos: [4.8, -0.84, -4.9], scale: 1.08 },
-    { pos: [6.8, -0.84, -3.5], scale: 0.95 },
-    { pos: [-6.7, -0.84, -0.85], scale: 1.02 },
-    { pos: [-6.1, -0.84, 1.45], scale: 0.92 },
-    { pos: [6.6, -0.84, -0.2], scale: 1.0 },
-    { pos: [6.0, -0.84, 1.95], scale: 0.88 },
-    { pos: [-7.2, -0.84, -3.1], scale: 0.96 },
-    // Western & South-Western Horizon Pine Belt
-    { pos: [-7.1, -0.84, 0.1], scale: 1.05 },
-    { pos: [-6.6, -0.84, -1.8], scale: 0.98 },
-    { pos: [-6.8, -0.84, 2.4], scale: 0.96 },
-    { pos: [-5.9, -0.84, 3.7], scale: 0.92 },
-    { pos: [-3.5, -0.84, 4.4], scale: 0.88 },
-    { pos: [-7.6, -0.84, -1.2], scale: 1.02 },
+export function generatePineTreesData(
+  existingTrees: { pos: [number, number, number] }[] = []
+): { pos: [number, number, number]; scale: number }[] {
+  const candidateInitial: { x: number; z: number; scale: number }[] = [
+    { x: -6.2, z: -5.6, scale: 1.05 },
+    { x: -3.6, z: -5.3, scale: 0.9 },
+    { x: -1.4, z: -5.4, scale: 0.84 },
+    { x: 0.55, z: -5.4, scale: 0.88 },
+    { x: 2.4, z: -5.0, scale: 0.96 },
+    { x: 4.8, z: -4.9, scale: 1.08 },
+    { x: 6.8, z: -3.5, scale: 0.95 },
+    { x: -6.7, z: -0.85, scale: 1.02 },
+    { x: -6.5, z: 1.45, scale: 0.92 },
+    { x: 6.6, z: -0.2, scale: 1.0 },
+    { x: 6.0, z: 1.95, scale: 0.88 },
+    { x: -7.2, z: -3.1, scale: 0.96 },
+    { x: -7.1, z: 0.1, scale: 1.05 },
+    { x: -6.6, z: -1.8, scale: 0.98 },
+    { x: -6.8, z: 2.4, scale: 0.96 },
+    { x: -5.9, z: 3.7, scale: 0.92 },
+    { x: -3.5, z: 4.4, scale: 0.88 },
+    { x: -7.6, z: -1.2, scale: 1.02 },
   ];
 
-  // Deep evergreen pine forest enclosing mountains, ridges and outer perimeter
+  const list: { pos: [number, number, number]; scale: number }[] = [];
+  const allTrees = [...existingTrees];
+
+  for (const item of candidateInitial) {
+    if (isTreePositionValid(item.x, item.z, allTrees, 1.45)) {
+      const tree: { pos: [number, number, number]; scale: number } = {
+        pos: [item.x, getTerrainHeightAt(item.x, item.z), item.z],
+        scale: item.scale,
+      };
+      list.push(tree);
+      allTrees.push(tree);
+    }
+  }
+
   for (let i = 0; i < 350; i++) {
     const angle = seeded(i * 23 + 7) * Math.PI * 2;
     const radius = 5.0 + seeded(i * 23 + 8) * 19.8;
     const x = Math.cos(angle) * radius * 1.1;
     const z = Math.sin(angle) * radius * 0.92;
 
-    // Keep central playable valley completely clear & walkable
-    if (Math.abs(x) < 4.4 && z > -3.3 && z < 2.5) continue;
-    if (Math.abs(x) < 3.2 && z >= 2.5 && z < 3.8) continue;
-    // Water stream & lake clearances
-    if (isWaterAt(x, z) || isNearWater(x, z, 0.72)) continue;
-    // Landmark clearances
-    if (Math.hypot(x - 4.55, z - -2.55) < 2.0) continue; // Shop
-    if (Math.hypot(x - -4.35, z - -4.05) < 2.35) continue; // Mine
-    if (Math.hypot(x - 3.65, z - 1.15) < 1.65) continue; // East knoll bench
-    if (Math.hypot(x - -3.24, z - -0.52) < 1.55) continue; // West knoll bed
-    if (Math.hypot(x - 2.50, z - -2.80) < 1.45) continue; // Trampoline left of shop
+    if (!isTreePositionValid(x, z, allTrees, 1.55)) continue;
 
     const scale = 0.54 + seeded(i * 23 + 9) * 0.65;
-    list.push({ pos: [x, -0.86, z], scale });
+    const tree: { pos: [number, number, number]; scale: number } = {
+      pos: [x, getTerrainHeightAt(x, z), z],
+      scale,
+    };
+    list.push(tree);
+    allTrees.push(tree);
   }
-  return list;
-}
 
-export function generateBushesData() {
-  const list: { pos: [number, number, number]; scale: [number, number, number] }[] = [
-    { pos: [-5.1, -0.78, -1.7], scale: [0.38, 0.28, 0.34] },
-    { pos: [-4.8, -0.78, 0.85], scale: [0.34, 0.25, 0.32] },
-    { pos: [-4.2, -0.35, -0.95], scale: [0.28, 0.22, 0.26] },
-    { pos: [-2.1, -0.78, -3.95], scale: [0.36, 0.28, 0.32] },
-    { pos: [0.85, -0.78, -4.1], scale: [0.38, 0.28, 0.34] },
-    { pos: [2.5, -0.78, -3.8], scale: [0.34, 0.25, 0.3] },
-    { pos: [4.2, -0.78, -3.3], scale: [0.38, 0.28, 0.34] },
-    { pos: [5.2, -0.78, -1.4], scale: [0.36, 0.26, 0.32] },
-    { pos: [5.0, -0.78, 0.45], scale: [0.34, 0.25, 0.3] },
-    { pos: [4.65, -0.78, 1.85], scale: [0.32, 0.24, 0.28] },
-    { pos: [-3.9, -0.78, 2.35], scale: [0.34, 0.25, 0.3] },
-    { pos: [3.8, -0.78, 2.55], scale: [0.32, 0.24, 0.28] },
-    { pos: [-1.48, -0.78, -4.05], scale: [0.32, 0.24, 0.3] },
-    { pos: [6.15, -0.78, -2.4], scale: [0.34, 0.26, 0.32] },
-    { pos: [-5.6, -0.78, -3.4], scale: [0.38, 0.28, 0.34] },
-    // Western & South-Western Horizon Foothill Bushes
-    { pos: [-5.6, -0.78, -0.3], scale: [0.36, 0.26, 0.32] },
-    { pos: [-5.3, -0.78, 1.3], scale: [0.34, 0.25, 0.3] },
-    { pos: [-4.6, -0.78, 2.9], scale: [0.32, 0.24, 0.28] },
-    { pos: [-3.2, -0.78, 4.1], scale: [0.34, 0.25, 0.3] },
-  ];
-
-  for (let i = 0; i < 160; i++) {
-    const angle = seeded(i * 29 + 3) * Math.PI * 2;
-    const radius = 4.5 + seeded(i * 29 + 4) * 19.5;
-    const x = Math.cos(angle) * radius * 1.08;
-    const z = Math.sin(angle) * radius * 0.92;
-    if (Math.abs(x) < 4.4 && z > -3.3 && z < 2.5) continue;
-    if (Math.abs(x) < 3.2 && z >= 2.5 && z < 3.8) continue;
-    if (isWaterAt(x, z) || isNearWater(x, z, 0.55)) continue;
-    if (Math.hypot(x - 4.55, z - -2.55) < 1.95) continue; // Shop
-    if (Math.hypot(x - -4.35, z - -4.05) < 2.15) continue; // Mine
-    if (Math.hypot(x - 3.65, z - 1.15) < 1.55) continue; // East knoll bench
-    if (Math.hypot(x - -3.24, z - -0.52) < 1.45) continue; // West knoll bed
-    if (Math.hypot(x - 2.50, z - -2.80) < 1.35) continue; // Trampoline left of shop
-    const s = 0.22 + seeded(i * 29 + 5) * 0.25;
-    list.push({ pos: [x, -0.82, z], scale: [s * 1.15, s * 0.82, s] });
-  }
   return list;
 }
 
@@ -586,27 +609,29 @@ export interface RiverRippleItem {
 
 export function generateRiverRipplesData(): RiverRippleItem[] {
   return [
-    // Winding brook ripples along the stream curve from mine headwaters down to pond
-    { x: -4.0, z: -3.9, speed: 1.1, phase: 0.1, maxRadius: 0.32 },
-    { x: -3.5, z: -3.65, speed: 0.9, phase: 0.8, maxRadius: 0.36 },
-    { x: -2.8, z: -3.3, speed: 1.15, phase: 1.2, maxRadius: 0.35 },
-    { x: -2.2, z: -3.0, speed: 1.25, phase: 1.5, maxRadius: 0.34 },
-    { x: -1.6, z: -2.75, speed: 1.0, phase: 2.2, maxRadius: 0.38 },
-    { x: -1.0, z: -2.55, speed: 1.1, phase: 2.9, maxRadius: 0.36 },
-    { x: -0.4, z: -2.32, speed: 1.05, phase: 3.6, maxRadius: 0.35 },
-    { x: 0.25, z: -2.2, speed: 1.05, phase: 5.0, maxRadius: 0.34 },
-    { x: 0.6, z: -2.05, speed: 0.92, phase: 5.7, maxRadius: 0.35 },
-    { x: 1.15, z: -1.85, speed: 1.12, phase: 0.2, maxRadius: 0.33 },
-    { x: 1.55, z: -1.65, speed: 0.98, phase: 0.8, maxRadius: 0.35 },
-    { x: 1.9, z: -1.45, speed: 1.0, phase: 1.2, maxRadius: 0.34 },
+    // Upstream canal ripples from tunnel cave towards bridge
+    { x: -11.5, z: -11.5, speed: 1.1, phase: 0.1, maxRadius: 0.32 },
+    { x: -10.0, z: -10.0, speed: 0.95, phase: 0.8, maxRadius: 0.35 },
+    { x: -8.5, z: -8.5, speed: 1.15, phase: 1.4, maxRadius: 0.34 },
+    { x: -7.0, z: -7.0, speed: 1.05, phase: 2.1, maxRadius: 0.36 },
+    { x: -5.5, z: -5.5, speed: 1.2, phase: 2.7, maxRadius: 0.33 },
 
-    // Lily pond ripples
-    { x: 2.45, z: -1.05, speed: 1.1, phase: 1.9, maxRadius: 0.42 },
-    { x: 2.15, z: -0.85, speed: 0.95, phase: 2.6, maxRadius: 0.35 },
-    { x: 2.75, z: -1.25, speed: 1.2, phase: 3.3, maxRadius: 0.38 },
-    { x: 2.3, z: -1.35, speed: 1.05, phase: 4.0, maxRadius: 0.34 },
-    { x: 2.8, z: -0.85, speed: 0.88, phase: 4.7, maxRadius: 0.36 },
-    { x: 1.95, z: -1.1, speed: 1.15, phase: 5.4, maxRadius: 0.32 },
-    { x: 2.6, z: -0.65, speed: 1.02, phase: 0.3, maxRadius: 0.35 },
+    // Downstream canal ripples from bridge towards duck pond
+    { x: -1.0, z: -1.0, speed: 1.0, phase: 3.4, maxRadius: 0.38 },
+    { x: 0.5, z: 0.5, speed: 1.1, phase: 4.1, maxRadius: 0.35 },
+    { x: 2.0, z: 2.0, speed: 0.92, phase: 4.8, maxRadius: 0.36 },
+    { x: 3.5, z: 3.5, speed: 1.12, phase: 5.5, maxRadius: 0.34 },
+    { x: 5.0, z: 5.0, speed: 0.98, phase: 0.3, maxRadius: 0.35 },
+    { x: 6.5, z: 6.5, speed: 1.05, phase: 1.1, maxRadius: 0.33 },
+
+    // Lotus Duck Pond ripples (centered at 9.5, 9.5)
+    { x: 8.0, z: 8.5, speed: 1.1, phase: 1.9, maxRadius: 0.42 },
+    { x: 8.5, z: 10.5, speed: 0.95, phase: 2.6, maxRadius: 0.38 },
+    { x: 9.2, z: 8.0, speed: 1.2, phase: 3.3, maxRadius: 0.36 },
+    { x: 9.5, z: 9.5, speed: 1.05, phase: 4.0, maxRadius: 0.45 },
+    { x: 10.5, z: 9.0, speed: 0.88, phase: 4.7, maxRadius: 0.39 },
+    { x: 10.8, z: 10.5, speed: 1.15, phase: 5.4, maxRadius: 0.37 },
+    { x: 9.0, z: 11.0, speed: 1.02, phase: 0.5, maxRadius: 0.36 },
+    { x: 11.2, z: 8.8, speed: 0.94, phase: 1.2, maxRadius: 0.35 },
   ];
 }

@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach } from "vitest";
 import { soundEffects } from "../src/engine/audio/soundEffects";
 import { useUIStore } from "../src/stores/uiStore";
 

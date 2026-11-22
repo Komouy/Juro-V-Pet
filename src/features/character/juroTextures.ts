@@ -3,11 +3,29 @@ import * as THREE from "three";
 /**
  * Procedural offscreen canvas textures for Juro's facial expressions,
  * dizzy states, sleeping Zzz particles, and soft ground contact shadow.
+ * Cached to prevent duplicate canvas allocations and conserve RAM/VRAM.
  */
+
+let _cachedSleepZ: THREE.CanvasTexture | null = null;
+let _cachedSoftShadow: THREE.CanvasTexture | null = null;
+let _cachedDizzyEye: THREE.CanvasTexture | null = null;
+let _cachedDizzyMouth: THREE.CanvasTexture | null = null;
+let _cachedDizzyStar: THREE.CanvasTexture | null = null;
+
+const isTestEnv = typeof import.meta !== "undefined" && Boolean(import.meta.env?.MODE === "test");
+
+export function clearJuroTextureCache(): void {
+  _cachedSleepZ = null;
+  _cachedSoftShadow = null;
+  _cachedDizzyEye = null;
+  _cachedDizzyMouth = null;
+  _cachedDizzyStar = null;
+}
 
 // Generate a crisp pixel-art "Z" sprite texture on an offscreen canvas
 export function createSleepZTexture(): THREE.CanvasTexture | null {
   if (typeof document === "undefined") return null;
+  if (_cachedSleepZ && !isTestEnv) return _cachedSleepZ;
   const canvas = document.createElement("canvas");
   canvas.width = 128;
   canvas.height = 128;
@@ -52,12 +70,14 @@ export function createSleepZTexture(): THREE.CanvasTexture | null {
   texture.minFilter = THREE.NearestFilter;
   texture.magFilter = THREE.NearestFilter;
   texture.needsUpdate = true;
+  _cachedSleepZ = texture;
   return texture;
 }
 
 // Generate a soft radial contact shadow texture with feathered edges (no hard circle!)
 export function createSoftShadowTexture(): THREE.CanvasTexture | null {
   if (typeof document === "undefined") return null;
+  if (_cachedSoftShadow && !isTestEnv) return _cachedSoftShadow;
   const canvas = document.createElement("canvas");
   canvas.width = 128;
   canvas.height = 128;
@@ -77,12 +97,14 @@ export function createSoftShadowTexture(): THREE.CanvasTexture | null {
   const texture = new THREE.CanvasTexture(canvas);
   texture.colorSpace = THREE.SRGBColorSpace;
   texture.needsUpdate = true;
+  _cachedSoftShadow = texture;
   return texture;
 }
 
 // Generate a crisp cartoon spiral eye ("@") texture for Dizzy Juro
 export function createDizzyEyeTexture(): THREE.CanvasTexture | null {
   if (typeof document === "undefined") return null;
+  if (_cachedDizzyEye && !isTestEnv) return _cachedDizzyEye;
   const canvas = document.createElement("canvas");
   canvas.width = 128;
   canvas.height = 128;
@@ -120,12 +142,14 @@ export function createDizzyEyeTexture(): THREE.CanvasTexture | null {
   texture.minFilter = THREE.NearestFilter;
   texture.magFilter = THREE.NearestFilter;
   texture.needsUpdate = true;
+  _cachedDizzyEye = texture;
   return texture;
 }
 
 // Generate a cute wavy squiggle ("~") mouth texture for Dizzy Juro
 export function createDizzyMouthTexture(): THREE.CanvasTexture | null {
   if (typeof document === "undefined") return null;
+  if (_cachedDizzyMouth && !isTestEnv) return _cachedDizzyMouth;
   const canvas = document.createElement("canvas");
   canvas.width = 128;
   canvas.height = 64;
@@ -152,12 +176,14 @@ export function createDizzyMouthTexture(): THREE.CanvasTexture | null {
   texture.minFilter = THREE.NearestFilter;
   texture.magFilter = THREE.NearestFilter;
   texture.needsUpdate = true;
+  _cachedDizzyMouth = texture;
   return texture;
 }
 
 // Generate a crisp golden pixel star sprite orbiting above Juro's head when dizzy
 export function createDizzyStarTexture(): THREE.CanvasTexture | null {
   if (typeof document === "undefined") return null;
+  if (_cachedDizzyStar && !isTestEnv) return _cachedDizzyStar;
   const canvas = document.createElement("canvas");
   canvas.width = 64;
   canvas.height = 64;
@@ -196,5 +222,6 @@ export function createDizzyStarTexture(): THREE.CanvasTexture | null {
   texture.minFilter = THREE.NearestFilter;
   texture.magFilter = THREE.NearestFilter;
   texture.needsUpdate = true;
+  _cachedDizzyStar = texture;
   return texture;
 }
