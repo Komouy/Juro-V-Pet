@@ -4,6 +4,7 @@ import { Navbar } from "./Navbar";
 import { MobileNav } from "./MobileNav";
 import { PixelToast } from "../ui/PixelToast";
 import { CaregiverHubModal } from "../caregiver/CaregiverHubModal";
+import { DesktopPetGlance } from "../glance/DesktopPetGlance";
 import { useCaregiverStore } from "../../stores/caregiverStore";
 import { soundEffects } from "../../engine/audio/soundEffects";
 import { isBedtimeHour } from "../../utils/timeOfDay";
@@ -46,6 +47,7 @@ export const RootLayout: React.FC = () => {
       <Navbar />
       <PixelToast />
       <CaregiverHubModal isOpen={isHubModalOpen} onClose={closeHubModal} />
+      <DesktopPetGlance />
       <div
         className={`flex-1 flex flex-col w-full ${
           isHome ? "min-h-0 pb-15 md:pb-0" : "pb-20 md:pb-8"

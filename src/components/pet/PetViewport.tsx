@@ -12,7 +12,7 @@ import {
 } from "../../features/character/JuroModel";
 import { OutdoorEnvironment } from "./OutdoorEnvironment";
 import { ItemIllustration } from "../items/ItemIllustration";
-import { Heart, CloudRain, Sun, Moon } from "lucide-react";
+import { CloudRain, Sun, Moon } from "lucide-react";
 import { usePetStore } from "../../stores/petStore";
 import { useGameStore } from "../../stores/gameStore";
 import { useUIStore } from "../../stores/uiStore";
@@ -94,7 +94,6 @@ export const PetViewport: React.FC = () => {
     recoverSleepEnergy,
     decayNightSleep,
     clean,
-    strokePet,
   } = usePetStore();
   const { addLog, addCoins, foodInventory, ownedToys, consumeFood } = useGameStore();
   const weather = useUIStore((s) => s.weather);
@@ -301,7 +300,6 @@ export const PetViewport: React.FC = () => {
           currentState: petState.currentState,
           isDizzy,
           isSleeping,
-          isPetting: isPettingActive,
           isBathing,
           isEating,
           isPlaying,
@@ -1242,7 +1240,6 @@ export const PetViewport: React.FC = () => {
   }, [addLog]);
 
   const handleBenchClick = useCallback(() => {
-    if (isPettingActive) setIsPettingActive(false);
     setShowStatDetails(false);
     setActiveTray("none");
     setIsChatOpen(false);
@@ -1256,7 +1253,7 @@ export const PetViewport: React.FC = () => {
 
     soundEffects.playPop();
     setIsBenchMenuOpen(true);
-  }, [isBenchMenuOpen, isPettingActive]);
+  }, [isBenchMenuOpen]);
 
   const handleSitOnBench = useCallback(() => {
     soundEffects.playClick();
@@ -1326,7 +1323,6 @@ export const PetViewport: React.FC = () => {
   }, [currentState]);
 
   const handleTrampolineClick = useCallback(() => {
-    if (isPettingActive) setIsPettingActive(false);
     setShowStatDetails(false);
     setActiveTray("none");
     setIsChatOpen(false);
@@ -1340,7 +1336,7 @@ export const PetViewport: React.FC = () => {
 
     soundEffects.playPop();
     setIsTrampolineMenuOpen(true);
-  }, [isTrampolineMenuOpen, isPettingActive]);
+  }, [isTrampolineMenuOpen]);
 
   const handleStartBounce = useCallback(() => {
     soundEffects.playClick();
@@ -1544,8 +1540,8 @@ export const PetViewport: React.FC = () => {
       return;
     }
 
-    // Don't interrupt feeding, scrubbing or petting
-    if (currentState === "eating" || isPettingActive) {
+    // Don't interrupt feeding or scrubbing
+    if (currentState === "eating") {
       return;
     }
 
@@ -1560,7 +1556,7 @@ export const PetViewport: React.FC = () => {
           : `Waktu malam telah tiba (pukul ${now.getHours()}:00). Juro berjalan menuju sofa tidurnya untuk tidur pulas.`
       );
     }
-  }, [isNightSleep, currentState, isPettingActive, now, wakeUp, addLog]);
+  }, [isNightSleep, currentState, now, wakeUp, addLog]);
 
   const getDraggedIllustrationId = (payload: DragPayload): string => {
     switch (payload.kind) {
@@ -1719,7 +1715,6 @@ export const PetViewport: React.FC = () => {
             juroWorldPosRef={juroWorldPosRef}
             walkCommand={walkCommand}
             onPetClick={handlePetClick}
-            isPettingActive={isPettingActive}
             isHeadingToBedRef={isHeadingToBedRef}
             onBedArrival={handleBedArrival}
             isHeadingToBenchRef={isHeadingToBenchRef}
@@ -1939,23 +1934,6 @@ export const PetViewport: React.FC = () => {
             <div className="absolute top-[16%] left-[20%] w-[26%] h-[26%] rounded-full bg-white/95" />
             <div className="absolute bottom-[20%] right-[22%] w-[14%] h-[14%] rounded-full bg-pink-200/60" />
           </div>
-        </div>
-      ))}
-
-      {/* Floating Affection Hearts */}
-      {hearts.map((h) => (
-        <div
-          key={h.id}
-          style={
-            {
-              left: `${h.x}px`,
-              top: `${h.y}px`,
-              "--dx": `${h.dx}px`,
-            } as React.CSSProperties
-          }
-          className="pointer-events-none absolute z-40 animate-pet-heart select-none drop-shadow-[2px_2px_0px_#171717]"
-        >
-          <Heart size={20} className="fill-rose-500 text-rose-600" strokeWidth={2} />
         </div>
       ))}
 

@@ -90,7 +90,6 @@ export interface JuroModelProps {
   juroScreenPosRef?: React.RefObject<JuroScreenTarget>;
   walkCommand?: WalkCommand | null;
   onPetClick?: (screenPos: { x: number; y: number }) => void;
-  isPettingActive?: boolean;
   juroWorldPosRef?: React.RefObject<THREE.Vector3>;
   isHeadingToBedRef?: React.RefObject<boolean>;
   onBedArrival?: () => void;
@@ -119,7 +118,6 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
   juroScreenPosRef,
   walkCommand,
   onPetClick,
-  isPettingActive = false,
   juroWorldPosRef,
   isHeadingToBedRef,
   onBedArrival,
@@ -174,7 +172,6 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
   const dizzyHaloRef = useRef<THREE.Group>(null);
   const dizzyStarRefs = useRef<(THREE.Sprite | null)[]>([]);
   const dizzyRef = useRef({ buildup: 0, timer: 0, lastSoundAt: -10, dragAge: 0 });
-  const petVelocityRef = useRef({ lastX: 0, lastY: 0, lastTime: 0, hasSample: false });
   const rapidTapHistoryRef = useRef<number[]>([]);
 
   // Eating animation refs
@@ -622,17 +619,6 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
     return shape;
   }, []);
 
-  // Handle Petting Mode (Elus) activation / focus
-  useEffect(() => {
-    if (isPettingActive) {
-      jumpRef.current.active = false;
-      if (fsm.currentState !== "sleep") {
-        fsm.transitionTo("happy", true);
-        setBehaviorState("happy");
-      }
-    }
-  }, [isPettingActive, fsm, setBehaviorState]);
-
   useFrame((state, delta) => {
     const t = state.clock.getElapsedTime();
 
@@ -703,33 +689,6 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
     }
     if (dizzyRef.current.buildup > 0) {
       dizzyRef.current.buildup = Math.max(0, dizzyRef.current.buildup - delta * 1.5);
-    }
-
-    // Dynamic trigger: vigorous petting speed calculation
-    if (isPettingActive && currentState !== "sleep") {
-      const nowMs = performance.now();
-      if (petVelocityRef.current.hasSample) {
-        const dtSec = Math.max((nowMs - petVelocityRef.current.lastTime) / 1000, 0.016);
-        const dx = state.pointer.x - petVelocityRef.current.lastX;
-        const dy = state.pointer.y - petVelocityRef.current.lastY;
-        const pSpeed = Math.hypot(dx, dy) / dtSec;
-        if (pSpeed > 5.0) {
-          dizzyRef.current.buildup = Math.min(2.5, dizzyRef.current.buildup + delta * (pSpeed * 0.45));
-          if (dizzyRef.current.buildup >= 1.25 && dizzyRef.current.timer <= 0.2) {
-            dizzyRef.current.timer = 3.2;
-            dizzyRef.current.buildup = 0;
-            soundEffects.playDizzy();
-          }
-        }
-      }
-      petVelocityRef.current = {
-        lastX: state.pointer.x,
-        lastY: state.pointer.y,
-        lastTime: nowMs,
-        hasSample: true,
-      };
-    } else {
-      petVelocityRef.current.hasSample = false;
     }
 
     // Dynamic trigger: rapid soap scrubbing during bath
@@ -1422,14 +1381,6 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
         }
       }
 
-      // 3. Tactile Direct Petting Reaction (Keep Juro plump, round & bouncy — no gepeng!)
-      if (isPettingActive && !isSleepingNow) {
-        const purrBreath = Math.sin(t * 12) * 0.015;
-        scale.y *= (0.99 + purrBreath);
-        scale.x *= (1.01 - purrBreath * 0.5);
-        scale.z *= (1.01 - purrBreath * 0.5);
-      }
-
       // 4. Sniffing Ground Posture while Wandering Hungry
       if (liveAttributes.hunger < 45 && (currentState === "wander" || currentState === "curious") && !isSleepingNow) {
         groupRef.current.rotation.x = Math.sin(t * 4) * 0.04 + 0.08;
@@ -1513,9 +1464,6 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
         groupRef.current.rotation.z = Math.sin(t * 24) * 0.05 * motionScale;
         groupRef.current.scale.y *= 0.94 + Math.sin(t * 20) * 0.025;
         groupRef.current.scale.x *= 1.04;
-      } else if (isPettingActive) {
-        // Affectionate cozy lean toward the caress, keeping plump round dumpling silhouette!
-        groupRef.current.rotation.z = Math.sin(t * 6) * 0.05 * motionScale;
       }
 
       // Project Juro's live 3D position & scaled radius to viewport pixel coordinates
@@ -2008,8 +1956,7 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
         fetchBallRef.current.stage === "bouncing" ||
         fetchBallRef.current.stage === "ground");
     const isPlayingBubbles = isPlayingToy && currentToyBeingPlayed?.id === "bubble-blower";
-    const isInteractingHappy =
-      (isPlayingToy && !isChasingBall && !isPlayingBubbles) || isPettingActive;
+    const isInteractingHappy = isPlayingToy && !isChasingBall && !isPlayingBubbles;
     const isHappyFace =
       !isSleeping &&
       !isDizzy &&
@@ -2024,7 +1971,7 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
       : naturalBlink;
 
     if (leftEyeRef.current && rightEyeRef.current) {
-      const showNormalEyes = !isSleeping && !isDizzy && !isHappyFace && !isPettingActive;
+      const showNormalEyes = !isSleeping && !isDizzy && !isHappyFace;
       leftEyeRef.current.visible = showNormalEyes;
       rightEyeRef.current.visible = showNormalEyes;
 
@@ -2145,7 +2092,6 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
       !isChewing &&
       !isBathSquint &&
       !isHappyFace &&
-      !isPettingActive &&
       expression !== "bored" &&
       expression !== "tired";
 
@@ -2166,13 +2112,12 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
       }
     }
 
-    // Delightful Smiling Curved Crescent Eyes (⌒ ⌒) when Petting or Happy
+    // Delightful Smiling Curved Crescent Eyes (⌒ ⌒) when Happy
     if (petEyesRef.current) {
-      const showPetEyes = !isSleeping && !isDizzy && (isPettingActive || isHappyFace);
+      const showPetEyes = !isSleeping && !isDizzy && isHappyFace;
       petEyesRef.current.visible = showPetEyes;
       if (showPetEyes) {
-        const squishPulse = isPettingActive ? 0.88 + Math.sin(t * 16) * 0.16 : 1.0;
-        petEyesRef.current.scale.set(1.12, squishPulse, 1);
+        petEyesRef.current.scale.set(1.12, 1.0, 1);
         petEyesRef.current.position.y = 0.02 + Math.sin(t * 16) * 0.008;
       }
     }
@@ -2208,10 +2153,6 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
           // Open mouth anticipating delicious food!
           mouthGroupRef.current.scale.set(1.22, 1.35, 1);
           mouthGroupRef.current.position.set(0, -0.015, 1.035);
-        } else if (isPettingActive) {
-          // Adorable wide joyful smile while purring!
-          mouthGroupRef.current.scale.set(1.26 + Math.sin(t * 12) * 0.08, 1.28, 1);
-          mouthGroupRef.current.position.set(0, -0.01, 1.035);
         } else if (isHappyFace || isBlowingBubbles || isPlayingBubbles) {
           mouthGroupRef.current.scale.set(1.18 + Math.sin(t * 8) * 0.08, 1.16, 1);
           mouthGroupRef.current.position.set(0, -0.01, 1.035);
@@ -2270,13 +2211,13 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
     const isAngry = !isSleeping && expression === "angry";
     const cheekColor = isAngry
       ? "#DC2626"
-      : isPettingActive || isBlowingBubbles || isPlayingBubbles
+      : isBlowingBubbles || isPlayingBubbles
       ? "#F43F5E"
       : "#F97316";
     if (leftCheekMatRef.current) leftCheekMatRef.current.color.set(cheekColor);
     if (rightCheekMatRef.current) rightCheekMatRef.current.color.set(cheekColor);
     if (leftCheekGroupRef.current && rightCheekGroupRef.current) {
-      const cheekScale = isAngry ? 1.25 : isPettingActive ? 1.34 + Math.sin(t * 10) * 0.12 : 1.0;
+      const cheekScale = isAngry ? 1.25 : 1.0;
       leftCheekGroupRef.current.scale.setScalar(cheekScale);
       rightCheekGroupRef.current.scale.setScalar(cheekScale);
     }

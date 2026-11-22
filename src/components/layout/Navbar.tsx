@@ -12,11 +12,13 @@ import {
   X,
   ChevronRight,
   Coins,
+  AppWindow,
 } from "lucide-react";
 import { soundEffects } from "../../engine/audio/soundEffects";
 import { useUIStore } from "../../stores/uiStore";
 import { useGameStore } from "../../stores/gameStore";
 import { useCaregiverStore } from "../../stores/caregiverStore";
+import { desktopGlanceService } from "../../services/desktopGlanceService";
 
 const NAV_LINKS = [
   { path: "/", label: "Home" },
@@ -175,6 +177,23 @@ export const Navbar: React.FC = () => {
             )}
           </button>
 
+          {/* Desktop Pet Glance Button */}
+          <button
+            type="button"
+            onClick={() => {
+              soundEffects.playClick();
+              desktopGlanceService.openDesktopPip();
+            }}
+            className="hidden sm:flex items-center gap-1.5 px-2 sm:px-2.5 py-1.5 border-2 border-charcoal dark:border-neutral-600 bg-warm-white dark:bg-neutral-800 text-charcoal dark:text-neutral-100 shadow-[2px_2px_0px_#171717] dark:shadow-[2px_2px_0px_#000000] hover:border-juro-orange active:translate-x-[1px] active:translate-y-[1px] cursor-pointer transition-colors"
+            title="Buka Pet Glance (Mini Desktop Companion)"
+            aria-label="Buka Pet Glance Desktop"
+          >
+            <AppWindow size={13} className="text-juro-orange shrink-0" />
+            <span className="pixel-text text-[9px] uppercase font-bold tracking-tight">
+              Glance
+            </span>
+          </button>
+
           {/* Single Menu Dropdown Toggle Button */}
           <button
             type="button"
@@ -232,6 +251,27 @@ export const Navbar: React.FC = () => {
                   Opsi Cepat
                 </span>
               </div>
+
+              {/* Item 0: Pet Glance Desktop / Mini Companion */}
+              <button
+                type="button"
+                onClick={() => {
+                  soundEffects.playClick();
+                  desktopGlanceService.openDesktopPip();
+                  setIsMenuOpen(false);
+                }}
+                className="w-full flex items-center justify-between px-2.5 py-2 text-left bg-white dark:bg-neutral-800 hover:bg-amber-50 dark:hover:bg-neutral-700 border border-charcoal/20 hover:border-charcoal transition-colors cursor-pointer"
+              >
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <AppWindow size={14} className="text-juro-orange shrink-0" />
+                  <span className="pixel-text text-[9.5px] uppercase font-bold text-charcoal dark:text-white truncate">
+                    Pet Glance
+                  </span>
+                </div>
+                <span className="pixel-text text-[7.5px] uppercase px-1.5 py-0.5 bg-juro-orange/15 text-juro-orange border border-charcoal/30">
+                  Mini
+                </span>
+              </button>
 
               {/* Item 1: Reset Sudut Kamera */}
               <button
