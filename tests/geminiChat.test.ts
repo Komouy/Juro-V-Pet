@@ -3,10 +3,6 @@ import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import {
   buildJuroSystemPrompt,
   sanitizeJuroReply,
-  getGeminiApiKey,
-  setGeminiApiKey,
-  getGeminiKeySource,
-  getCustomGeminiApiKey,
   chatWithJuro,
   computePetExpression,
   computePetActivity,
@@ -17,13 +13,12 @@ import {
 describe("Gemini AI Chat Service", () => {
   beforeEach(() => {
     localStorage.clear();
-    vi.stubEnv("VITE_GEMINI_API_KEY", "");
     vi.restoreAllMocks();
   });
 
   afterEach(() => {
     localStorage.clear();
-    vi.unstubAllEnvs();
+    vi.unstubAllGlobals();
     vi.restoreAllMocks();
   });
 
@@ -238,77 +233,44 @@ describe("Gemini AI Chat Service", () => {
     });
   });
 
-  describe("API Key storage", () => {
-    it("prioritizes VITE_GEMINI_API_KEY environment variable if defined", () => {
-      vi.stubEnv("VITE_GEMINI_API_KEY", "AQ.EnvKeyFromVercel");
-      expect(getGeminiApiKey()).toBe("AQ.EnvKeyFromVercel");
-      expect(getGeminiKeySource()).toBe("env");
-    });
-
-    it("stores and retrieves the Gemini API key from localStorage", () => {
-      expect(getGeminiApiKey()).toBeNull();
-      expect(getGeminiKeySource()).toBe("none");
-      expect(getCustomGeminiApiKey()).toBe("");
-
-      setGeminiApiKey("AIzaSyTest12345");
-      expect(getGeminiApiKey()).toBe("AIzaSyTest12345");
-      expect(getGeminiKeySource()).toBe("custom");
-      expect(getCustomGeminiApiKey()).toBe("AIzaSyTest12345");
-    });
-
-    it("stores and retrieves both AQ... and AIzaSy... formatted keys", () => {
-      setGeminiApiKey("AQ.TestKey.NewFormat123");
-      expect(getGeminiApiKey()).toBe("AQ.TestKey.NewFormat123");
-      expect(getCustomGeminiApiKey()).toBe("AQ.TestKey.NewFormat123");
-      expect(getGeminiKeySource()).toBe("custom");
-    });
-
-    it("removes the API key when set to empty string", () => {
-      setGeminiApiKey("AIzaSyTest12345");
-      expect(getGeminiApiKey()).toBe("AIzaSyTest12345");
-      setGeminiApiKey("   ");
-      expect(getGeminiApiKey()).toBeNull();
-      expect(getGeminiKeySource()).toBe("none");
-    });
-  });
-
   describe("chatWithJuro", () => {
-    it("returns a canned in-character fallback reply when no API key is set", async () => {
+    it("posts chat context and history to /api/gemini/chat and returns sanitized reply", async () => {
+      const fetchMock = vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          text: "**Juro** lagi asyik melompat-lompat gembira!",
+        }),
+      });
+      vi.stubGlobal("fetch", fetchMock);
+
+      const reply = await chatWithJuro("Lagi ngapain Juro?");
+      expect(reply).toBe("Juro lagi asyik melompat-lompat gembira!");
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+
+      const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+      expect(url).toBe("/api/gemini/chat");
+      expect(init.method).toBe("POST");
+      const parsedBody = JSON.parse(String(init.body));
+      expect(typeof parsedBody.systemInstruction).toBe("string");
+      expect(Array.isArray(parsedBody.contents)).toBe(true);
+      expect(parsedBody.contents.at(-1)?.parts?.[0]?.text).toContain("Lagi ngapain Juro?");
+    });
+
+    it("falls back to contextual reply when server returns an error response", async () => {
+      const fetchMock = vi.fn().mockResolvedValue({
+        ok: false,
+        status: 503,
+        text: async () => JSON.stringify({ error: "Gemini API key is not configured on the server." }),
+      });
+      vi.stubGlobal("fetch", fetchMock);
+
       const reply = await chatWithJuro("Halo Juro!");
       expect(typeof reply).toBe("string");
       expect(reply.length).toBeGreaterThan(0);
       expect(JURO_FALLBACK_REPLIES).toContain(reply);
     });
 
-    it("fetches from Gemini REST API when API key is provided and returns clean reply", async () => {
-      setGeminiApiKey("AIzaSyFakeKey");
-
-      const mockResponse = {
-        candidates: [
-          {
-            content: {
-              parts: [{ text: "Bloop! Juro lagi asyik melompat-lompat gembira!" }],
-            },
-          },
-        ],
-      };
-
-      const fetchMock = vi.fn().mockResolvedValue({
-        ok: true,
-        json: async () => mockResponse,
-      });
-      vi.stubGlobal("fetch", fetchMock);
-
-      const reply = await chatWithJuro("Lagi ngapain Juro?");
-      expect(reply).toBe("Bloop! Juro lagi asyik melompat-lompat gembira!");
-      expect(fetchMock).toHaveBeenCalledTimes(1);
-
-      vi.unstubAllGlobals();
-    });
-
     it("gracefully catches fetch failures and returns a fallback reply", async () => {
-      setGeminiApiKey("AIzaSyFakeKey");
-
       const fetchMock = vi.fn().mockRejectedValue(new Error("Network Error"));
       vi.stubGlobal("fetch", fetchMock);
 
@@ -316,8 +278,6 @@ describe("Gemini AI Chat Service", () => {
       expect(typeof reply).toBe("string");
       expect(reply.length).toBeGreaterThan(0);
       expect(JURO_FALLBACK_REPLIES).toContain(reply);
-
-      vi.unstubAllGlobals();
     });
   });
 });

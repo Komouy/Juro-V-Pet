@@ -1,10 +1,12 @@
 import React, { useState, useRef, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { Card } from "../components/ui/Card";
 import { Button } from "../components/ui/Button";
 import { PixelInput } from "../components/ui/PixelInput";
 import { PixelSwitch } from "../components/ui/PixelSwitch";
 import { usePetStore } from "../stores/petStore";
 import { useUIStore } from "../stores/uiStore";
+import type { GraphicsQualitySetting } from "../engine/world/graphicsProfile";
 import { soundEffects } from "../engine/audio/soundEffects";
 import { persistenceService } from "../services/persistenceService";
 import { notificationService } from "../services/notificationService";
@@ -27,18 +29,23 @@ import {
   Sunset,
   Moon,
   CloudRain,
+  Cpu,
+  X,
 } from "lucide-react";
 
 export const SettingsPage: React.FC = () => {
+  const navigate = useNavigate();
   const { name } = usePetStore();
   const {
     theme,
     soundEnabled,
     actionMenuStyle,
+    graphicsQuality,
     weather,
     toggleTheme,
     toggleSound,
     setActionMenuStyle,
+    setGraphicsQuality,
     setWeather,
     showToast,
   } = useUIStore();
@@ -192,19 +199,31 @@ export const SettingsPage: React.FC = () => {
   };
 
   return (
-    <main className="w-full max-w-6xl mx-auto px-4 py-4 md:py-5 space-y-5">
-      <div className="border-b-2 border-charcoal/15 dark:border-neutral-700 pb-3.5 flex items-center justify-between gap-2">
-        <h1 className="pixel-text text-sm md:text-base text-charcoal dark:text-white uppercase tracking-wider flex items-center gap-2 shrink-0">
-          <Settings size={16} strokeWidth={2.5} className="text-juro-orange" />
+    <section className="w-full px-4 sm:px-6 py-4 sm:py-5 space-y-4">
+      <div className="border-b border-neutral-200/80 dark:border-neutral-800 pb-3.5 flex items-center justify-between gap-3">
+        <h1 className="text-base sm:text-lg font-bold text-neutral-900 dark:text-white tracking-tight flex items-center gap-2 shrink-0">
+          <Settings size={18} strokeWidth={2.2} className="text-juro-orange" />
           <span>Pengaturan</span>
         </h1>
+        <button
+          type="button"
+          onClick={() => {
+            soundEffects.playDismiss();
+            navigate("/");
+          }}
+          className="w-8 h-8 rounded-xl inline-flex items-center justify-center text-neutral-500 hover:text-neutral-900 hover:bg-neutral-100 dark:text-neutral-400 dark:hover:text-white dark:hover:bg-neutral-800 transition-colors cursor-pointer"
+          aria-label="Tutup dan kembali ke Home"
+          title="Kembali ke Home"
+        >
+          <X size={17} strokeWidth={2} />
+        </button>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-start">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5 items-start">
         {/* Pet Name */}
-        <Card shadowOffset="sm" className="p-4">
-          <h2 className="pixel-text text-[11px] text-charcoal dark:text-white uppercase mb-3 flex items-center gap-2">
-            <User size={13} strokeWidth={2.5} className="text-juro-orange" />
+        <Card shadowOffset="sm" className="p-4 shadow-none">
+          <h2 className="text-sm font-semibold text-neutral-900 dark:text-white mb-3 flex items-center gap-2">
+            <User size={16} strokeWidth={2.2} className="text-juro-orange" />
             <span>Nama Juro</span>
           </h2>
           <form onSubmit={handleSaveName} className="flex flex-col sm:flex-row sm:items-end gap-2.5">
@@ -221,7 +240,7 @@ export const SettingsPage: React.FC = () => {
             <Button
               label={savedSuccess ? "Tersimpan" : "Simpan"}
               icon={savedSuccess ? Check : undefined}
-              size="sm"
+              size="md"
               variant="primary"
               type="submit"
               disabled={!canSaveName && !savedSuccess}
@@ -230,9 +249,9 @@ export const SettingsPage: React.FC = () => {
         </Card>
 
         {/* Preferences */}
-        <Card shadowOffset="sm" className="p-4">
-          <h2 className="pixel-text text-[11px] text-charcoal dark:text-white uppercase mb-3.5 flex items-center gap-2">
-            <Sliders size={13} strokeWidth={2.5} className="text-juro-orange" />
+        <Card shadowOffset="sm" className="p-4 shadow-none">
+          <h2 className="text-sm font-semibold text-neutral-900 dark:text-white mb-3.5 flex items-center gap-2">
+            <Sliders size={16} strokeWidth={2.2} className="text-juro-orange" />
             <span>Tampilan & Suara</span>
           </h2>
 
@@ -242,18 +261,18 @@ export const SettingsPage: React.FC = () => {
               checked={theme === "dark"}
               onChange={toggleTheme}
             />
-            <div className="border-t border-charcoal/10 dark:border-neutral-700" />
+            <div className="border-t border-neutral-100 dark:border-neutral-800" />
             <PixelSwitch
               label="Efek Suara"
               checked={soundEnabled}
               onChange={toggleSound}
             />
-            <div className="border-t border-charcoal/10 dark:border-neutral-700" />
+            <div className="border-t border-neutral-100 dark:border-neutral-800" />
             <div className="space-y-2">
-              <span className="pixel-text text-[9px] uppercase font-bold text-charcoal dark:text-neutral-200">
+              <span className="text-xs font-medium text-neutral-700 dark:text-neutral-200 block">
                 Waktu & Suasana Lembah
               </span>
-              <div className="grid grid-cols-2 sm:grid-cols-5 gap-1.5 pt-1">
+              <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 pt-0.5">
                 {[
                   { id: "auto", label: "Otomatis", icon: Sliders },
                   { id: "cerah", label: "Siang", icon: Sun },
@@ -275,14 +294,60 @@ export const SettingsPage: React.FC = () => {
                         setWeather(item.id as any);
                         showToast(`Suasana diubah ke ${item.label}`, "success");
                       }}
-                      className={`flex flex-col items-center justify-center p-2 border-2 border-charcoal dark:border-neutral-600 transition-all cursor-pointer ${
+                      className={`flex flex-col items-center justify-center p-2.5 rounded-xl border transition-all cursor-pointer ${
                         isSelected
-                          ? "bg-juro-orange text-white shadow-[2px_2px_0px_#171717] dark:shadow-[2px_2px_0px_#000000] font-bold"
-                          : "bg-white dark:bg-neutral-800 text-charcoal dark:text-neutral-200 hover:bg-amber-50 dark:hover:bg-neutral-700"
+                          ? "bg-juro-orange text-white border-juro-orange shadow-xs font-semibold"
+                          : "bg-neutral-50 dark:bg-neutral-800 text-neutral-700 dark:text-neutral-200 border-neutral-200 dark:border-neutral-700 hover:bg-neutral-100 dark:hover:bg-neutral-700"
                       }`}
                     >
-                      <Icon size={14} className="mb-1" />
-                      <span className="pixel-text text-[8px] uppercase">{item.label}</span>
+                      <Icon size={15} className="mb-1" />
+                      <span className="text-xs">{item.label}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+            <div className="border-t border-neutral-100 dark:border-neutral-800" />
+            <div className="space-y-2">
+              <span className="text-xs font-medium text-neutral-700 dark:text-neutral-200 flex items-center gap-1.5">
+                <Cpu size={14} className="text-juro-orange" />
+                <span>Kualitas Grafis 3D</span>
+              </span>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-0.5">
+                {(
+                  [
+                    { id: "auto", label: "Otomatis", desc: "Sesuai perangkat" },
+                    { id: "low", label: "Ringan", desc: "Hemat RAM" },
+                    { id: "balanced", label: "Seimbang", desc: "Tajam & lancar" },
+                    { id: "high", label: "Tinggi", desc: "Detail maksimal" },
+                  ] as Array<{ id: GraphicsQualitySetting; label: string; desc: string }>
+                ).map((preset) => {
+                  const isSelected = graphicsQuality === preset.id;
+                  return (
+                    <button
+                      key={preset.id}
+                      type="button"
+                      onClick={() => {
+                        soundEffects.playClick();
+                        setGraphicsQuality(preset.id);
+                        showToast(`Kualitas grafis diubah ke ${preset.label}`, "success");
+                      }}
+                      className={`flex flex-col items-start justify-center p-2.5 rounded-xl border transition-all cursor-pointer text-left ${
+                        isSelected
+                          ? "bg-juro-orange text-white border-juro-orange shadow-xs"
+                          : "bg-neutral-50 dark:bg-neutral-800 text-neutral-700 dark:text-neutral-200 border-neutral-200 dark:border-neutral-700 hover:bg-neutral-100 dark:hover:bg-neutral-700"
+                      }`}
+                    >
+                      <span className="text-xs font-semibold">{preset.label}</span>
+                      <span
+                        className={`text-[11px] mt-0.5 ${
+                          isSelected
+                            ? "text-white/90"
+                            : "text-neutral-500 dark:text-neutral-400"
+                        }`}
+                      >
+                        {preset.desc}
+                      </span>
                     </button>
                   );
                 })}
@@ -291,42 +356,35 @@ export const SettingsPage: React.FC = () => {
           </div>
         </Card>
 
-        {/* Interaction Style / Gaya Menu & Interaksi */}
-        <Card shadowOffset="sm" className="p-4 md:col-span-2 space-y-3.5">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <h2 className="pixel-text text-[11px] text-charcoal dark:text-white uppercase flex items-center gap-2">
-              <Settings size={16} strokeWidth={2.5} className="text-juro-orange" />
-              <span>Gaya Menu & Interaksi Juro</span>
-            </h2>
-          </div>
+        {/* Interaction Style */}
+        <Card shadowOffset="sm" className="p-4 shadow-none md:col-span-2 space-y-3">
+          <h2 className="text-sm font-semibold text-neutral-900 dark:text-white flex items-center gap-2">
+            <Settings size={16} strokeWidth={2.2} className="text-juro-orange" />
+            <span>Gaya Menu Interaksi</span>
+          </h2>
 
-          <p className="pixel-text text-[8.5px] text-neutral-600 dark:text-neutral-400 leading-relaxed">
-            Pilih letak dan cara memanggil menu perawatan serta dialog AI Juro sesuai kenyamanan Anda:
-          </p>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
-            {/* Option 1: Floating (Classic) */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {/* Option 1: Floating */}
             <button
               type="button"
               onClick={() => {
                 setActionMenuStyle("floating");
                 soundEffects.playPop();
               }}
-              className={`p-3 text-left border-2 transition-all cursor-pointer relative ${
+              className={`p-3.5 rounded-xl text-left border transition-all cursor-pointer ${
                 actionMenuStyle === "floating"
-                  ? "bg-amber-50 dark:bg-amber-950/30 border-juro-orange shadow-[3px_3px_0px_#F97316]"
-                  : "bg-white dark:bg-neutral-800 border-charcoal dark:border-neutral-700 shadow-[2px_2px_0px_#171717] dark:shadow-[2px_2px_0px_#000000] hover:border-juro-orange/60"
+                  ? "bg-orange-50/70 dark:bg-orange-500/15 border-juro-orange ring-1 ring-juro-orange"
+                  : "bg-neutral-50 dark:bg-neutral-800 border-neutral-200 dark:border-neutral-700 hover:border-juro-orange/50"
               }`}
             >
-              <div className="flex items-center justify-between gap-2 mb-1.5">
-                <span className="pixel-text text-[9.5px] uppercase font-bold text-charcoal dark:text-white flex items-center gap-1.5">
-                  <MessageSquare size={13} className="text-juro-orange" />
+              <div className="flex items-center justify-between gap-2 mb-1">
+                <span className="text-sm font-semibold text-neutral-900 dark:text-white flex items-center gap-1.5">
+                  <MessageSquare size={15} className="text-juro-orange" />
                   <span>Melayang di Juro</span>
                 </span>
-                {actionMenuStyle === "floating"}
               </div>
-              <p className="pixel-text text-[8px] text-neutral-600 dark:text-neutral-400 leading-relaxed">
-                Klik tubuh jeli Juro untuk membuka balon menu aksi & kolom obrolan tepat di atas kepalanya seperti versi awal.
+              <p className="text-xs text-neutral-500 dark:text-neutral-400 leading-relaxed">
+                Ketuk tubuh Juro untuk membuka menu dan obrolan di dekatnya.
               </p>
             </button>
 
@@ -337,32 +395,31 @@ export const SettingsPage: React.FC = () => {
                 setActionMenuStyle("dock");
                 soundEffects.playPop();
               }}
-              className={`p-3 text-left border-2 transition-all cursor-pointer relative ${
+              className={`p-3.5 rounded-xl text-left border transition-all cursor-pointer ${
                 actionMenuStyle === "dock"
-                  ? "bg-amber-50 dark:bg-amber-950/30 border-juro-orange shadow-[3px_3px_0px_#F97316]"
-                  : "bg-white dark:bg-neutral-800 border-charcoal dark:border-neutral-700 shadow-[2px_2px_0px_#171717] dark:shadow-[2px_2px_0px_#000000] hover:border-juro-orange/60"
+                  ? "bg-orange-50/70 dark:bg-orange-500/15 border-juro-orange ring-1 ring-juro-orange"
+                  : "bg-neutral-50 dark:bg-neutral-800 border-neutral-200 dark:border-neutral-700 hover:border-juro-orange/50"
               }`}
             >
-              <div className="flex items-center justify-between gap-2 mb-1.5">
-                <span className="pixel-text text-[9.5px] uppercase font-bold text-charcoal dark:text-white flex items-center gap-1.5">
-                  <LayoutGrid size={13} className="text-juro-orange" />
+              <div className="flex items-center justify-between gap-2 mb-1">
+                <span className="text-sm font-semibold text-neutral-900 dark:text-white flex items-center gap-1.5">
+                  <LayoutGrid size={15} className="text-juro-orange" />
                   <span>Bilah Bawah</span>
                 </span>
-                {actionMenuStyle === "dock"}
               </div>
-              <p className="pixel-text text-[8px] text-neutral-600 dark:text-neutral-400 leading-relaxed">
-                Menu aksi dan tombol obrolan selalu siap di bilah bawah layar; klik langsung pada Juro untuk mengelus atau membangunkannya.
+              <p className="text-xs text-neutral-500 dark:text-neutral-400 leading-relaxed">
+                Menu aksi dan obrolan selalu tampil di bagian bawah layar.
               </p>
             </button>
           </div>
         </Card>
 
         {/* Notifications & Reminders */}
-        <Card shadowOffset="sm" className="p-4 md:col-span-2 space-y-3.5">
+        <Card shadowOffset="sm" className="p-4 shadow-none md:col-span-2 space-y-3">
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <h2 className="pixel-text text-[11px] text-charcoal dark:text-white uppercase flex items-center gap-2">
-              <Bell size={13} strokeWidth={2.5} className="text-juro-orange" />
-              <span>Notifikasi & Pengingat Asuh</span>
+            <h2 className="text-sm font-semibold text-neutral-900 dark:text-white flex items-center gap-2">
+              <Bell size={16} strokeWidth={2.2} className="text-juro-orange" />
+              <span>Notifikasi & Pengingat</span>
             </h2>
             <Button
               label={testingNotif ? "Mengirim..." : "Tes Notifikasi"}
@@ -373,23 +430,23 @@ export const SettingsPage: React.FC = () => {
             />
           </div>
 
-          <div className="pt-2 border-t border-charcoal/10 dark:border-neutral-700 space-y-2">
+          <div className="pt-3 border-t border-neutral-100 dark:border-neutral-800 space-y-1.5">
             <PixelSwitch
               label="Aktifkan Notifikasi Pengingat"
               checked={notifEnabled}
               onChange={handleToggleNotifications}
             />
-            <p className="pixel-text text-[8.5px] text-neutral-500 dark:text-neutral-400 leading-relaxed">
-              Kirimkan pemberitahuan saat Juro membutuhkan perhatian (lapar, mengantuk, atau kotor) serta saat pasangan perawat merawat Juro ketika aplikasi sedang diminimalkan.
+            <p className="text-xs text-neutral-500 dark:text-neutral-400 leading-relaxed">
+              Kirim pengingat saat Juro lapar, lelah, kotor, atau dirawat pasangan.
             </p>
           </div>
         </Card>
 
         {/* Android App (.apk) */}
-        <Card shadowOffset="sm" className="p-4 md:col-span-2 space-y-3.5">
+        <Card shadowOffset="sm" className="p-4 shadow-none md:col-span-2 space-y-3">
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <h2 className="pixel-text text-[11px] text-charcoal dark:text-white uppercase flex items-center gap-2">
-              <Smartphone size={13} strokeWidth={2.5} className="text-juro-orange" />
+            <h2 className="text-sm font-semibold text-neutral-900 dark:text-white flex items-center gap-2">
+              <Smartphone size={16} strokeWidth={2.2} className="text-juro-orange" />
               <span>Aplikasi Android (.apk)</span>
             </h2>
             <div className="flex flex-wrap items-center gap-2">
@@ -417,31 +474,30 @@ export const SettingsPage: React.FC = () => {
             </div>
           </div>
 
-          <div className="pt-2 border-t border-charcoal/10 dark:border-neutral-700 space-y-2">
-            <p className="pixel-text text-[8.5px] text-neutral-600 dark:text-neutral-300 leading-relaxed">
-              Pasang Juro sebagai aplikasi di HP Android Anda dan pasangan. Dapatkan notifikasi langsung saat Juro lapar atau saat pasangan merawat Juro tanpa perlu membuka browser.
+          <div className="pt-3 border-t border-neutral-100 dark:border-neutral-800 space-y-1.5">
+            <p className="text-xs text-neutral-500 dark:text-neutral-400 leading-relaxed">
+              Pasang aplikasi Android untuk akses cepat dan notifikasi langsung.
             </p>
-            <div className="flex items-center gap-2 text-[8px] pixel-text text-neutral-400">
-              <span>File: Juro-Virtual-Pet.apk</span>
-              <span>•</span>
+            <div className="flex items-center gap-2 text-xs text-neutral-400">
+              <span>Juro-Virtual-Pet.apk</span>
+              <span>·</span>
               <a
                 href={RELEASES_PAGE_URL}
                 target="_blank"
                 rel="noreferrer"
                 className="underline hover:text-juro-orange"
               >
-                Riwayat Rilis GitHub
+                Rilis GitHub
               </a>
             </div>
           </div>
         </Card>
 
-
         {/* Backup & Reset */}
-        <Card shadowOffset="sm" className="p-4 md:col-span-2 space-y-4">
+        <Card shadowOffset="sm" className="p-4 shadow-none md:col-span-2 space-y-4">
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <h2 className="pixel-text text-[11px] text-charcoal dark:text-white uppercase flex items-center gap-2">
-              <Database size={13} strokeWidth={2.5} className="text-juro-orange" />
+            <h2 className="text-sm font-semibold text-neutral-900 dark:text-white flex items-center gap-2">
+              <Database size={16} strokeWidth={2.2} className="text-juro-orange" />
               <span>Cadangan Data</span>
             </h2>
             <div className="flex flex-wrap items-center gap-2">
@@ -469,9 +525,9 @@ export const SettingsPage: React.FC = () => {
             </div>
           </div>
 
-          <div className="pt-3.5 border-t border-charcoal/15 dark:border-neutral-700 flex flex-wrap items-center justify-between gap-3">
-            <span className="pixel-text text-[10px] text-rose-600 dark:text-rose-400 uppercase flex items-center gap-1.5">
-              <RotateCcw size={12} strokeWidth={2.5} />
+          <div className="pt-3 border-t border-neutral-100 dark:border-neutral-800 flex flex-wrap items-center justify-between gap-3">
+            <span className="text-xs font-medium text-rose-600 dark:text-rose-400 flex items-center gap-1.5">
+              <RotateCcw size={14} strokeWidth={2.2} />
               <span>Reset Progres</span>
             </span>
 
@@ -501,6 +557,6 @@ export const SettingsPage: React.FC = () => {
           </div>
         </Card>
       </div>
-    </main>
+    </section>
   );
 };

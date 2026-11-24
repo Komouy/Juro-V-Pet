@@ -39,34 +39,39 @@ export interface RainSystem {
   ripplePhases: Float32Array;
 }
 
-export interface NavigationVisuals {
-  group: THREE.Group;
-  breadcrumbs: THREE.InstancedMesh;
-  maxBreadcrumbs: number;
-  beaconGroup: THREE.Group;
-  beaconRing: THREE.Mesh;
-}
-
 export interface BuiltWorld {
   rootGroup: THREE.Group;
   terrainMesh: THREE.Mesh;
   cobbleOverlay: THREE.Mesh;
-  walkableClickTargets: THREE.Object3D[];
   waterMesh: THREE.Mesh;
   kois: AnimatedKoi[];
   lanternLights: THREE.PointLight[];
   lanternBulbs: THREE.Mesh[];
-  navVisuals: NavigationVisuals;
   rain: RainSystem;
   landmarkHitboxes: THREE.Mesh[];
   dispose: () => void;
 }
 
+export interface WorldBuildOptions {
+  isSoftwareGl?: boolean;
+  terrainSegments?: number;
+  shadowsEnabled?: boolean;
+  maxPointLights?: number;
+  rainCount?: number;
+}
+
 export function buildRetroWorld(
   scene: THREE.Group,
   textures: PixelTextureSet,
-  isSoftwareGl = false
+  options: boolean | WorldBuildOptions = false
 ): BuiltWorld {
+  const opts: WorldBuildOptions =
+    typeof options === "boolean" ? { isSoftwareGl: options } : options;
+  const isSoftwareGl = Boolean(opts.isSoftwareGl);
+  const shadowsEnabled = opts.shadowsEnabled ?? !isSoftwareGl;
+  const maxPointLights = Math.max(0, opts.maxPointLights ?? (shadowsEnabled ? 5 : 1));
+  const rainCount = Math.max(40, opts.rainCount ?? 260);
+
   const disposables: Array<{ dispose: () => void }> = [];
   const trackGeo = <T extends THREE.BufferGeometry>(g: T): T => {
     disposables.push(g);
@@ -83,7 +88,7 @@ export function buildRetroWorld(
   // =========================================================
   // 1. SOFT STORYBOOK TERRAIN WITH WINDING SANDY TRAIL & CLIFF FACES
   // =========================================================
-  const segs = 128;
+  const segs = opts.terrainSegments ?? 96;
   const terrainGeo = trackGeo(new THREE.PlaneGeometry(WORLD_SIZE + 24, WORLD_SIZE + 24, segs, segs));
   terrainGeo.rotateX(-Math.PI / 2);
 
@@ -161,7 +166,7 @@ export function buildRetroWorld(
     })
   );
   const terrainMesh = new THREE.Mesh(terrainGeo, terrainMat);
-  terrainMesh.receiveShadow = !isSoftwareGl;
+  terrainMesh.receiveShadow = shadowsEnabled;
   terrainMesh.name = "terrain";
   rootGroup.add(terrainMesh);
 
@@ -179,7 +184,7 @@ export function buildRetroWorld(
   const cobbleOverlay = new THREE.Mesh(plazaGeo, plazaMat);
   cobbleOverlay.position.set(14.8, 0.07, -1.6);
   cobbleOverlay.scale.set(1.12, 1, 0.92);
-  cobbleOverlay.receiveShadow = !isSoftwareGl;
+  cobbleOverlay.receiveShadow = shadowsEnabled;
   rootGroup.add(cobbleOverlay);
 
   const stoneMat = trackMat(
@@ -195,30 +200,28 @@ export function buildRetroWorld(
     m.position.set(st.x, groundHeightAt(st.x, st.z) + 0.04, st.z);
     m.scale.set(st.radius, 1, st.radius);
     m.rotation.y = st.rotation;
-    m.receiveShadow = !isSoftwareGl;
-    m.castShadow = !isSoftwareGl;
+    m.receiveShadow = shadowsEnabled;
     rootGroup.add(m);
   }
 
   // =========================================================
   // 3. CANAL & POND WATER + POND BOULDERS + DUCKLINGS + KOI + LILYPADS
   // =========================================================
-  const waterGeo = trackGeo(new THREE.PlaneGeometry(36, 36, 32, 32));
+  const waterGeo = trackGeo(new THREE.PlaneGeometry(36, 36, 12, 12));
   waterGeo.rotateX(-Math.PI / 2);
   const waterMat = trackMat(
-    new THREE.MeshPhysicalMaterial({
+    new THREE.MeshStandardMaterial({
       map: textures.waterPixel,
       color: "#52b6f0",
-      roughness: 0.18,
-      metalness: 0.04,
-      clearcoat: 0.5,
+      roughness: 0.16,
+      metalness: 0.06,
       transparent: true,
       opacity: 0.86,
     })
   );
   const waterMesh = new THREE.Mesh(waterGeo, waterMat);
   waterMesh.position.set(-1, -0.32, -1);
-  waterMesh.receiveShadow = !isSoftwareGl;
+  waterMesh.receiveShadow = shadowsEnabled;
   rootGroup.add(waterMesh);
 
   // Stone material for architectural accents (e.g. cafe chimney)
@@ -374,6 +377,26 @@ export function buildRetroWorld(
   // =========================================================
   const lanternLights: THREE.PointLight[] = [];
   const lanternBulbs: THREE.Mesh[] = [];
+  const lightCandidates: Array<{
+    priority: number;
+    parent: THREE.Object3D;
+    light: THREE.PointLight;
+  }> = [];
+  const registerPointLight = (
+    priority: number,
+    parent: THREE.Object3D,
+    color: string,
+    intensity: number,
+    distance: number,
+    decay: number,
+    x: number,
+    y: number,
+    z: number
+  ) => {
+    const pt = new THREE.PointLight(color, intensity, distance, decay);
+    pt.position.set(x, y, z);
+    lightCandidates.push({ priority, parent, light: pt });
+  };
 
   const woodMat = trackMat(
     new THREE.MeshStandardMaterial({
@@ -403,13 +426,19 @@ export function buildRetroWorld(
   const lanternCapGeo = trackGeo(new THREE.ConeGeometry(0.22, 0.18, 6));
   const lanternBulbGeo = trackGeo(new THREE.SphereGeometry(0.14, 7, 6));
 
-  const createLantern = (x: number, y: number, z: number, withLight = true): THREE.Group => {
+  const createLantern = (
+    x: number,
+    y: number,
+    z: number,
+    withLight = true,
+    lightPriority = 5
+  ): THREE.Group => {
     const g = new THREE.Group();
     g.position.set(x, y, z);
 
     const post = new THREE.Mesh(lanternPostGeo, woodMat);
     post.position.y = 1.1;
-    post.castShadow = !isSoftwareGl;
+    post.castShadow = shadowsEnabled;
     g.add(post);
 
     const arm = new THREE.Mesh(lanternArmGeo, darkIronMat);
@@ -426,10 +455,7 @@ export function buildRetroWorld(
     lanternBulbs.push(bulb);
 
     if (withLight) {
-      const pt = new THREE.PointLight("#ffc46b", 0.9, 13, 1.6);
-      pt.position.set(0.44, 1.8, 0);
-      g.add(pt);
-      lanternLights.push(pt);
+      registerPointLight(lightPriority, g, "#ffc46b", 0.9, 13, 1.6, 0.44, 1.8, 0);
     }
 
     rootGroup.add(g);
@@ -450,7 +476,7 @@ export function buildRetroWorld(
       for (const pz of [-1.35, 1.35]) {
         const piling = new THREE.Mesh(pilingGeo, woodMat);
         piling.position.set(px, 0.1, pz);
-        piling.castShadow = !isSoftwareGl;
+        piling.castShadow = shadowsEnabled;
         bridge.add(piling);
       }
     }
@@ -463,8 +489,8 @@ export function buildRetroWorld(
       const plank = new THREE.Mesh(plankGeo, woodMat);
       plank.position.set(px, archY, 0);
       plank.rotation.z = -Math.sin(t * Math.PI * 0.5) * 0.11;
-      plank.castShadow = !isSoftwareGl;
-      plank.receiveShadow = !isSoftwareGl;
+      plank.castShadow = shadowsEnabled;
+      plank.receiveShadow = shadowsEnabled;
       bridge.add(plank);
     }
 
@@ -475,18 +501,18 @@ export function buildRetroWorld(
         const archY = 0.52 + Math.cos((px / 3.5) * Math.PI * 0.5) * 0.4;
         const post = new THREE.Mesh(railPostGeo, woodMat);
         post.position.set(px, archY + 0.48, rz);
-        post.castShadow = !isSoftwareGl;
+        post.castShadow = shadowsEnabled;
         bridge.add(post);
       }
       const rail = new THREE.Mesh(railBarGeo, woodMat);
       rail.rotation.z = Math.PI / 2;
       rail.position.set(0, 1.38, rz);
-      rail.castShadow = !isSoftwareGl;
+      rail.castShadow = shadowsEnabled;
       bridge.add(rail);
     }
 
     rootGroup.add(bridge);
-    createLantern(-6.0, groundHeightAt(-6.0, -0.4), -0.4, true);
+    createLantern(-6.0, groundHeightAt(-6.0, -0.4), -0.4, true, 4);
     createLantern(-0.4, groundHeightAt(-0.4, -6.0), -6.0, false);
   }
 
@@ -523,8 +549,8 @@ export function buildRetroWorld(
       const boulder = new THREE.Mesh(sharedTunnelBoulderGeo, rockMat);
       boulder.position.set(bx, by, bz);
       boulder.scale.set(1.1 * br, 0.9 * br, 1.0 * br);
-      boulder.castShadow = !isSoftwareGl;
-      boulder.receiveShadow = !isSoftwareGl;
+      boulder.castShadow = shadowsEnabled;
+      boulder.receiveShadow = shadowsEnabled;
       tunnel.add(boulder);
     }
 
@@ -537,12 +563,12 @@ export function buildRetroWorld(
     for (const sx of [-2.0, 2.0]) {
       const pillar = new THREE.Mesh(pillarGeo, stoneArchMat);
       pillar.position.set(sx, 1.25, 0.1);
-      pillar.castShadow = !isSoftwareGl;
+      pillar.castShadow = shadowsEnabled;
       tunnel.add(pillar);
     }
     const lintel = new THREE.Mesh(trackGeo(new THREE.BoxGeometry(5.1, 0.85, 1.35)), stoneArchMat);
     lintel.position.set(0, 3.1, 0.2);
-    lintel.castShadow = !isSoftwareGl;
+    lintel.castShadow = shadowsEnabled;
     tunnel.add(lintel);
 
     const signMat = trackMat(
@@ -564,10 +590,7 @@ export function buildRetroWorld(
       tunnel.add(bulb);
       lanternBulbs.push(bulb);
     }
-    const tunnelLight = new THREE.PointLight("#ffbb5c", 1.2, 15, 1.5);
-    tunnelLight.position.set(0, 2.4, 1.4);
-    tunnel.add(tunnelLight);
-    lanternLights.push(tunnelLight);
+    registerPointLight(3, tunnel, "#ffbb5c", 1.2, 15, 1.5, 0, 2.4, 1.4);
 
     rootGroup.add(tunnel);
   }
@@ -592,15 +615,15 @@ export function buildRetroWorld(
     // Cozy low daybed sofa base frame - lengthened along Z for dual-pet comfort
     const baseFrame = new THREE.Mesh(trackGeo(new THREE.BoxGeometry(2.35, 0.24, 4.4)), sofaFrameMat);
     baseFrame.position.set(-0.35, 0.12, 0);
-    baseFrame.receiveShadow = !isSoftwareGl;
-    baseFrame.castShadow = !isSoftwareGl;
+    baseFrame.receiveShadow = shadowsEnabled;
+    baseFrame.castShadow = shadowsEnabled;
     baseFrame.userData = { landmarkId: "bed" };
     lounge.add(baseFrame);
 
     // Low rounded backrest along the rear wall
     const backWall = new THREE.Mesh(trackGeo(new THREE.BoxGeometry(0.38, 0.56, 4.4)), sofaFrameMat);
     backWall.position.set(-1.42, 0.40, 0);
-    backWall.castShadow = !isSoftwareGl;
+    backWall.castShadow = shadowsEnabled;
     backWall.userData = { landmarkId: "bed" };
     lounge.add(backWall);
 
@@ -608,7 +631,7 @@ export function buildRetroWorld(
     for (const sz of [-2.08, 2.08]) {
       const armrest = new THREE.Mesh(trackGeo(new THREE.BoxGeometry(2.0, 0.44, 0.32)), sofaFrameMat);
       armrest.position.set(-0.32, 0.34, sz);
-      armrest.castShadow = !isSoftwareGl;
+      armrest.castShadow = shadowsEnabled;
       armrest.userData = { landmarkId: "bed" };
       lounge.add(armrest);
     }
@@ -616,7 +639,7 @@ export function buildRetroWorld(
     // Wide, thick, super plush lengthened mattress cushion for Juro to rest comfortably
     const mattress = new THREE.Mesh(trackGeo(new THREE.BoxGeometry(1.92, 0.28, 3.92)), cushionMat);
     mattress.position.set(-0.35, 0.29, 0);
-    mattress.receiveShadow = !isSoftwareGl;
+    mattress.receiveShadow = shadowsEnabled;
     mattress.userData = { landmarkId: "bed" };
     lounge.add(mattress);
 
@@ -625,7 +648,7 @@ export function buildRetroWorld(
       const pillow = new THREE.Mesh(trackGeo(new THREE.BoxGeometry(0.32, 0.32, 0.65)), pillowMat);
       pillow.position.set(-1.12, 0.44, pz);
       pillow.rotation.z = 0.18;
-      pillow.castShadow = !isSoftwareGl;
+      pillow.castShadow = shadowsEnabled;
       lounge.add(pillow);
     }
 
@@ -633,8 +656,8 @@ export function buildRetroWorld(
     const tableMat = trackMat(new THREE.MeshStandardMaterial({ color: "#7c4f34", roughness: 0.7 }));
     const table = new THREE.Mesh(trackGeo(new THREE.BoxGeometry(0.72, 0.42, 0.68)), tableMat);
     table.position.set(-0.35, 0.21, -2.65);
-    table.castShadow = !isSoftwareGl;
-    table.receiveShadow = !isSoftwareGl;
+    table.castShadow = shadowsEnabled;
+    table.receiveShadow = shadowsEnabled;
     lounge.add(table);
 
     // Nightstand Brass Knob
@@ -671,11 +694,8 @@ export function buildRetroWorld(
     lounge.add(bedBulb);
     lanternBulbs.push(bedBulb);
 
-    // Real Warm PointLight illuminating the bed
-    const bedLight = new THREE.PointLight("#ffba66", 1.4, 9, 1.5);
-    bedLight.position.set(-0.35, 0.85, -2.65);
-    lounge.add(bedLight);
-    lanternLights.push(bedLight);
+    // Real Warm PointLight illuminating the bed (priority 1)
+    registerPointLight(1, lounge, "#ffba66", 1.4, 9, 1.5, -0.35, 0.85, -2.65);
 
     // Atmospheric Warm Spherical Glow Halo
     const glowMat = trackMat(
@@ -692,8 +712,8 @@ export function buildRetroWorld(
       const sy = groundHeightAt(sx, 4.0) + 0.05;
       const step = new THREE.Mesh(stairStepGeo, stoneMat);
       step.position.set(sx, sy, 4.0);
-      step.receiveShadow = !isSoftwareGl;
-      step.castShadow = !isSoftwareGl;
+      step.receiveShadow = shadowsEnabled;
+      step.castShadow = shadowsEnabled;
       rootGroup.add(step);
     }
 
@@ -714,13 +734,13 @@ export function buildRetroWorld(
 
     const plinth = new THREE.Mesh(trackGeo(new THREE.BoxGeometry(5.6, 0.35, 5.2)), stoneMat);
     plinth.position.y = 0.17;
-    plinth.receiveShadow = !isSoftwareGl;
+    plinth.receiveShadow = shadowsEnabled;
     cafe.add(plinth);
 
     const mainBody = new THREE.Mesh(trackGeo(new THREE.BoxGeometry(4.8, 2.8, 4.4)), wallMat);
     mainBody.position.y = 1.75;
-    mainBody.castShadow = !isSoftwareGl;
-    mainBody.receiveShadow = !isSoftwareGl;
+    mainBody.castShadow = shadowsEnabled;
+    mainBody.receiveShadow = shadowsEnabled;
     cafe.add(mainBody);
 
     const cornerGeo = trackGeo(new THREE.BoxGeometry(0.28, 2.85, 0.28));
@@ -728,7 +748,7 @@ export function buildRetroWorld(
       for (const cz of [-2.2, 2.2]) {
         const col = new THREE.Mesh(cornerGeo, woodMat);
         col.position.set(cx, 1.75, cz);
-        col.castShadow = !isSoftwareGl;
+        col.castShadow = shadowsEnabled;
         cafe.add(col);
       }
     }
@@ -745,13 +765,13 @@ export function buildRetroWorld(
     const awning = new THREE.Mesh(trackGeo(new THREE.BoxGeometry(3.6, 0.18, 1.35)), awningMat);
     awning.position.set(0, 2.42, 2.70);
     awning.rotation.x = 0.25;
-    awning.castShadow = !isSoftwareGl;
+    awning.castShadow = shadowsEnabled;
     cafe.add(awning);
 
     const roof = new THREE.Mesh(trackGeo(new THREE.ConeGeometry(4.15, 2.45, 4)), roofMat);
     roof.position.y = 4.48;
     roof.rotation.y = Math.PI / 4;
-    roof.castShadow = !isSoftwareGl;
+    roof.castShadow = shadowsEnabled;
     cafe.add(roof);
 
     const finial = new THREE.Mesh(trackGeo(new THREE.SphereGeometry(0.26, 8, 8)), woodMat);
@@ -760,13 +780,13 @@ export function buildRetroWorld(
 
     const chimney = new THREE.Mesh(trackGeo(new THREE.BoxGeometry(0.65, 1.4, 0.65)), curbMat);
     chimney.position.set(-1.35, 4.88, -1.1);
-    chimney.castShadow = !isSoftwareGl;
+    chimney.castShadow = shadowsEnabled;
     cafe.add(chimney);
 
     // Front fascia header supporting the signboard
     const fascia = new THREE.Mesh(trackGeo(new THREE.BoxGeometry(3.6, 0.65, 0.24)), woodMat);
     fascia.position.set(0, 2.92, 2.42);
-    fascia.castShadow = !isSoftwareGl;
+    fascia.castShadow = shadowsEnabled;
     cafe.add(fascia);
 
     const cafeSignMat = trackMat(
@@ -782,13 +802,10 @@ export function buildRetroWorld(
     cafeSign.position.set(0, 2.92, 2.56);
     cafe.add(cafeSign);
 
-    const cafeLight = new THREE.PointLight("#ffc06e", 1.1, 15, 1.5);
-    cafeLight.position.set(0, 2.4, 3.4);
-    cafe.add(cafeLight);
-    lanternLights.push(cafeLight);
+    registerPointLight(2, cafe, "#ffc06e", 1.1, 15, 1.5, 0, 2.4, 3.4);
 
     rootGroup.add(cafe);
-    createLantern(14.2, plazaY, 2.6, true);
+    createLantern(14.2, plazaY, 2.6, true, 6);
   }
 
   // --- E. POS PANDANG SELATAN (TEMPAT DUDUK BENCH) ---
@@ -801,16 +818,19 @@ export function buildRetroWorld(
     bench.position.set(0, 0, 0.6);
     const seat = new THREE.Mesh(trackGeo(new THREE.BoxGeometry(2.2, 0.16, 0.72)), woodMat);
     seat.position.y = 0.52;
-    seat.castShadow = !isSoftwareGl;
+    seat.castShadow = shadowsEnabled;
+    seat.userData.landmarkId = "overlook";
     bench.add(seat);
     const back = new THREE.Mesh(trackGeo(new THREE.BoxGeometry(2.2, 0.55, 0.14)), woodMat);
     back.position.set(0, 0.85, 0.3);
     back.rotation.x = 0.15;
-    back.castShadow = !isSoftwareGl;
+    back.castShadow = shadowsEnabled;
+    back.userData.landmarkId = "overlook";
     bench.add(back);
     for (const lx of [-0.85, 0.85]) {
       const leg = new THREE.Mesh(trackGeo(new THREE.BoxGeometry(0.16, 0.52, 0.62)), darkIronMat);
       leg.position.set(lx, 0.26, 0);
+      leg.userData.landmarkId = "overlook";
       bench.add(leg);
     }
     overlook.add(bench);
@@ -822,15 +842,18 @@ export function buildRetroWorld(
     scopeGroup.position.set(-1.85, 0, -0.4);
     const tripod = new THREE.Mesh(trackGeo(new THREE.CylinderGeometry(0.08, 0.38, 1.15, 6)), woodMat);
     tripod.position.y = 0.58;
+    tripod.userData.landmarkId = "overlook";
     scopeGroup.add(tripod);
     const tube = new THREE.Mesh(trackGeo(new THREE.CylinderGeometry(0.11, 0.08, 0.95, 10)), brassMat);
     tube.position.y = 1.25;
     tube.rotation.x = Math.PI / 2 - 0.15;
+    tube.userData.landmarkId = "overlook";
     scopeGroup.add(tube);
     overlook.add(scopeGroup);
 
     const post = new THREE.Mesh(trackGeo(new THREE.CylinderGeometry(0.08, 0.09, 1.85, 8)), woodMat);
     post.position.set(2.0, 0.92, -0.3);
+    post.userData.landmarkId = "overlook";
     overlook.add(post);
     const boardMat = trackMat(
       new THREE.MeshStandardMaterial({ map: textures.signPost, roughness: 0.8 })
@@ -838,10 +861,11 @@ export function buildRetroWorld(
     const board = new THREE.Mesh(trackGeo(new THREE.BoxGeometry(1.5, 0.52, 0.1)), boardMat);
     board.position.set(2.0, 1.55, -0.2);
     board.rotation.y = -0.35;
+    board.userData.landmarkId = "overlook";
     overlook.add(board);
 
     rootGroup.add(overlook);
-    createLantern(8.1, groundHeightAt(8.1, 18.8), 18.8, true);
+    createLantern(8.1, groundHeightAt(8.1, 18.8), 18.8, true, 5);
   }
 
   // --- F. TRAMPOLIN JAMUR (BOUNCY MUSHROOM TRAMPOLINE) ---
@@ -858,13 +882,13 @@ export function buildRetroWorld(
     // Stalk / stem of the mushroom
     const stem = new THREE.Mesh(trackGeo(new THREE.CylinderGeometry(0.32, 0.42, 0.48, 14)), stemMat);
     stem.position.y = 0.24;
-    stem.castShadow = !isSoftwareGl;
+    stem.castShadow = shadowsEnabled;
     trampGroup.add(stem);
 
     // Wooden counter ring under the cap (repurposed from the mushroom kiosk design)
     const counterRing = new THREE.Mesh(trackGeo(new THREE.CylinderGeometry(0.68, 0.62, 0.10, 16)), woodMat);
     counterRing.position.y = 0.38;
-    counterRing.castShadow = !isSoftwareGl;
+    counterRing.castShadow = shadowsEnabled;
     trampGroup.add(counterRing);
 
     // Cute rounded dome cap with red and white polka-dots (proportioned for Juro)
@@ -874,11 +898,19 @@ export function buildRetroWorld(
     );
     cap.position.y = 0.42;
     cap.scale.set(1, 0.68, 1);
-    cap.castShadow = !isSoftwareGl;
-    cap.receiveShadow = !isSoftwareGl;
+    cap.castShadow = shadowsEnabled;
+    cap.receiveShadow = shadowsEnabled;
     trampGroup.add(cap);
 
     rootGroup.add(trampGroup);
+  }
+
+  // Attach prioritized point lights within GPU light budget
+  lightCandidates.sort((a, b) => a.priority - b.priority);
+  for (let i = 0; i < Math.min(maxPointLights, lightCandidates.length); i++) {
+    const { parent, light } = lightCandidates[i];
+    parent.add(light);
+    lanternLights.push(light);
   }
 
   // --- G. TREE STUMPS & RUSTIC WOODEN FENCES (Shared Geometries) ---
@@ -896,7 +928,7 @@ export function buildRetroWorld(
 
     const base = new THREE.Mesh(stumpBaseGeo, woodMat);
     base.position.y = 0.28;
-    base.castShadow = !isSoftwareGl;
+    base.castShadow = shadowsEnabled;
     g.add(base);
 
     const ring = new THREE.Mesh(stumpRingGeo, stumpTopMat);
@@ -917,7 +949,6 @@ export function buildRetroWorld(
       const post = new THREE.Mesh(fencePostGeo, woodMat);
       post.position.set((p - f.panels * 0.5) * 1.15, 0.48, 0);
       post.rotation.z = (p % 2 === 0 ? 1 : -1) * 0.05;
-      post.castShadow = !isSoftwareGl;
       fg.add(post);
     }
 
@@ -926,7 +957,6 @@ export function buildRetroWorld(
     for (const ry of [0.36, 0.72]) {
       const rail = new THREE.Mesh(railGeo, woodMat);
       rail.position.set(0, ry, 0.06);
-      rail.castShadow = !isSoftwareGl;
       fg.add(rail);
     }
 
@@ -974,13 +1004,13 @@ export function buildRetroWorld(
       pineTrees.length
     );
 
-    pTrunk.castShadow = !isSoftwareGl;
-    pTrunk.receiveShadow = !isSoftwareGl;
-    pCone1.castShadow = !isSoftwareGl;
-    pCone1.receiveShadow = !isSoftwareGl;
+    pTrunk.castShadow = shadowsEnabled;
+    pTrunk.receiveShadow = shadowsEnabled;
+    pCone1.castShadow = shadowsEnabled;
+    pCone1.receiveShadow = shadowsEnabled;
     // Upper cones (pCone2, pCone3) receive shadows while base cone casts the footprint
-    pCone2.receiveShadow = !isSoftwareGl;
-    pCone3.receiveShadow = !isSoftwareGl;
+    pCone2.receiveShadow = shadowsEnabled;
+    pCone3.receiveShadow = shadowsEnabled;
 
     pineTrees.forEach((t: TreeSpec, idx: number) => {
       const gy = groundHeightAt(t.x, t.z);
@@ -1035,12 +1065,12 @@ export function buildRetroWorld(
       roundTrees.length
     );
 
-    rTrunk.castShadow = !isSoftwareGl;
-    rTrunk.receiveShadow = !isSoftwareGl;
-    rCrownMain.castShadow = !isSoftwareGl;
-    rCrownMain.receiveShadow = !isSoftwareGl;
+    rTrunk.castShadow = shadowsEnabled;
+    rTrunk.receiveShadow = shadowsEnabled;
+    rCrownMain.castShadow = shadowsEnabled;
+    rCrownMain.receiveShadow = shadowsEnabled;
     // Top crown sits inside main crown shadow volume
-    rCrownTop.receiveShadow = !isSoftwareGl;
+    rCrownTop.receiveShadow = shadowsEnabled;
 
     roundTrees.forEach((t: TreeSpec, idx: number) => {
       const gy = groundHeightAt(t.x, t.z);
@@ -1083,8 +1113,8 @@ export function buildRetroWorld(
       new THREE.MeshStandardMaterial({ color: "#a5adb8", roughness: 0.88, flatShading: true })
     );
     const rockInst = new THREE.InstancedMesh(rockGeo, rockMatInst, rocks.length);
-    rockInst.castShadow = !isSoftwareGl;
-    rockInst.receiveShadow = !isSoftwareGl;
+    rockInst.castShadow = shadowsEnabled;
+    rockInst.receiveShadow = shadowsEnabled;
     rocks.forEach((r: RockSpec, idx: number) => {
       const gy = groundHeightAt(r.x, r.z);
       dummy.position.set(r.x, gy + 0.25 * r.scale, r.z);
@@ -1163,12 +1193,15 @@ export function buildRetroWorld(
   const landmarkHitboxes: THREE.Mesh[] = [];
   const hitboxMat = trackMat(new THREE.MeshBasicMaterial({ visible: false }));
   for (const lm of LANDMARKS) {
-    const gy = walkableHeightAt(lm.position.x, lm.position.z);
-    const hb = new THREE.Mesh(trackGeo(new THREE.CylinderGeometry(2.8, 2.8, 4.5, 8)), hitboxMat);
-    hb.position.set(lm.position.x, gy + 2.0, lm.position.z);
-    hb.userData.landmarkId = lm.id;
-    rootGroup.add(hb);
-    landmarkHitboxes.push(hb);
+    // Only add enclosing portal hitboxes for Shop & Mine; Bed, Bench, Bridge, and Pond rely on visible meshes so Juro is never occluded
+    if (lm.id === "cafe" || lm.id === "tunnel") {
+      const gy = walkableHeightAt(lm.position.x, lm.position.z);
+      const hb = new THREE.Mesh(trackGeo(new THREE.CylinderGeometry(2.6, 2.6, 4.2, 8)), hitboxMat);
+      hb.position.set(lm.position.x, gy + 2.0, lm.position.z);
+      hb.userData.landmarkId = lm.id;
+      rootGroup.add(hb);
+      landmarkHitboxes.push(hb);
+    }
 
     const ey = walkableHeightAt(lm.entryPoint.x, lm.entryPoint.z);
     const markerRing = new THREE.Mesh(
@@ -1187,10 +1220,10 @@ export function buildRetroWorld(
     rootGroup.add(markerRing);
   }
 
-  // Trampoline hitbox
+  // Trampoline hitbox kept low to the mushroom cap so bouncing Juro on top remains directly clickable
   const trampGy = groundHeightAt(JURO_TRAMPOLINE_POS.x, JURO_TRAMPOLINE_POS.z);
-  const trampHb = new THREE.Mesh(trackGeo(new THREE.CylinderGeometry(1.2, 1.2, 2.0, 8)), hitboxMat);
-  trampHb.position.set(JURO_TRAMPOLINE_POS.x, trampGy + 1.0, JURO_TRAMPOLINE_POS.z);
+  const trampHb = new THREE.Mesh(trackGeo(new THREE.CylinderGeometry(1.05, 1.05, 0.45, 8)), hitboxMat);
+  trampHb.position.set(JURO_TRAMPOLINE_POS.x, trampGy + 0.32, JURO_TRAMPOLINE_POS.z);
   trampHb.userData.landmarkId = "trampoline";
   rootGroup.add(trampHb);
   landmarkHitboxes.push(trampHb);
@@ -1199,7 +1232,7 @@ export function buildRetroWorld(
   // 7. RAIN PARTICLES & WATER RIPPLES
   // =========================================================
   const rain = (() => {
-    const count = 260;
+    const count = rainCount;
     const rainGeo = trackGeo(new THREE.BoxGeometry(0.035, 0.72, 0.035));
     const rainMat = trackMat(
       new THREE.MeshBasicMaterial({
@@ -1259,80 +1292,14 @@ export function buildRetroWorld(
     return { mesh, count, positions, speeds, ripples, ripplePhases };
   })();
 
-  // =========================================================
-  // 7. SOFT GLOWING NAVIGATION MARKERS & BEACON
-  // =========================================================
-  const navVisuals: NavigationVisuals = (() => {
-    const group = new THREE.Group();
-    rootGroup.add(group);
-
-    const maxBreadcrumbs = 64;
-    const crumbGeo = trackGeo(new THREE.SphereGeometry(0.2, 10, 8));
-    const crumbMat = trackMat(
-      new THREE.MeshStandardMaterial({
-        color: "#ffe373",
-        emissive: "#f5b942",
-        emissiveIntensity: 0.65,
-        roughness: 0.35,
-      })
-    );
-    const breadcrumbs = new THREE.InstancedMesh(crumbGeo, crumbMat, maxBreadcrumbs);
-    breadcrumbs.count = 0;
-    breadcrumbs.frustumCulled = false;
-    group.add(breadcrumbs);
-
-    const beaconGroup = new THREE.Group();
-    beaconGroup.visible = false;
-    group.add(beaconGroup);
-
-    const beaconRing = new THREE.Mesh(
-      trackGeo(new THREE.RingGeometry(0.55, 0.82, 20)),
-      trackMat(
-        new THREE.MeshBasicMaterial({
-          color: "#ffd24d",
-          side: THREE.DoubleSide,
-          transparent: true,
-          opacity: 0.85,
-        })
-      )
-    );
-    beaconRing.rotation.x = -Math.PI / 2;
-    beaconRing.position.y = 0.08;
-    beaconGroup.add(beaconRing);
-
-    return {
-      group,
-      breadcrumbs,
-      maxBreadcrumbs,
-      beaconGroup,
-      beaconRing,
-    };
-  })();
-
-  const bridgeClickPlane = new THREE.Mesh(
-    trackGeo(new THREE.BoxGeometry(7.6, 0.2, 3.4)),
-    hitboxMat
-  );
-  bridgeClickPlane.position.set(-3.2, 0.85, -3.2);
-  bridgeClickPlane.rotation.y = Math.PI / 4;
-  rootGroup.add(bridgeClickPlane);
-
-  const walkableClickTargets: THREE.Object3D[] = [
-    terrainMesh,
-    cobbleOverlay,
-    bridgeClickPlane,
-  ];
-
   return {
     rootGroup,
     terrainMesh,
     cobbleOverlay,
-    walkableClickTargets,
     waterMesh,
     kois,
     lanternLights,
     lanternBulbs,
-    navVisuals,
     rain,
     landmarkHitboxes,
     dispose: () => {

@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from "react";
-import { Link, useSearchParams } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import {
   Store,
   Coins,
@@ -9,10 +9,10 @@ import {
   ShoppingBag,
   ArrowRightLeft,
   Palette,
+  X,
 } from "lucide-react";
 import { Card } from "../components/ui/Card";
 import { Button } from "../components/ui/Button";
-import { Badge } from "../components/ui/Badge";
 import { PixelSegmented } from "../components/ui/PixelSegmented";
 import { ItemIllustration } from "../components/items/ItemIllustration";
 import { useGameStore } from "../stores/gameStore";
@@ -35,6 +35,7 @@ type ShopTab = "food" | "toy" | "skins" | "sell" | "tools";
 const VALID_TABS: ShopTab[] = ["food", "toy", "skins", "sell", "tools"];
 
 export const ShopPage: React.FC = () => {
+  const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const initialTabParam = searchParams.get("tab") as ShopTab | null;
   const activeTab: ShopTab =
@@ -234,42 +235,47 @@ export const ShopPage: React.FC = () => {
   };
 
   return (
-    <main className="w-full max-w-6xl mx-auto px-4 py-4 md:py-5 space-y-5">
-      {/* Consistent Header & Wallet Row (Desktop & Mobile) */}
-      <div className="border-b-2 border-charcoal/15 dark:border-neutral-700 pb-3.5 flex items-center justify-between gap-2">
-        <h1 className="pixel-text text-sm md:text-base text-charcoal dark:text-white uppercase tracking-wider flex items-center gap-2 shrink-0">
-          <Store size={16} strokeWidth={2.5} className="text-juro-orange" />
+    <section className="w-full px-4 sm:px-6 py-4 sm:py-5 space-y-4">
+      {/* Compact Overlay Header & Wallet Row */}
+      <div className="border-b border-neutral-200/80 dark:border-neutral-800 pb-3.5 flex items-center justify-between gap-3">
+        <h1 className="text-base sm:text-lg font-bold text-neutral-900 dark:text-white tracking-tight flex items-center gap-2 shrink-0">
+          <Store size={18} strokeWidth={2.2} className="text-juro-orange" />
           <span>Toko</span>
         </h1>
 
-        <div className="flex items-center gap-1.5 sm:gap-2">
+        <div className="flex items-center gap-2 sm:gap-3">
           <div
-            className={`inline-flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 bg-white dark:bg-dark-surface border-2 border-charcoal dark:border-neutral-600 shadow-[2px_2px_0px_#171717] dark:shadow-[2px_2px_0px_#000000] ${
-              walletPulse ? "animate-wallet-pop border-juro-orange" : ""
+            className={`inline-flex items-center gap-3 text-xs sm:text-sm font-semibold tabular-nums transition-transform ${
+              walletPulse ? "animate-wallet-pop text-juro-orange" : "text-neutral-900 dark:text-white"
             }`}
           >
-            <Coins size={13} strokeWidth={2.5} className="text-amber-500" />
-            <span className="pixel-text text-[10px] font-bold text-charcoal dark:text-white">
-              {coins}
+            <span className="inline-flex items-center gap-1.5">
+              <Coins size={14} strokeWidth={2.2} className="text-amber-500" />
+              <span>{coins}</span>
+            </span>
+            <span className="w-px h-3.5 bg-neutral-200 dark:bg-neutral-700" aria-hidden="true" />
+            <span className="inline-flex items-center gap-1.5">
+              <Gem size={14} strokeWidth={2.2} className="text-sky-500" />
+              <span>{totalCrystals}</span>
             </span>
           </div>
-          <div
-            className={`inline-flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 bg-white dark:bg-dark-surface border-2 border-charcoal dark:border-neutral-600 shadow-[2px_2px_0px_#171717] dark:shadow-[2px_2px_0px_#000000] ${
-              walletPulse ? "animate-wallet-pop" : ""
-            }`}
+
+          <button
+            type="button"
+            onClick={() => {
+              soundEffects.playDismiss();
+              navigate("/");
+            }}
+            className="w-8 h-8 rounded-xl inline-flex items-center justify-center text-neutral-500 hover:text-neutral-900 hover:bg-neutral-100 dark:text-neutral-400 dark:hover:text-white dark:hover:bg-neutral-800 transition-colors cursor-pointer"
+            aria-label="Tutup dan kembali ke Home"
+            title="Kembali ke Home"
           >
-            <Gem size={13} strokeWidth={2.5} className="text-sky-500" />
-            <span className="pixel-text text-[10px] font-bold text-charcoal dark:text-white">
-              {totalCrystals}
-            </span>
-          </div>
-          <Link to="/mine" className="hidden sm:inline-block">
-            <Button label="Tambang" icon={Pickaxe} size="sm" variant="primary" />
-          </Link>
+            <X size={17} strokeWidth={2} />
+          </button>
         </div>
       </div>
 
-      {/* Category Switcher (Full-Width Grid on Mobile, Stable Position Across All Tabs) */}
+      {/* Category Switcher */}
       <div className="w-full flex items-center justify-between gap-3">
         <PixelSegmented
           fullWidthOnMobile
@@ -289,8 +295,8 @@ export const ShopPage: React.FC = () => {
         />
       </div>
 
-      {/* Fixed-Width, Non-Shifting Tab Content Stage */}
-      <div className="w-full min-h-[380px]">
+      {/* Tab Content Stage */}
+      <div className="w-full min-h-[340px]">
         {/* TAB 1: MAKANAN */}
         {activeTab === "food" && (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5">
@@ -300,46 +306,65 @@ export const ShopPage: React.FC = () => {
               const canBuy3 = coins >= food.price * 3;
 
               return (
-                <Card key={food.id} shadowOffset="sm" className="p-3.5 flex flex-col justify-between gap-3">
-                  <div className="flex items-start gap-3">
-                    <div className="p-2 bg-warm-white dark:bg-neutral-800 border-2 border-charcoal dark:border-neutral-600 shadow-[2px_2px_0px_#171717] dark:shadow-[2px_2px_0px_#000000] shrink-0">
-                      <ItemIllustration id={food.id} size={40} />
+                <Card key={food.id} shadowOffset="sm" className="p-4 shadow-none flex flex-col justify-between gap-3">
+                  <div className="flex items-center gap-3">
+                    <div className="w-12 h-12 rounded-xl bg-neutral-50 dark:bg-neutral-800 border border-neutral-200/80 dark:border-neutral-700/70 flex items-center justify-center shrink-0">
+                      <ItemIllustration id={food.id} size={34} />
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center justify-between gap-2">
-                        <h3 className="pixel-text text-[11px] text-charcoal dark:text-white font-bold truncate">
+                        <h3 className="text-sm font-semibold text-neutral-900 dark:text-white truncate">
                           {food.name}
                         </h3>
-                        <Badge
-                          label={`×${stock}`}
-                          variant={stock > 0 ? "good" : "default"}
-                          size="sm"
-                        />
+                        <span
+                          className={`text-xs font-semibold tabular-nums shrink-0 ${
+                            stock > 0
+                              ? "text-emerald-600 dark:text-emerald-400"
+                              : "text-neutral-400"
+                          }`}
+                        >
+                          ×{stock}
+                        </span>
                       </div>
-                      <p className="pixel-text text-[8px] sm:text-[9px] text-muted dark:text-neutral-400 mt-1.5 leading-relaxed">
+                      <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-1 tabular-nums truncate">
                         +{food.hungerRestore} Lapar · +{food.happinessGain} Senang · +{food.xpReward} XP
                       </p>
                     </div>
                   </div>
 
-                  <div className="pt-2.5 border-t border-charcoal/10 dark:border-neutral-700 grid grid-cols-2 gap-2">
-                    <Button
-                      label={`×1 · ${food.price}`}
-                      icon={ShoppingBag}
-                      size="sm"
-                      variant={canBuy1 ? "primary" : "secondary"}
+                  <div className="pt-3 border-t border-neutral-100 dark:border-neutral-800 grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
                       disabled={!canBuy1}
-                      onClick={() => handleBuyFood(food.id, food.name, 1, food.price)}
-                      className="w-full"
-                    />
-                    <Button
-                      label={`×3 · ${food.price * 3}`}
-                      size="sm"
-                      variant="secondary"
+                      onClick={() => {
+                        soundEffects.playClick();
+                        handleBuyFood(food.id, food.name, 1, food.price);
+                      }}
+                      className={`w-full min-h-[40px] py-1.5 px-2.5 rounded-xl border text-center transition-all cursor-pointer select-none active:scale-[0.98] disabled:opacity-45 disabled:cursor-not-allowed disabled:active:scale-100 ${
+                        canBuy1
+                          ? "bg-neutral-900 text-white border-neutral-900 hover:bg-neutral-800 dark:bg-neutral-100 dark:text-neutral-900 dark:border-neutral-100 dark:hover:bg-neutral-200"
+                          : "bg-white text-neutral-800 border-neutral-200 dark:bg-neutral-800 dark:text-neutral-100 dark:border-neutral-700"
+                      }`}
+                    >
+                      <span className="block text-xs font-semibold leading-tight">Beli 1</span>
+                      <span className="block text-[11px] opacity-80 tabular-nums leading-tight mt-0.5">
+                        {food.price} Koin
+                      </span>
+                    </button>
+                    <button
+                      type="button"
                       disabled={!canBuy3}
-                      onClick={() => handleBuyFood(food.id, food.name, 3, food.price)}
-                      className="w-full"
-                    />
+                      onClick={() => {
+                        soundEffects.playClick();
+                        handleBuyFood(food.id, food.name, 3, food.price);
+                      }}
+                      className="w-full min-h-[40px] py-1.5 px-2.5 rounded-xl border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-800 dark:text-neutral-100 hover:bg-neutral-50 hover:border-neutral-300 dark:hover:bg-neutral-750 text-center transition-all cursor-pointer select-none active:scale-[0.98] disabled:opacity-45 disabled:cursor-not-allowed disabled:active:scale-100"
+                    >
+                      <span className="block text-xs font-semibold leading-tight">Beli 3</span>
+                      <span className="block text-[11px] text-neutral-500 dark:text-neutral-400 tabular-nums leading-tight mt-0.5">
+                        {food.price * 3} Koin
+                      </span>
+                    </button>
                   </div>
                 </Card>
               );
@@ -355,29 +380,33 @@ export const ShopPage: React.FC = () => {
               const canBuy = !isOwned && coins >= toy.price;
 
               return (
-                <Card key={toy.id} shadowOffset="sm" className="p-3.5 flex flex-col justify-between gap-3">
-                  <div className="flex items-start gap-3">
-                    <div className="p-2 bg-warm-white dark:bg-neutral-800 border-2 border-charcoal dark:border-neutral-600 shadow-[2px_2px_0px_#171717] dark:shadow-[2px_2px_0px_#000000] shrink-0">
-                      <ItemIllustration id={toy.id} size={40} />
+                <Card key={toy.id} shadowOffset="sm" className="p-4 shadow-none flex flex-col justify-between gap-3">
+                  <div className="flex items-center gap-3">
+                    <div className="w-12 h-12 rounded-xl bg-neutral-50 dark:bg-neutral-800 border border-neutral-200/80 dark:border-neutral-700/70 flex items-center justify-center shrink-0">
+                      <ItemIllustration id={toy.id} size={34} />
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center justify-between gap-2">
-                        <h3 className="pixel-text text-[11px] text-charcoal dark:text-white font-bold truncate">
+                        <h3 className="text-sm font-semibold text-neutral-900 dark:text-white truncate">
                           {toy.name}
                         </h3>
-                        {isOwned ? (
-                          <Badge label="Milik" variant="good" size="sm" />
-                        ) : (
-                          <Badge label={`${toy.price}`} variant="orange" size="sm" />
-                        )}
+                        <span
+                          className={`text-xs font-semibold tabular-nums shrink-0 ${
+                            isOwned
+                              ? "text-emerald-600 dark:text-emerald-400"
+                              : "text-juro-orange"
+                          }`}
+                        >
+                          {isOwned ? "Milik" : `${toy.price} Koin`}
+                        </span>
                       </div>
-                      <p className="pixel-text text-[8px] sm:text-[9px] text-muted dark:text-neutral-400 mt-1.5 leading-relaxed">
+                      <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-1 tabular-nums truncate">
                         +{toy.happinessGain} Senang · +{toy.affectionGain} Sayang · +{toy.xpReward} XP
                       </p>
                     </div>
                   </div>
 
-                  <div className="pt-2.5 border-t border-charcoal/10 dark:border-neutral-700">
+                  <div className="pt-3 border-t border-neutral-100 dark:border-neutral-800">
                     {isOwned ? (
                       <Button
                         label="Dimiliki"
@@ -385,7 +414,7 @@ export const ShopPage: React.FC = () => {
                         size="sm"
                         variant="secondary"
                         disabled
-                        className="w-full"
+                        className="w-full min-h-[40px]"
                       />
                     ) : (
                       <Button
@@ -395,7 +424,7 @@ export const ShopPage: React.FC = () => {
                         variant={canBuy ? "primary" : "secondary"}
                         disabled={!canBuy}
                         onClick={() => handleBuyToy(toy.id, toy.name, toy.price)}
-                        className="w-full"
+                        className="w-full min-h-[40px]"
                       />
                     )}
                   </div>
@@ -409,16 +438,16 @@ export const ShopPage: React.FC = () => {
         {activeTab === "skins" && (
           <div className="space-y-6">
             {/* Bagian 1: Koleksi Topi (Bagian Atas) */}
-            <div className="space-y-3">
-              <div className="flex items-center justify-between border-b-2 border-charcoal/15 dark:border-neutral-700 pb-2">
+            <div className="space-y-3.5">
+              <div className="flex items-center justify-between border-b border-neutral-200/80 dark:border-neutral-800 pb-2.5">
                 <div className="flex items-center gap-2">
-                  <ShoppingBag size={15} strokeWidth={2.5} className="text-juro-orange" />
-                  <h2 className="pixel-text text-xs text-charcoal dark:text-white uppercase tracking-wider font-bold">
+                  <ShoppingBag size={16} strokeWidth={2.2} className="text-juro-orange" />
+                  <h2 className="text-sm font-semibold text-neutral-900 dark:text-white">
                     Koleksi Topi
                   </h2>
                 </div>
-                <span className="pixel-text text-[9px] text-muted dark:text-neutral-400">
-                  {unlockedHats.length} / {HAT_CATALOG.length} Dimiliki
+                <span className="text-xs text-neutral-500 dark:text-neutral-400 tabular-nums">
+                  {unlockedHats.length} / {HAT_CATALOG.length} dimiliki
                 </span>
               </div>
 
@@ -432,45 +461,45 @@ export const ShopPage: React.FC = () => {
                     <Card
                       key={hat.id}
                       shadowOffset="sm"
-                      className={`p-3.5 flex flex-col justify-between gap-3.5 transition-all ${
-                        isSelected ? "border-juro-orange ring-2 ring-juro-orange/25" : ""
+                      className={`p-4 shadow-none flex flex-col justify-between gap-3 transition-all ${
+                        isSelected ? "border-juro-orange ring-1 ring-juro-orange/25" : ""
                       }`}
                     >
-                      <div className="flex items-start gap-3.5">
-                        {/* Mini Pixel-Framed Hat Preview */}
-                        <div className="relative w-14 h-14 bg-warm-white dark:bg-neutral-900 border-2 border-charcoal dark:border-neutral-600 shadow-[2px_2px_0px_#171717] dark:shadow-[2px_2px_0px_#000000] flex items-center justify-center shrink-0">
-                          <ItemIllustration id={hat.illustrationId} size={40} />
+                      <div className="flex items-center gap-3">
+                        <div className="relative w-12 h-12 rounded-xl bg-neutral-50 dark:bg-neutral-800 border border-neutral-200/80 dark:border-neutral-700/70 flex items-center justify-center shrink-0">
+                          <ItemIllustration id={hat.illustrationId} size={34} />
                           {isSelected && (
-                            <span className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-juro-orange text-white border-2 border-charcoal flex items-center justify-center">
-                              <Check size={10} strokeWidth={3} />
+                            <span className="absolute -top-1.5 -right-1.5 w-4.5 h-4.5 rounded-full bg-juro-orange text-white shadow-xs flex items-center justify-center">
+                              <Check size={10} strokeWidth={2.8} />
                             </span>
                           )}
                         </div>
 
-                        <div className="min-w-0 flex-1">
-                          <div className="flex items-center justify-between gap-2">
-                            <h3 className="pixel-text text-[11px] text-charcoal dark:text-white font-bold truncate">
-                              {hat.name}
-                            </h3>
-                            {isSelected ? (
-                              <Badge label="Aktif" variant="orange" size="sm" />
-                            ) : isUnlocked ? (
-                              <Badge label="Milik" variant="good" size="sm" />
-                            ) : (
-                              <Badge
-                                label={hat.price > 0 ? `${hat.price} Koin` : "Gratis"}
-                                variant="charcoal"
-                                size="sm"
-                              />
-                            )}
-                          </div>
-                          <p className="pixel-text text-[8px] sm:text-[9px] text-muted dark:text-neutral-400 mt-1.5 leading-relaxed">
-                            {hat.flavorDesc}
-                          </p>
+                        <div className="min-w-0 flex-1 flex items-center justify-between gap-2">
+                          <h3 className="text-sm font-semibold text-neutral-900 dark:text-white truncate">
+                            {hat.name}
+                          </h3>
+                          <span
+                            className={`text-xs font-semibold tabular-nums shrink-0 ${
+                              isSelected
+                                ? "text-juro-orange"
+                                : isUnlocked
+                                ? "text-emerald-600 dark:text-emerald-400"
+                                : "text-neutral-500 dark:text-neutral-400"
+                            }`}
+                          >
+                            {isSelected
+                              ? "Aktif"
+                              : isUnlocked
+                              ? "Milik"
+                              : hat.price > 0
+                              ? `${hat.price} Koin`
+                              : "Gratis"}
+                          </span>
                         </div>
                       </div>
 
-                      <div className="pt-2.5 border-t border-charcoal/10 dark:border-neutral-700">
+                      <div className="pt-3 border-t border-neutral-100 dark:border-neutral-800">
                         {isUnlocked ? (
                           <Button
                             label={
@@ -485,7 +514,7 @@ export const ShopPage: React.FC = () => {
                             variant={isSelected ? "secondary" : "primary"}
                             disabled={isSelected}
                             onClick={() => handleEquipHat(hat.id, hat.name)}
-                            className="w-full"
+                            className="w-full min-h-[40px]"
                           />
                         ) : (
                           <Button
@@ -495,7 +524,7 @@ export const ShopPage: React.FC = () => {
                             variant={canBuy ? "primary" : "secondary"}
                             disabled={!canBuy}
                             onClick={() => handleUnlockHat(hat.id, hat.name, hat.price)}
-                            className="w-full"
+                            className="w-full min-h-[40px]"
                           />
                         )}
                       </div>
@@ -506,16 +535,16 @@ export const ShopPage: React.FC = () => {
             </div>
 
             {/* Bagian 2: Warna Tubuh Jeli (Bagian Bawah) */}
-            <div className="space-y-3 pt-2">
-              <div className="flex items-center justify-between border-b-2 border-charcoal/15 dark:border-neutral-700 pb-2">
+            <div className="space-y-3.5 pt-1">
+              <div className="flex items-center justify-between border-b border-neutral-200/80 dark:border-neutral-800 pb-2.5">
                 <div className="flex items-center gap-2">
-                  <Palette size={15} strokeWidth={2.5} className="text-juro-orange" />
-                  <h2 className="pixel-text text-xs text-charcoal dark:text-white uppercase tracking-wider font-bold">
+                  <Palette size={16} strokeWidth={2.2} className="text-juro-orange" />
+                  <h2 className="text-sm font-semibold text-neutral-900 dark:text-white">
                     Warna Tubuh Jeli
                   </h2>
                 </div>
-                <span className="pixel-text text-[9px] text-muted dark:text-neutral-400">
-                  {unlockedSkins.length} / {SKIN_CATALOG.length} Dimiliki
+                <span className="text-xs text-neutral-500 dark:text-neutral-400 tabular-nums">
+                  {unlockedSkins.length} / {SKIN_CATALOG.length} dimiliki
                 </span>
               </div>
 
@@ -543,56 +572,54 @@ export const ShopPage: React.FC = () => {
                     <Card
                       key={skin.id}
                       shadowOffset="sm"
-                      className={`p-3.5 flex flex-col justify-between gap-3.5 transition-all ${
-                        isSelected ? "border-juro-orange ring-2 ring-juro-orange/25" : ""
+                      className={`p-4 shadow-none flex flex-col justify-between gap-3 transition-all ${
+                        isSelected ? "border-juro-orange ring-1 ring-juro-orange/25" : ""
                       }`}
                     >
-                      <div className="flex items-start gap-3.5">
-                        {/* Mini Pixel-Framed Juro Jelly Preview */}
-                        <div className="relative w-14 h-14 bg-warm-white dark:bg-neutral-900 border-2 border-charcoal dark:border-neutral-600 shadow-[2px_2px_0px_#171717] dark:shadow-[2px_2px_0px_#000000] flex items-center justify-center shrink-0">
+                      <div className="flex items-center gap-3">
+                        <div className="relative w-12 h-12 rounded-xl bg-neutral-50 dark:bg-neutral-800 border border-neutral-200/80 dark:border-neutral-700/70 flex items-center justify-center shrink-0">
                           <div
-                            className="relative w-10 h-9 rounded-t-full rounded-b-[14px] border-2 border-charcoal overflow-hidden flex items-center justify-center"
+                            className="relative w-9 h-8 rounded-t-full rounded-b-[12px] border border-black/15 shadow-xs overflow-hidden flex items-center justify-center"
                             style={{
                               background: `radial-gradient(circle at 35% 28%, ${skin.colorB} 0%, ${skin.colorA} 72%)`,
                             }}
                           >
                             <span className="absolute top-1 left-2 w-2 h-1.5 bg-white/75 rounded-full" />
                             <span className="flex items-center gap-2 mt-1">
-                              <span className="w-1.5 h-1.5 bg-charcoal rounded-full relative">
+                              <span className="w-1.5 h-1.5 bg-neutral-900 rounded-full relative">
                                 <span className="absolute top-[1px] left-[1px] w-[2px] h-[2px] bg-white rounded-full" />
                               </span>
-                              <span className="w-1.5 h-1.5 bg-charcoal rounded-full relative">
+                              <span className="w-1.5 h-1.5 bg-neutral-900 rounded-full relative">
                                 <span className="absolute top-[1px] left-[1px] w-[2px] h-[2px] bg-white rounded-full" />
                               </span>
                             </span>
                           </div>
                           {isSelected && (
-                            <span className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-juro-orange text-white border-2 border-charcoal flex items-center justify-center">
-                              <Check size={10} strokeWidth={3} />
+                            <span className="absolute -top-1.5 -right-1.5 w-4.5 h-4.5 rounded-full bg-juro-orange text-white shadow-xs flex items-center justify-center">
+                              <Check size={10} strokeWidth={2.8} />
                             </span>
                           )}
                         </div>
 
-                        <div className="min-w-0 flex-1">
-                          <div className="flex items-center justify-between gap-2">
-                            <h3 className="pixel-text text-[11px] text-charcoal dark:text-white font-bold truncate">
-                              {skin.name}
-                            </h3>
-                            {isSelected ? (
-                              <Badge label="Aktif" variant="orange" size="sm" />
-                            ) : isUnlocked ? (
-                              <Badge label="Milik" variant="good" size="sm" />
-                            ) : (
-                              <Badge label={costLabel} variant="charcoal" size="sm" />
-                            )}
-                          </div>
-                          <p className="pixel-text text-[8px] sm:text-[9px] text-muted dark:text-neutral-400 mt-1.5 leading-relaxed">
-                            {skin.flavorDesc}
-                          </p>
+                        <div className="min-w-0 flex-1 flex items-center justify-between gap-2">
+                          <h3 className="text-sm font-semibold text-neutral-900 dark:text-white truncate">
+                            {skin.name}
+                          </h3>
+                          <span
+                            className={`text-xs font-semibold tabular-nums shrink-0 ${
+                              isSelected
+                                ? "text-juro-orange"
+                                : isUnlocked
+                                ? "text-emerald-600 dark:text-emerald-400"
+                                : "text-neutral-500 dark:text-neutral-400"
+                            }`}
+                          >
+                            {isSelected ? "Aktif" : isUnlocked ? "Milik" : costLabel}
+                          </span>
                         </div>
                       </div>
 
-                      <div className="pt-2.5 border-t border-charcoal/10 dark:border-neutral-700">
+                      <div className="pt-3 border-t border-neutral-100 dark:border-neutral-800">
                         {isUnlocked ? (
                           <Button
                             label={isSelected ? "Dipakai" : "Pakai Warna"}
@@ -601,7 +628,7 @@ export const ShopPage: React.FC = () => {
                             variant={isSelected ? "secondary" : "primary"}
                             disabled={isSelected}
                             onClick={() => handleEquipSkin(skin.id, skin.name)}
-                            className="w-full"
+                            className="w-full min-h-[40px]"
                           />
                         ) : (
                           <Button
@@ -611,7 +638,7 @@ export const ShopPage: React.FC = () => {
                             variant={canUnlock ? "primary" : "secondary"}
                             disabled={!canUnlock}
                             onClick={() => handleUnlockSkin(skin.id, skin.name, costLabel)}
-                            className="w-full"
+                            className="w-full min-h-[40px]"
                           />
                         )}
                       </div>
@@ -629,16 +656,16 @@ export const ShopPage: React.FC = () => {
             <Card
               variant="warm"
               shadowOffset="sm"
-              className="p-3.5 flex flex-wrap items-center justify-between gap-3"
+              className="p-4 shadow-none flex flex-wrap items-center justify-between gap-3"
             >
               <div className="flex items-center gap-3">
-                <div className="p-2 bg-white dark:bg-neutral-900 border-2 border-charcoal dark:border-neutral-600">
-                  <ArrowRightLeft size={15} strokeWidth={2.5} className="text-juro-orange" />
+                <div className="w-10 h-10 rounded-xl bg-white dark:bg-neutral-900 border border-neutral-200/80 dark:border-neutral-700 flex items-center justify-center shrink-0">
+                  <ArrowRightLeft size={16} strokeWidth={2.2} className="text-juro-orange" />
                 </div>
-                <p className="pixel-text text-[10px] sm:text-xs text-charcoal dark:text-white font-bold">
+                <p className="text-sm font-semibold text-neutral-900 dark:text-white tabular-nums">
                   {totalCrystals > 0
                     ? `${totalCrystals} Kristal · ~${totalCrystalValue} Koin`
-                    : "Kantong Kristal Kosong"}
+                    : "Kantong kristal kosong"}
                 </p>
               </div>
 
@@ -657,40 +684,40 @@ export const ShopPage: React.FC = () => {
               )}
             </Card>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 gap-3.5">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
               {CRYSTAL_CATALOG.map((c) => {
                 const count = crystals[c.id] ?? 0;
                 const totalVal = count * c.sellPrice;
 
                 return (
-                  <Card key={c.id} shadowOffset="sm" className="p-3.5 flex flex-col justify-between gap-3">
+                  <Card key={c.id} shadowOffset="sm" className="p-4 shadow-none flex flex-col justify-between gap-3">
                     <div className="flex items-center gap-3">
-                      <div className="p-2 bg-warm-white dark:bg-neutral-800 border-2 border-charcoal dark:border-neutral-600 shadow-[2px_2px_0px_#171717] dark:shadow-[2px_2px_0px_#000000] shrink-0">
-                        <ItemIllustration id={c.illustrationId} size={40} />
+                      <div className="w-12 h-12 rounded-xl bg-neutral-50 dark:bg-neutral-800 border border-neutral-200/80 dark:border-neutral-700/70 flex items-center justify-center shrink-0">
+                        <ItemIllustration id={c.illustrationId} size={34} />
                       </div>
                       <div className="flex-1 min-w-0">
-                        <h3 className="pixel-text text-[11px] text-charcoal dark:text-white font-bold truncate">
+                        <h3 className="text-sm font-semibold text-neutral-900 dark:text-white truncate">
                           {c.name}
                         </h3>
-                        <div className="mt-1.5 flex items-center justify-between pixel-text text-[9px] sm:text-[10px]">
-                          <span className="text-charcoal dark:text-neutral-200">
+                        <div className="mt-1 flex items-center justify-between text-xs tabular-nums">
+                          <span className="text-neutral-600 dark:text-neutral-300">
                             Stok: <strong className="text-juro-orange">×{count}</strong>
                           </span>
-                          <span className="text-amber-600 dark:text-amber-400 font-bold">
+                          <span className="text-amber-600 dark:text-amber-400 font-semibold">
                             {c.sellPrice} Koin
                           </span>
                         </div>
                       </div>
                     </div>
 
-                    <div className="pt-2.5 border-t border-charcoal/10 dark:border-neutral-700 grid grid-cols-2 gap-2">
+                    <div className="pt-3 border-t border-neutral-100 dark:border-neutral-800 grid grid-cols-2 gap-2">
                       <Button
                         label={`Jual 1 (+${c.sellPrice})`}
                         size="sm"
                         variant="secondary"
                         disabled={count < 1}
                         onClick={() => handleSellCrystal(c.id, c.name, 1)}
-                        className="w-full"
+                        className="w-full min-h-[40px]"
                       />
                       <Button
                         label={count > 0 ? `Semua (+${totalVal})` : "Semua"}
@@ -698,7 +725,7 @@ export const ShopPage: React.FC = () => {
                         variant={count > 0 ? "primary" : "secondary"}
                         disabled={count < 1}
                         onClick={() => handleSellCrystal(c.id, c.name, count)}
-                        className="w-full"
+                        className="w-full min-h-[40px]"
                       />
                     </div>
                   </Card>
@@ -722,34 +749,38 @@ export const ShopPage: React.FC = () => {
                   key={tier.level}
                   variant={isActive ? "warm" : "default"}
                   shadowOffset="sm"
-                  className={`p-3.5 flex flex-col justify-between gap-3 ${
-                    isActive ? "border-juro-orange" : ""
+                  className={`p-4 shadow-none flex flex-col justify-between gap-3 ${
+                    isActive ? "border-juro-orange ring-1 ring-juro-orange/25" : ""
                   }`}
                 >
-                  <div className="flex items-start gap-3">
-                    <div className="p-2 bg-white dark:bg-neutral-900 border-2 border-charcoal dark:border-neutral-600 shadow-[2px_2px_0px_#171717] dark:shadow-[2px_2px_0px_#000000] shrink-0">
-                      <ItemIllustration id={tier.illustrationId} size={40} />
+                  <div className="flex items-center gap-3">
+                    <div className="w-12 h-12 rounded-xl bg-white dark:bg-neutral-800 border border-neutral-200/80 dark:border-neutral-700/70 flex items-center justify-center shrink-0">
+                      <ItemIllustration id={tier.illustrationId} size={34} />
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center justify-between gap-2">
-                        <h3 className="pixel-text text-[11px] text-charcoal dark:text-white font-bold truncate">
+                        <h3 className="text-sm font-semibold text-neutral-900 dark:text-white truncate">
                           Lv.{tier.level} · {tier.name}
                         </h3>
-                        {isActive ? (
-                          <Badge label="Aktif" variant="orange" size="sm" />
-                        ) : isOwned ? (
-                          <Badge label="Milik" variant="good" size="sm" />
-                        ) : (
-                          <Badge label={`${tier.price}`} variant="charcoal" size="sm" />
-                        )}
+                        <span
+                          className={`text-xs font-semibold tabular-nums shrink-0 ${
+                            isActive
+                              ? "text-juro-orange"
+                              : isOwned
+                              ? "text-emerald-600 dark:text-emerald-400"
+                              : "text-neutral-500 dark:text-neutral-400"
+                          }`}
+                        >
+                          {isActive ? "Aktif" : isOwned ? "Milik" : `${tier.price} Koin`}
+                        </span>
                       </div>
-                      <p className="pixel-text text-[8px] sm:text-[9px] text-muted dark:text-neutral-400 mt-1.5 leading-relaxed">
+                      <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-1 tabular-nums truncate">
                         Daya {tier.power} · +{Math.round(tier.bonusChance * 100)}% Bonus
                       </p>
                     </div>
                   </div>
 
-                  <div className="pt-2.5 border-t border-charcoal/10 dark:border-neutral-700">
+                  <div className="pt-3 border-t border-neutral-100 dark:border-neutral-800">
                     {isOwned ? (
                       <Button
                         label={isActive ? "Dipakai" : "Dimiliki"}
@@ -757,7 +788,7 @@ export const ShopPage: React.FC = () => {
                         size="sm"
                         variant="secondary"
                         disabled
-                        className="w-full"
+                        className="w-full min-h-[40px]"
                       />
                     ) : isNext ? (
                       <Button
@@ -767,7 +798,7 @@ export const ShopPage: React.FC = () => {
                         variant={canBuy ? "primary" : "secondary"}
                         disabled={!canBuy}
                         onClick={() => handleUpgradePickaxe(tier.name, tier.price)}
-                        className="w-full"
+                        className="w-full min-h-[40px]"
                       />
                     ) : (
                       <Button
@@ -775,7 +806,7 @@ export const ShopPage: React.FC = () => {
                         size="sm"
                         variant="secondary"
                         disabled
-                        className="w-full"
+                        className="w-full min-h-[40px]"
                       />
                     )}
                   </div>
@@ -785,6 +816,6 @@ export const ShopPage: React.FC = () => {
           </div>
         )}
       </div>
-    </main>
+    </section>
   );
 };

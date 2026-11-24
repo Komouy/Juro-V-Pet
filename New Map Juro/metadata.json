@@ -1,6 +1,0 @@
-{
-  "name": "RetroPixel Atlas — 3D Pixel Navigation Map",
-  "description": "Interactive retro pixel-art 3D diorama map with real-time A* pathfinding navigation, dynamic weather blending, and live radar minimap built with TypeScript and Three.js.",
-  "requestFramePermissions": ["geolocation"],
-  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
-}

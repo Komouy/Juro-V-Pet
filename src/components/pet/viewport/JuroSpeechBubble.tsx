@@ -119,29 +119,29 @@ export const JuroSpeechBubble: React.FC<JuroSpeechBubbleProps> = ({
       }}
       className="absolute top-0 left-0 z-35 pointer-events-auto will-change-transform select-none"
     >
-      <div className="relative animate-tray-enter p-2.5 sm:p-3 bg-warm-white/95 dark:bg-neutral-900/95 backdrop-blur-xs border-2 border-charcoal dark:border-neutral-600 shadow-[3px_3px_0px_#171717] dark:shadow-[3px_3px_0px_#000000]">
-        {/* Dynamic Pointer Tail — points straight down to Juro (or straight up if flipped) */}
+      <div className="relative animate-tray-enter p-3 rounded-2xl bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-700 shadow-lg">
+        {/* Dynamic Pointer Tail */}
         {isPlacedAbove ? (
           <div
             ref={tailRef}
             style={{ left: `${initialTailLeft}px` }}
-            className="absolute -bottom-1.5 -translate-x-1/2 w-3 h-3 bg-warm-white dark:bg-neutral-900 rotate-45 border-r-2 border-b-2 border-charcoal dark:border-neutral-600 pointer-events-none"
+            className="absolute -bottom-1.5 -translate-x-1/2 w-3 h-3 bg-white dark:bg-neutral-900 rotate-45 border-r border-b border-neutral-200 dark:border-neutral-700 pointer-events-none"
             aria-hidden="true"
           />
         ) : (
           <div
             ref={tailRef}
             style={{ left: `${initialTailLeft}px` }}
-            className="absolute -top-1.5 -translate-x-1/2 w-3 h-3 bg-warm-white dark:bg-neutral-900 rotate-45 border-l-2 border-t-2 border-charcoal dark:border-neutral-600 pointer-events-none"
+            className="absolute -top-1.5 -translate-x-1/2 w-3 h-3 bg-white dark:bg-neutral-900 rotate-45 border-l border-t border-neutral-200 dark:border-neutral-700 pointer-events-none"
             aria-hidden="true"
           />
         )}
 
-        {/* Header Bar: Pet Name Badge + Close Icon */}
-        <div className="flex items-center justify-between gap-3 pb-1.5 border-b border-charcoal/20 dark:border-neutral-700/60 mb-2">
+        {/* Header Bar */}
+        <div className="flex items-center justify-between gap-3 pb-1.5 border-b border-neutral-200 dark:border-neutral-800 mb-2">
           <div className="flex items-center gap-1.5">
-            <span className="w-1.5 h-1.5 bg-juro-orange inline-block" />
-            <span className="pixel-text text-[8.5px] sm:text-[9.5px] font-bold text-juro-orange uppercase tracking-wider">
+            <span className="w-2 h-2 rounded-full bg-juro-orange inline-block" />
+            <span className="text-xs font-semibold text-juro-orange">
               {petName}
             </span>
           </div>
@@ -149,17 +149,17 @@ export const JuroSpeechBubble: React.FC<JuroSpeechBubbleProps> = ({
           <button
             type="button"
             onClick={onClose}
-            className="text-neutral-500 hover:text-charcoal dark:hover:text-white p-0.5 transition-colors cursor-pointer"
+            className="text-neutral-400 hover:text-neutral-700 dark:hover:text-white p-0.5 rounded-md transition-colors cursor-pointer"
             aria-label="Tutup pesan"
           >
-            <X size={12} strokeWidth={2.5} />
+            <X size={14} strokeWidth={2} />
           </button>
         </div>
 
         {/* Content: Loading Dots or Juro's Reply */}
         {isLoading ? (
-          <div className="flex items-center gap-1.5 py-1 text-charcoal dark:text-neutral-200">
-            <span className="pixel-text text-[9px] sm:text-[10px] text-neutral-500 dark:text-neutral-400">
+          <div className="flex items-center gap-1.5 py-0.5 text-neutral-700 dark:text-neutral-200">
+            <span className="text-xs text-neutral-500 dark:text-neutral-400">
               Juro berpikir
             </span>
             <span className="inline-flex gap-0.5">
@@ -170,7 +170,7 @@ export const JuroSpeechBubble: React.FC<JuroSpeechBubbleProps> = ({
           </div>
         ) : (
           <div className="relative">
-            <p className="pixel-text text-[9px] sm:text-[10.5px] leading-relaxed text-charcoal dark:text-neutral-100 font-medium">
+            <p className="text-xs sm:text-sm leading-relaxed text-neutral-800 dark:text-neutral-100">
               {text}
             </p>
           </div>

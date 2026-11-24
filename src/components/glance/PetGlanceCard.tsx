@@ -128,18 +128,18 @@ export const PetGlanceCard: React.FC<PetGlanceCardProps> = ({
       className={`w-full max-w-[340px] ${
         isDetachedWindow
           ? "h-full border-0 shadow-none"
-          : "border-2 shadow-[3px_3px_0px_#18181B] dark:shadow-[3px_3px_0px_#000000]"
-      } bg-warm-white dark:bg-neutral-900 border-charcoal dark:border-neutral-600 p-3.5 flex flex-col gap-3 font-sans select-none`}
+          : "rounded-2xl border border-neutral-200 dark:border-neutral-700 shadow-xl"
+      } bg-white dark:bg-neutral-900 p-4 flex flex-col gap-3 select-none`}
     >
-      {/* 1. Header Bar: Identity & Window Controls */}
-      <div className="flex items-center justify-between gap-2 pb-2 border-b-2 border-charcoal/15 dark:border-neutral-700">
-        <div className="flex items-center gap-1.5">
-          <h2 className="pixel-text text-xs font-bold text-charcoal dark:text-neutral-100 tracking-wide truncate">
+      {/* 1. Header Bar */}
+      <div className="flex items-center justify-between gap-2 pb-2.5 border-b border-neutral-200 dark:border-neutral-800">
+        <div className="flex items-center gap-2 min-w-0">
+          <h2 className="text-sm font-bold text-neutral-900 dark:text-neutral-100 truncate tabular-nums">
             {name} · Lv.{level}
           </h2>
           {activeRoomCode && (
-            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-juro-orange/15 border border-charcoal text-[8px] font-bold text-juro-orange dark:text-orange-400">
-              <Users size={9} />
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-orange-50 dark:bg-orange-500/20 text-[11px] font-semibold text-juro-orange dark:text-orange-300 shrink-0">
+              <Users size={11} />
               2P
             </span>
           )}
@@ -151,32 +151,29 @@ export const PetGlanceCard: React.FC<PetGlanceCardProps> = ({
               type="button"
               onClick={onClose}
               aria-label="Tutup jendela pet glance"
-              className="p-1 hover:bg-neutral-200 dark:hover:bg-neutral-800 border border-charcoal/30 text-charcoal dark:text-neutral-300 transition-colors cursor-pointer"
+              className="p-1 rounded-lg hover:bg-neutral-100 dark:hover:bg-neutral-800 text-neutral-500 dark:text-neutral-300 transition-colors cursor-pointer"
             >
-              <X size={13} />
+              <X size={15} />
             </button>
           )}
         </div>
       </div>
 
-      {/* 2. Visual Center: 2D Juro Avatar + Dynamic Speech Bubble */}
-      <div className="relative flex flex-col items-center justify-center pt-2 pb-1">
-        {/* Retro Dialogue Bubble */}
-        <div className="relative w-full mb-2 bg-warm-white dark:bg-neutral-800 border-2 border-charcoal dark:border-neutral-600 p-2 shadow-[2px_2px_0px_#18181B] dark:shadow-[2px_2px_0px_#000000]">
-          <p className="text-xs leading-relaxed text-charcoal dark:text-neutral-200 font-medium">
+      {/* 2. Visual Center */}
+      <div className="relative flex flex-col items-center justify-center pt-1 pb-1">
+        <div className="relative w-full mb-2.5 rounded-xl bg-neutral-50 dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 p-2.5 shadow-xs">
+          <p className="text-xs sm:text-sm leading-relaxed text-neutral-800 dark:text-neutral-200">
             {isChatLoading ? (
-              <span className="pixel-text text-[10px] text-muted animate-pulse">
+              <span className="text-xs text-neutral-500">
                 Juro sedang berpikir...
               </span>
             ) : (
               speechText
             )}
           </p>
-          {/* Dialogue Arrow Pointer */}
-          <div className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 w-2.5 h-2.5 bg-warm-white dark:bg-neutral-800 border-r-2 border-b-2 border-charcoal dark:border-neutral-600 rotate-45" />
+          <div className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 w-2.5 h-2.5 bg-neutral-50 dark:bg-neutral-800 border-r border-b border-neutral-200 dark:border-neutral-700 rotate-45" />
         </div>
 
-        {/* 2D Responsive Pixel Slime Avatar */}
         <div className="relative flex items-center justify-center py-1">
           <JuroAvatar2D
             skinId={activeSkin}
@@ -189,97 +186,93 @@ export const PetGlanceCard: React.FC<PetGlanceCardProps> = ({
         </div>
       </div>
 
-      {/* 3. Vital Stat Grid (Lapar, Tidur, Bersih, Senang) */}
-      <div className="grid grid-cols-2 gap-1.5 pt-1">
-        {/* Lapar */}
-        <div className="bg-neutral-100 dark:bg-neutral-800/80 border border-charcoal/40 dark:border-neutral-700 px-2 py-1 flex items-center justify-between">
+      {/* 3. Vital Stat Grid */}
+      <div className="grid grid-cols-2 gap-2 pt-1">
+        <div className="rounded-xl bg-neutral-50 dark:bg-neutral-800/80 border border-neutral-200 dark:border-neutral-700 px-2.5 py-1.5 flex items-center justify-between">
           <div className="flex items-center gap-1.5">
-            <Utensils size={11} className="text-amber-600 dark:text-amber-400" />
-            <span className="pixel-text text-[8.5px] uppercase font-bold text-charcoal dark:text-neutral-300">
+            <Utensils size={13} className="text-amber-600 dark:text-amber-400" />
+            <span className="text-xs font-medium text-neutral-700 dark:text-neutral-300">
               Lapar
             </span>
           </div>
-          <span className="pixel-text text-[8.5px] font-bold text-charcoal dark:text-neutral-200">
+          <span className="text-xs font-semibold tabular-nums text-neutral-900 dark:text-neutral-100">
             {Math.round(hunger)}%
           </span>
         </div>
 
-        {/* Tidur */}
-        <div className="bg-neutral-100 dark:bg-neutral-800/80 border border-charcoal/40 dark:border-neutral-700 px-2 py-1 flex items-center justify-between">
+        <div className="rounded-xl bg-neutral-50 dark:bg-neutral-800/80 border border-neutral-200 dark:border-neutral-700 px-2.5 py-1.5 flex items-center justify-between">
           <div className="flex items-center gap-1.5">
-            <Moon size={11} className="text-indigo-600 dark:text-indigo-400" />
-            <span className="pixel-text text-[8.5px] uppercase font-bold text-charcoal dark:text-neutral-300">
+            <Moon size={13} className="text-indigo-600 dark:text-indigo-400" />
+            <span className="text-xs font-medium text-neutral-700 dark:text-neutral-300">
               Tidur
             </span>
           </div>
-          <span className="pixel-text text-[8.5px] font-bold text-charcoal dark:text-neutral-200">
+          <span className="text-xs font-semibold tabular-nums text-neutral-900 dark:text-neutral-100">
             {Math.round(energy)}%
           </span>
         </div>
 
-        {/* Bersih */}
-        <div className="bg-neutral-100 dark:bg-neutral-800/80 border border-charcoal/40 dark:border-neutral-700 px-2 py-1 flex items-center justify-between">
+        <div className="rounded-xl bg-neutral-50 dark:bg-neutral-800/80 border border-neutral-200 dark:border-neutral-700 px-2.5 py-1.5 flex items-center justify-between">
           <div className="flex items-center gap-1.5">
-            <Droplets size={11} className="text-sky-600 dark:text-sky-400" />
-            <span className="pixel-text text-[8.5px] uppercase font-bold text-charcoal dark:text-neutral-300">
+            <Droplets size={13} className="text-sky-600 dark:text-sky-400" />
+            <span className="text-xs font-medium text-neutral-700 dark:text-neutral-300">
               Bersih
             </span>
           </div>
-          <span className="pixel-text text-[8.5px] font-bold text-charcoal dark:text-neutral-200">
+          <span className="text-xs font-semibold tabular-nums text-neutral-900 dark:text-neutral-100">
             {Math.round(cleanliness)}%
           </span>
         </div>
 
-        {/* Senang */}
-        <div className="bg-neutral-100 dark:bg-neutral-800/80 border border-charcoal/40 dark:border-neutral-700 px-2 py-1 flex items-center justify-between">
+        <div className="rounded-xl bg-neutral-50 dark:bg-neutral-800/80 border border-neutral-200 dark:border-neutral-700 px-2.5 py-1.5 flex items-center justify-between">
           <div className="flex items-center gap-1.5">
-            <Smile size={11} className="text-rose-600 dark:text-rose-400" />
-            <span className="pixel-text text-[8.5px] uppercase font-bold text-charcoal dark:text-neutral-300">
+            <Smile size={13} className="text-rose-600 dark:text-rose-400" />
+            <span className="text-xs font-medium text-neutral-700 dark:text-neutral-300">
               Senang
             </span>
           </div>
-          <span className="pixel-text text-[8.5px] font-bold text-charcoal dark:text-neutral-200">
+          <span className="text-xs font-semibold tabular-nums text-neutral-900 dark:text-neutral-100">
             {Math.round(happiness)}%
           </span>
         </div>
       </div>
 
-      {/* 4. Partner Status Glance (If in 2-Player Room) */}
+      {/* 4. Partner Status Glance */}
       {partnerPet && (
-        <div className="bg-juro-orange/10 dark:bg-juro-orange/5 border border-juro-orange/30 p-2 flex items-center justify-between gap-2">
+        <div className="rounded-xl bg-orange-50/70 dark:bg-orange-500/10 border border-orange-200/80 dark:border-orange-500/20 px-3 py-2 flex items-center justify-between gap-2">
           <div className="flex items-center gap-1.5 truncate">
             <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" />
-            <span className="pixel-text text-[8.5px] font-bold text-charcoal dark:text-neutral-200 truncate">
+            <span className="text-xs font-medium text-neutral-800 dark:text-neutral-200 truncate">
               {partnerPet.name} ({partnerPet.ownerName})
             </span>
           </div>
-          <span className="pixel-text text-[8px] text-muted shrink-0">
-            {partnerPet.isOnline ? "Online" : "Tidur"}
+          <span className="text-xs text-neutral-500 shrink-0">
+            {partnerPet.isOnline ? "Online" : "Istirahat"}
           </span>
         </div>
       )}
 
-      {/* 5. Quick Chat Box (Direct Chat from Homescreen/Desktop) */}
-      <form onSubmit={handleSendQuickChat} className="flex items-center gap-1.5 pt-1">
+      {/* 5. Quick Chat Box */}
+      <form onSubmit={handleSendQuickChat} className="flex items-center gap-2 pt-0.5">
         <input
           type="text"
           value={messageInput}
           onChange={(e) => setMessageInput(e.target.value)}
           placeholder="Sapa Juro..."
           disabled={isChatLoading}
-          className="flex-1 h-8 px-2.5 bg-neutral-100 dark:bg-neutral-800 border-2 border-charcoal dark:border-neutral-600 text-xs text-charcoal dark:text-white placeholder:text-muted focus:outline-none focus:border-juro-orange"
+          className="flex-1 h-9 px-3 rounded-xl bg-neutral-50 dark:bg-neutral-800 border border-neutral-300 dark:border-neutral-700 text-xs sm:text-sm text-neutral-900 dark:text-white placeholder:text-neutral-400 focus:outline-none focus:border-juro-orange focus:ring-2 focus:ring-juro-orange/20"
         />
         <button
           type="submit"
           disabled={isChatLoading || !messageInput.trim()}
           aria-label="Kirim pesan cepat ke Juro"
-          className="h-8 px-2.5 bg-juro-orange hover:bg-orange-600 active:translate-x-[1px] active:translate-y-[1px] text-white border-2 border-charcoal shadow-[2px_2px_0px_#18181B] disabled:opacity-50 disabled:pointer-events-none cursor-pointer flex items-center justify-center transition-all"
+          className="h-9 px-3 rounded-xl bg-juro-orange hover:bg-orange-600 active:scale-95 text-white disabled:opacity-50 disabled:pointer-events-none cursor-pointer flex items-center justify-center transition-all"
         >
-          <Send size={12} />
+          <Send size={14} />
         </button>
       </form>
 
-      {/* 6. Action Button to Return to Full 3D Valley */}
+      {/* 6. Return to 3D Valley */}
       {onOpenValley3D && (
         <button
           type="button"
@@ -287,29 +280,29 @@ export const PetGlanceCard: React.FC<PetGlanceCardProps> = ({
             soundEffects.playPop();
             onOpenValley3D();
           }}
-          className="w-full mt-2 py-1.5 bg-neutral-100 dark:bg-neutral-800 hover:bg-neutral-200 dark:hover:bg-neutral-700 text-charcoal dark:text-neutral-200 border-2 border-charcoal dark:border-neutral-600 pixel-text text-[9px] uppercase font-bold flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+          className="w-full py-2 rounded-xl bg-neutral-100 dark:bg-neutral-800 hover:bg-neutral-200 dark:hover:bg-neutral-700 text-neutral-800 dark:text-neutral-200 border border-neutral-200 dark:border-neutral-700 text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
         >
-          <ExternalLink size={11} />
+          <ExternalLink size={13} />
           <span>Buka Lembah 3D</span>
         </button>
       )}
 
-      {/* 7. Mobile Android Floating PiP & Widget Guidance */}
+      {/* 7. Mobile Android Floating PiP */}
       {desktopGlanceService.isNativeAndroid() && !isDetachedWindow && (
-        <div className="mt-2 pt-1.5 border-t border-charcoal/15 dark:border-neutral-700/50 flex flex-col gap-1.5">
+        <div className="pt-2 border-t border-neutral-200 dark:border-neutral-800 flex flex-col gap-1.5">
           <button
             type="button"
             onClick={() => {
               soundEffects.playPop();
               desktopGlanceService.enterNativePip();
             }}
-            className="w-full py-1.5 bg-juro-orange hover:bg-orange-600 text-white border-2 border-charcoal pixel-text text-[8.5px] uppercase font-bold flex items-center justify-center gap-1.5 shadow-[2px_2px_0px_#18181B] active:translate-x-[1px] active:translate-y-[1px] cursor-pointer"
+            className="w-full py-2 rounded-xl bg-juro-orange hover:bg-orange-600 text-white text-xs font-semibold flex items-center justify-center gap-1.5 active:scale-[0.98] cursor-pointer transition-all"
           >
-            <ExternalLink size={10} />
-            <span>Mode Mengambang di Layar (PiP)</span>
+            <ExternalLink size={13} />
+            <span>Mode Mengambang (PiP)</span>
           </button>
-          <p className="pixel-text text-[7.5px] text-muted text-center leading-tight">
-            Tip: Kamu juga dapat memasang widget di layar beranda ponsel (tekan lama layar &gt; Widget &gt; Juro).
+          <p className="text-[11px] text-neutral-500 text-center leading-snug">
+            Widget juga tersedia di menu widget layar beranda ponsel.
           </p>
         </div>
       )}

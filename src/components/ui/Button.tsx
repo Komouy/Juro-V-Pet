@@ -35,22 +35,22 @@ export const Button: React.FC<ButtonProps> = ({
   };
 
   const sizeStyles = {
-    sm: "px-2.5 py-1.5 text-[10px] gap-1.5",
-    md: "px-4 py-2 text-xs gap-2",
-    lg: "px-5 py-3 text-sm gap-2.5",
+    sm: "px-3.5 py-2 text-xs gap-1.5 min-h-[38px]",
+    md: "px-4 py-2 text-xs sm:text-sm gap-2 min-h-[42px]",
+    lg: "px-5 py-2.5 text-sm sm:text-base gap-2.5 min-h-[46px]",
   };
 
   const variantStyles = {
     primary:
-      "bg-charcoal text-white border-2 border-charcoal shadow-[3px_3px_0px_#F97316] hover:bg-neutral-800 dark:border-neutral-600 dark:shadow-[3px_3px_0px_#F97316]",
+      "bg-neutral-900 text-white border border-neutral-900 shadow-xs hover:bg-neutral-800 dark:bg-neutral-100 dark:text-neutral-900 dark:border-neutral-100 dark:hover:bg-neutral-200",
     secondary:
-      "bg-white text-charcoal border-2 border-charcoal shadow-[3px_3px_0px_#171717] hover:bg-warm-white dark:bg-dark-surface dark:text-neutral-100 dark:border-neutral-600 dark:shadow-[3px_3px_0px_#000000] dark:hover:bg-neutral-800",
+      "bg-white text-neutral-800 border border-neutral-200 shadow-xs hover:bg-neutral-50 hover:border-neutral-300 dark:bg-neutral-800 dark:text-neutral-100 dark:border-neutral-700 dark:hover:bg-neutral-750",
     accent:
-      "bg-juro-orange text-white border-2 border-charcoal shadow-[3px_3px_0px_#171717] hover:bg-orange-600 dark:border-neutral-700 dark:shadow-[3px_3px_0px_#000000] border-t-white/30",
+      "bg-juro-orange text-white border border-juro-orange shadow-xs hover:bg-orange-600 hover:border-orange-600",
     ghost:
-      "bg-transparent text-charcoal border-2 border-transparent hover:border-charcoal hover:bg-white/60 dark:text-neutral-200 dark:hover:border-neutral-600 dark:hover:bg-neutral-800/60 shadow-none",
+      "bg-transparent text-neutral-700 border border-transparent hover:bg-neutral-100 dark:text-neutral-200 dark:hover:bg-neutral-800 shadow-none",
     danger:
-      "bg-rose-600 text-white border-2 border-charcoal shadow-[3px_3px_0px_#171717] hover:bg-rose-700 dark:border-neutral-700 dark:shadow-[3px_3px_0px_#000000]",
+      "bg-rose-600 text-white border border-rose-600 shadow-xs hover:bg-rose-700 hover:border-rose-700",
   };
 
   return (
@@ -58,12 +58,12 @@ export const Button: React.FC<ButtonProps> = ({
       onClick={handleClick}
       disabled={disabled || loading}
       className={`
-        pixel-text relative inline-flex items-center justify-center font-bold uppercase tracking-wider
+        relative inline-flex items-center justify-center rounded-xl font-semibold
         cursor-pointer select-none
-        transition-all duration-75
-        active:translate-x-[2px] active:translate-y-[2px] active:shadow-none
+        transition-all duration-150
+        active:scale-[0.98]
         focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-juro-orange focus-visible:ring-offset-1
-        disabled:opacity-40 disabled:cursor-not-allowed disabled:active:translate-x-0 disabled:active:translate-y-0 disabled:hover:bg-auto
+        disabled:opacity-45 disabled:cursor-not-allowed disabled:active:scale-100
         ${sizeStyles[size]}
         ${variantStyles[variant]}
         ${className}
@@ -71,9 +71,9 @@ export const Button: React.FC<ButtonProps> = ({
       {...props}
     >
       {loading ? (
-        <span className="inline-block w-3 h-3 bg-current animate-pulse border border-current" />
+        <span className="inline-block w-3.5 h-3.5 rounded-full border-2 border-current border-t-transparent animate-spin" />
       ) : (
-        Icon && <Icon size={size === "sm" ? 12 : size === "lg" ? 16 : 14} strokeWidth={2.5} />
+        Icon && <Icon size={size === "sm" ? 14 : size === "lg" ? 18 : 16} strokeWidth={2} />
       )}
       <span>{label}</span>
     </button>

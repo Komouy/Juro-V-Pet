@@ -79,10 +79,11 @@ export const App: React.FC = () => {
 
   if (!isHydrated) {
     return (
-      <div className="min-h-screen bg-warm-white dark:bg-dark-bg flex items-center justify-center p-4">
-        <div className="bg-card-bg dark:bg-dark-card border-2 border-charcoal dark:border-neutral-700 shadow-retro px-6 py-4 text-center">
-          <p className="pixel-text text-sm font-bold text-charcoal dark:text-neutral-200">
-            Memuat Dunia Juro...
+      <div className="min-h-screen bg-neutral-50 dark:bg-dark-bg flex items-center justify-center p-4">
+        <div className="bg-white dark:bg-dark-surface border border-neutral-200 dark:border-neutral-800 rounded-2xl shadow-sm px-6 py-4 flex items-center gap-3">
+          <span className="w-4 h-4 rounded-full border-2 border-juro-orange border-t-transparent animate-spin" />
+          <p className="text-sm font-medium text-neutral-800 dark:text-neutral-200">
+            Memuat dunia Juro...
           </p>
         </div>
       </div>

@@ -23,8 +23,8 @@ export const MobileNav: React.FC = () => {
   );
 
   return (
-    <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-white/95 dark:bg-dark-surface/95 border-t-2 border-charcoal dark:border-neutral-700 backdrop-blur-xs pb-[env(safe-area-inset-bottom)]">
-      <div className="flex items-center justify-around h-15 px-1 max-w-lg mx-auto">
+    <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-white/95 dark:bg-neutral-900/95 border-t border-neutral-200/80 dark:border-neutral-800 pb-[env(safe-area-inset-bottom)]">
+      <div className="flex items-center justify-around h-14 px-2 max-w-lg mx-auto">
         {MOBILE_LINKS.map(({ path, label, icon: Icon }) => {
           const isActive = location.pathname === path;
           const showDot = path === "/shop" && hasCrystals && !isActive;
@@ -37,25 +37,31 @@ export const MobileNav: React.FC = () => {
                 if (!isActive) soundEffects.playTab();
               }}
               className={`
-                flex flex-col items-center justify-center flex-1 h-full py-1 transition-all select-none
+                relative flex flex-col items-center justify-center flex-1 h-full py-1 transition-colors select-none
                 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-juro-orange focus-visible:ring-inset
                 ${
                   isActive
-                    ? "text-juro-orange border-t-2 border-juro-orange -mt-[2px] font-bold"
-                    : "text-muted hover:text-charcoal dark:hover:text-white"
+                    ? "text-juro-orange font-semibold"
+                    : "text-neutral-400 hover:text-neutral-900 dark:text-neutral-500 dark:hover:text-white"
                 }
               `}
             >
+              {isActive && (
+                <span
+                  className="absolute top-0 w-6 h-0.5 rounded-full bg-juro-orange"
+                  aria-hidden="true"
+                />
+              )}
               <span className="relative inline-flex">
-                <Icon size={18} strokeWidth={isActive ? 2.8 : 2.2} />
+                <Icon size={19} strokeWidth={isActive ? 2.3 : 1.8} />
                 {showDot && (
                   <span
-                    className="absolute -top-0.5 -right-1 w-2 h-2 bg-sky-400 border border-charcoal"
+                    className="absolute -top-0.5 -right-1 w-1.5 h-1.5 rounded-full bg-sky-500"
                     aria-hidden="true"
                   />
                 )}
               </span>
-              <span className="pixel-text text-[8.5px] uppercase tracking-tight mt-1">
+              <span className="text-[11px] font-medium mt-0.5 leading-none">
                 {label}
               </span>
             </Link>

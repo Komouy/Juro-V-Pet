@@ -1,24 +1,26 @@
 import React, { useEffect } from "react";
-import { Outlet, useLocation } from "react-router-dom";
+import { Outlet, useLocation, useNavigate } from "react-router-dom";
 import { Navbar } from "./Navbar";
 import { MobileNav } from "./MobileNav";
 import { PixelToast } from "../ui/PixelToast";
 import { CaregiverHubModal } from "../caregiver/CaregiverHubModal";
 import { DesktopPetGlance } from "../glance/DesktopPetGlance";
+import { HomePage } from "../../pages/HomePage";
 import { useCaregiverStore } from "../../stores/caregiverStore";
 import { soundEffects } from "../../engine/audio/soundEffects";
 import { isBedtimeHour } from "../../utils/timeOfDay";
 
-const SUB_ROUTES = new Set(["/shop", "/mine", "/collection", "/evolution", "/settings"]);
+const OVERLAY_ROUTES = new Set(["/shop", "/mine", "/collection", "/evolution", "/settings"]);
 
 export const RootLayout: React.FC = () => {
   const location = useLocation();
-  const isHome = !SUB_ROUTES.has(location.pathname);
+  const navigate = useNavigate();
+  const isOverlayOpen = OVERLAY_ROUTES.has(location.pathname);
   const { isHubModalOpen, closeHubModal } = useCaregiverStore();
 
-  // Seamless procedural retro BGM switching per page/environment
+  // Seamless BGM switching per view
   useEffect(() => {
-    if (location.pathname === "/") {
+    if (!isOverlayOpen) {
       const isNight = isBedtimeHour(new Date());
       soundEffects.setBgmTrack(isNight ? "lullaby" : "meadow");
     } else if (location.pathname === "/shop") {
@@ -28,9 +30,22 @@ export const RootLayout: React.FC = () => {
     } else {
       soundEffects.setBgmTrack("cozy");
     }
-  }, [location.pathname]);
+  }, [isOverlayOpen, location.pathname]);
 
-  // Otomatis sambungkan kembali listener Firebase jika sudah memiliki kamar aktif
+  // Close active overlay back to Home when pressing Escape (unless Caregiver modal is open)
+  useEffect(() => {
+    if (!isOverlayOpen || isHubModalOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        soundEffects.playDismiss();
+        navigate("/");
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isOverlayOpen, isHubModalOpen, navigate]);
+
+  // Automatically reconnect Firebase listener if an active room exists
   useEffect(() => {
     const caregiver = useCaregiverStore.getState();
     if (caregiver.activeRoomCode && caregiver.myProfile) {
@@ -39,28 +54,41 @@ export const RootLayout: React.FC = () => {
   }, []);
 
   return (
-    <div
-      className={`${
-        isHome ? "h-dvh overflow-hidden" : "min-h-screen"
-      } flex flex-col bg-warm-white text-charcoal dark:bg-dark-bg dark:text-neutral-100 transition-colors duration-150`}
-    >
+    <div className="h-dvh overflow-hidden flex flex-col bg-neutral-50 text-neutral-900 dark:bg-dark-bg dark:text-neutral-100 transition-colors duration-150">
       <Navbar />
       <PixelToast />
       <CaregiverHubModal isOpen={isHubModalOpen} onClose={closeHubModal} />
       <DesktopPetGlance />
-      <div
-        className={`flex-1 flex flex-col w-full ${
-          isHome ? "min-h-0 pb-15 md:pb-0" : "pb-20 md:pb-8"
-        }`}
-      >
-        {isHome ? (
-          <Outlet />
-        ) : (
-          <div key={location.pathname} className="animate-page-enter w-full flex-1 flex flex-col">
-            <Outlet />
+
+      <div className="relative flex-1 min-h-0 w-full flex flex-col pb-14 md:pb-0">
+        {/* Persistent Live 3D Juro Viewport */}
+        <HomePage />
+
+        {/* Minimalist Floating Sheet Overlay for Toko, Tambang, Evolusi & Pengaturan */}
+        {isOverlayOpen && (
+          <div
+            onClick={() => {
+              soundEffects.playDismiss();
+              navigate("/");
+            }}
+            className="absolute inset-0 z-40 flex items-center justify-center p-2.5 sm:p-5 md:p-6 bg-neutral-950/35 animate-fade-in"
+            role="dialog"
+            aria-modal="true"
+          >
+            <div
+              onClick={(e) => e.stopPropagation()}
+              className="relative w-full max-w-4xl max-h-full flex flex-col rounded-2xl bg-white dark:bg-neutral-900 border border-neutral-200/90 dark:border-neutral-800 shadow-2xl overflow-hidden animate-scale-up"
+            >
+              <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain">
+                <div key={location.pathname} className="animate-page-enter">
+                  <Outlet />
+                </div>
+              </div>
+            </div>
           </div>
         )}
       </div>
+
       <MobileNav />
     </div>
   );

@@ -35,10 +35,10 @@ export const HeartPop3D: React.FC = React.memo(() => {
 
   return (
     <mesh geometry={heartGeo}>
-      <meshPhysicalMaterial
+      <meshStandardMaterial
         color="#F43F5E"
         roughness={0.14}
-        clearcoat={1}
+        metalness={0.08}
         emissive="#FB7185"
         emissiveIntensity={0.35}
       />
@@ -59,25 +59,24 @@ export const FoodProp3D: React.FC<FoodProp3DProps> = React.memo(({ foodId = "ora
       <group rotation={[0.18, 0.25, -0.12]} scale={1.15}>
         {/* Rounded Glossy Honey Pot Base */}
         <mesh position={[0, -0.03, 0]} scale={[1.05, 0.96, 1.05]}>
-          <sphereGeometry args={[0.145, 18, 16]} />
-          <meshPhysicalMaterial
+          <sphereGeometry args={[0.145, 16, 14]} />
+          <meshStandardMaterial
             color="#F59E0B"
-            roughness={0.08}
-            clearcoat={1}
-            clearcoatRoughness={0.05}
+            roughness={0.1}
+            metalness={0.08}
             emissive="#D97706"
             emissiveIntensity={0.22}
           />
         </mesh>
         {/* Inner Golden Glow Highlight */}
         <mesh position={[-0.045, 0.01, 0.1]} scale={[0.45, 0.72, 0.35]}>
-          <sphereGeometry args={[0.07, 12, 10]} />
+          <sphereGeometry args={[0.07, 10, 8]} />
           <meshBasicMaterial color="#FEF3C7" transparent opacity={0.65} />
         </mesh>
 
         {/* Cream Paper Label Wrap */}
         <mesh position={[0, -0.04, 0]}>
-          <cylinderGeometry args={[0.151, 0.151, 0.075, 18, 1, true]} />
+          <cylinderGeometry args={[0.151, 0.151, 0.075, 16, 1, true]} />
           <meshStandardMaterial color="#FFFBEB" roughness={0.65} side={THREE.DoubleSide} />
         </mesh>
         {/* Amber Honeycomb Emblem on Front Label */}
@@ -88,21 +87,21 @@ export const FoodProp3D: React.FC<FoodProp3DProps> = React.memo(({ foodId = "ora
 
         {/* Jar Neck & Rustic Wooden Rim */}
         <mesh position={[0, 0.11, 0]}>
-          <cylinderGeometry args={[0.095, 0.11, 0.05, 16]} />
+          <cylinderGeometry args={[0.095, 0.11, 0.05, 14]} />
           <meshStandardMaterial color="#B45309" roughness={0.55} />
         </mesh>
         <mesh position={[0, 0.135, 0]} rotation={[Math.PI / 2, 0, 0]}>
-          <torusGeometry args={[0.098, 0.018, 10, 18]} />
+          <torusGeometry args={[0.098, 0.018, 8, 16]} />
           <meshStandardMaterial color="#92400E" roughness={0.5} />
         </mesh>
 
         {/* Glossy Thick Honey Pool on Top */}
         <mesh position={[0, 0.138, 0]}>
           <cylinderGeometry args={[0.086, 0.086, 0.018, 14]} />
-          <meshPhysicalMaterial
+          <meshStandardMaterial
             color="#FBBF24"
-            roughness={0.06}
-            clearcoat={1}
+            roughness={0.08}
+            metalness={0.08}
             emissive="#F59E0B"
             emissiveIntensity={0.25}
           />
@@ -111,16 +110,16 @@ export const FoodProp3D: React.FC<FoodProp3DProps> = React.memo(({ foodId = "ora
         {/* Sculpted Thick Honey Drips Oozing Over Rim */}
         <group>
           <mesh position={[0.06, 0.085, 0.095]}>
-            <capsuleGeometry args={[0.017, 0.065, 6, 8]} />
-            <meshPhysicalMaterial color="#FBBF24" roughness={0.05} clearcoat={1} />
+            <capsuleGeometry args={[0.017, 0.065, 5, 8]} />
+            <meshStandardMaterial color="#FBBF24" roughness={0.08} metalness={0.06} />
           </mesh>
           <mesh position={[-0.04, 0.095, 0.1]}>
-            <capsuleGeometry args={[0.014, 0.045, 6, 8]} />
-            <meshPhysicalMaterial color="#F59E0B" roughness={0.05} clearcoat={1} />
+            <capsuleGeometry args={[0.014, 0.045, 5, 8]} />
+            <meshStandardMaterial color="#F59E0B" roughness={0.08} metalness={0.06} />
           </mesh>
           <mesh position={[0.01, 0.105, 0.106]}>
             <sphereGeometry args={[0.016, 8, 8]} />
-            <meshPhysicalMaterial color="#FDE047" roughness={0.05} clearcoat={1} />
+            <meshStandardMaterial color="#FDE047" roughness={0.08} metalness={0.06} />
           </mesh>
         </group>
 
@@ -139,11 +138,11 @@ export const FoodProp3D: React.FC<FoodProp3DProps> = React.memo(({ foodId = "ora
           ))}
           {/* Glistening Honey Drop on Dipper Tip */}
           <mesh position={[0.012, 0.135, 0.02]} scale={[0.85, 1.25, 0.85]}>
-            <sphereGeometry args={[0.02, 10, 10]} />
-            <meshPhysicalMaterial
+            <sphereGeometry args={[0.02, 8, 8]} />
+            <meshStandardMaterial
               color="#FDE047"
-              roughness={0.05}
-              clearcoat={1}
+              roughness={0.08}
+              metalness={0.06}
               emissive="#F59E0B"
               emissiveIntensity={0.3}
             />
@@ -159,11 +158,11 @@ export const FoodProp3D: React.FC<FoodProp3DProps> = React.memo(({ foodId = "ora
       <group rotation={[0.38, 0.35, 0.05]} scale={1.12}>
         {/* Glossy White Mini Porcelain Dessert Plate */}
         <mesh position={[0, -0.1, 0]}>
-          <cylinderGeometry args={[0.24, 0.17, 0.028, 22]} />
-          <meshPhysicalMaterial color="#F8FAFC" roughness={0.12} clearcoat={1} />
+          <cylinderGeometry args={[0.24, 0.17, 0.028, 20]} />
+          <meshStandardMaterial color="#F8FAFC" roughness={0.14} metalness={0.06} />
         </mesh>
         <mesh position={[0, -0.088, 0]} rotation={[Math.PI / 2, 0, 0]}>
-          <torusGeometry args={[0.23, 0.012, 8, 22]} />
+          <torusGeometry args={[0.23, 0.012, 8, 20]} />
           <meshStandardMaterial color="#CBD5E1" roughness={0.25} />
         </mesh>
 
@@ -179,10 +178,10 @@ export const FoodProp3D: React.FC<FoodProp3DProps> = React.memo(({ foodId = "ora
           </mesh>
           <mesh position={[0, 0.015, 0]}>
             <boxGeometry args={[0.115, 0.085, 0.115]} />
-            <meshPhysicalMaterial
+            <meshStandardMaterial
               color="#10B981"
-              roughness={0.08}
-              clearcoat={1}
+              roughness={0.1}
+              metalness={0.05}
               emissive="#059669"
               emissiveIntensity={0.15}
             />
@@ -201,10 +200,10 @@ export const FoodProp3D: React.FC<FoodProp3DProps> = React.memo(({ foodId = "ora
           </mesh>
           <mesh position={[0, 0.015, 0]}>
             <boxGeometry args={[0.115, 0.085, 0.115]} />
-            <meshPhysicalMaterial
+            <meshStandardMaterial
               color="#34D399"
-              roughness={0.08}
-              clearcoat={1}
+              roughness={0.1}
+              metalness={0.05}
               emissive="#10B981"
               emissiveIntensity={0.18}
             />
@@ -219,10 +218,10 @@ export const FoodProp3D: React.FC<FoodProp3DProps> = React.memo(({ foodId = "ora
           </mesh>
           <mesh position={[0, 0.008, 0]}>
             <boxGeometry args={[0.11, 0.088, 0.11]} />
-            <meshPhysicalMaterial
+            <meshStandardMaterial
               color="#10B981"
-              roughness={0.06}
-              clearcoat={1}
+              roughness={0.08}
+              metalness={0.05}
               emissive="#34D399"
               emissiveIntensity={0.2}
             />
@@ -285,7 +284,7 @@ export const FoodProp3D: React.FC<FoodProp3DProps> = React.memo(({ foodId = "ora
         {/* Melting Cream Butter Pat on Center */}
         <mesh position={[0, 0.056, 0]} rotation={[0, 0.4, 0]}>
           <boxGeometry args={[0.075, 0.025, 0.075]} />
-          <meshPhysicalMaterial color="#FEF9C3" roughness={0.18} clearcoat={0.8} />
+          <meshStandardMaterial color="#FEF9C3" roughness={0.18} metalness={0.05} />
         </mesh>
       </group>
     );
@@ -297,26 +296,26 @@ export const FoodProp3D: React.FC<FoodProp3DProps> = React.memo(({ foodId = "ora
       <group rotation={[0.22, -0.25, 0.08]} scale={1.12}>
         {/* Ceramic Mug Body */}
         <mesh position={[0, -0.02, 0]}>
-          <cylinderGeometry args={[0.135, 0.125, 0.24, 20]} />
-          <meshPhysicalMaterial color="#F8FAFC" roughness={0.14} clearcoat={1} />
+          <cylinderGeometry args={[0.135, 0.125, 0.24, 18]} />
+          <meshStandardMaterial color="#F8FAFC" roughness={0.14} metalness={0.08} />
         </mesh>
         {/* Warm Orange Accent Band on Mug */}
         <mesh position={[0, -0.02, 0]}>
-          <cylinderGeometry args={[0.137, 0.131, 0.06, 20, 1, true]} />
+          <cylinderGeometry args={[0.137, 0.131, 0.06, 18, 1, true]} />
           <meshStandardMaterial color="#F97316" roughness={0.3} side={THREE.DoubleSide} />
         </mesh>
         {/* Mug Handle */}
         <mesh position={[0.14, -0.02, 0]} rotation={[0, 0, -Math.PI / 2]}>
-          <torusGeometry args={[0.065, 0.018, 8, 16, Math.PI]} />
-          <meshPhysicalMaterial color="#F1F5F9" roughness={0.14} clearcoat={1} />
+          <torusGeometry args={[0.065, 0.018, 8, 14, Math.PI]} />
+          <meshStandardMaterial color="#F1F5F9" roughness={0.14} metalness={0.08} />
         </mesh>
         {/* Creamy Milk Surface */}
         <mesh position={[0, 0.085, 0]}>
-          <cylinderGeometry args={[0.118, 0.118, 0.02, 18]} />
-          <meshPhysicalMaterial
+          <cylinderGeometry args={[0.118, 0.118, 0.02, 16]} />
+          <meshStandardMaterial
             color="#FFFBEB"
-            roughness={0.08}
-            clearcoat={1}
+            roughness={0.1}
+            metalness={0.04}
             emissive="#FEF3C7"
             emissiveIntensity={0.15}
           />
@@ -339,11 +338,11 @@ export const FoodProp3D: React.FC<FoodProp3DProps> = React.memo(({ foodId = "ora
     <group rotation={[0.52, 0.22, -0.25]} scale={1.15}>
       {/* Outer Textured Tangerine Peel */}
       <mesh position={[0, -0.018, 0]}>
-        <cylinderGeometry args={[0.215, 0.215, 0.078, 24, 1, false, 0, Math.PI]} />
-        <meshPhysicalMaterial
+        <cylinderGeometry args={[0.215, 0.215, 0.078, 20, 1, false, 0, Math.PI]} />
+        <meshStandardMaterial
           color="#EA580C"
           roughness={0.28}
-          clearcoat={0.65}
+          metalness={0.04}
           emissive="#C2410C"
           emissiveIntensity={0.1}
         />
@@ -351,18 +350,17 @@ export const FoodProp3D: React.FC<FoodProp3DProps> = React.memo(({ foodId = "ora
 
       {/* Creamy White Inner Pith Rim */}
       <mesh position={[0, -0.006, 0]}>
-        <cylinderGeometry args={[0.194, 0.194, 0.082, 22, 1, false, 0.03, Math.PI - 0.06]} />
+        <cylinderGeometry args={[0.194, 0.194, 0.082, 20, 1, false, 0.03, Math.PI - 0.06]} />
         <meshStandardMaterial color="#FFF7ED" roughness={0.45} />
       </mesh>
 
       {/* Juicy Glossy Citrus Pulp */}
       <mesh position={[0, 0, 0]}>
-        <cylinderGeometry args={[0.174, 0.174, 0.086, 22, 1, false, 0.06, Math.PI - 0.12]} />
-        <meshPhysicalMaterial
+        <cylinderGeometry args={[0.174, 0.174, 0.086, 20, 1, false, 0.06, Math.PI - 0.12]} />
+        <meshStandardMaterial
           color="#F97316"
-          roughness={0.08}
-          clearcoat={1}
-          clearcoatRoughness={0.04}
+          roughness={0.1}
+          metalness={0.06}
           emissive="#FB923C"
           emissiveIntensity={0.22}
         />

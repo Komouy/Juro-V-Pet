@@ -45,7 +45,7 @@ export const StatBars: React.FC<StatBarsProps> = ({
   return (
     <div className="absolute top-3 left-3 z-20 pointer-events-none">
       <div className="relative pointer-events-auto">
-        {/* Ultra-Minimal 4-Stat Strip (Consistent Horizontal Alignment Desktop & Mobile) */}
+        {/* Compact 4-Stat Strip */}
         <button
           type="button"
           onClick={() => {
@@ -54,7 +54,7 @@ export const StatBars: React.FC<StatBarsProps> = ({
           }}
           aria-expanded={showStatDetails}
           aria-label="Lihat detail status Juro"
-          className="h-10 inline-flex items-center gap-2 sm:gap-2.5 px-3 bg-warm-white/95 dark:bg-neutral-900/90 backdrop-blur-xs border-2 border-charcoal dark:border-neutral-600 shadow-[2px_2px_0px_#171717] dark:shadow-[2px_2px_0px_#000000] hover:border-juro-orange transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-juro-orange"
+          className="h-9 inline-flex items-center gap-2 sm:gap-2.5 px-3 rounded-xl bg-white/95 dark:bg-neutral-900/95 border border-neutral-200/80 dark:border-neutral-800 shadow-sm hover:border-juro-orange transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-juro-orange"
         >
           {compactStats.map((stat) => {
             const Icon = stat.icon;
@@ -63,16 +63,16 @@ export const StatBars: React.FC<StatBarsProps> = ({
               <div
                 key={stat.key}
                 title={`${stat.label}: ${stat.value}%`}
-                className="flex items-center gap-1"
+                className="flex items-center gap-1.5"
               >
                 <Icon
-                  size={12}
-                  strokeWidth={2.5}
-                  className={`${isLow ? "text-rose-500 animate-pulse" : stat.iconColor} shrink-0`}
+                  size={13}
+                  strokeWidth={2.2}
+                  className={`${isLow ? "text-rose-500" : stat.iconColor} shrink-0`}
                 />
-                <div className="w-5 sm:w-8 h-1.5 bg-neutral-200 dark:bg-neutral-700 border border-charcoal/40 overflow-hidden">
+                <div className="w-5 sm:w-7 h-1.5 rounded-full bg-neutral-200 dark:bg-neutral-700 overflow-hidden">
                   <div
-                    className={`h-full transition-all duration-300 ${
+                    className={`h-full rounded-full transition-all duration-300 ${
                       isLow ? "bg-rose-500" : stat.barColor
                     }`}
                     style={{ width: `${Math.max(0, Math.min(100, stat.value))}%` }}
@@ -83,24 +83,24 @@ export const StatBars: React.FC<StatBarsProps> = ({
           })}
         </button>
 
-        {/* Compact Tap-to-Peek Detail Popover with Clear Labels */}
+        {/* Tap-to-Peek Detail Popover */}
         {showStatDetails && (
-          <div className="animate-tray-enter absolute top-12 left-0 w-52 sm:w-56 bg-warm-white/95 dark:bg-neutral-900/95 backdrop-blur-xs border-2 border-charcoal dark:border-neutral-600 shadow-[3px_3px_0px_#171717] dark:shadow-[3px_3px_0px_#000000] p-2.5 space-y-2">
+          <div className="animate-tray-enter absolute top-11 left-0 w-56 rounded-2xl bg-white dark:bg-neutral-900 border border-neutral-200/90 dark:border-neutral-800 shadow-lg p-3 space-y-2.5">
             {/* Popover Arrow Indicator */}
             <div
-              className="absolute -top-1.5 left-5 w-3 h-3 bg-warm-white dark:bg-neutral-900 rotate-45 border-l-2 border-t-2 border-charcoal dark:border-neutral-600 pointer-events-none"
+              className="absolute -top-1.5 left-4 w-3 h-3 bg-white dark:bg-neutral-900 rotate-45 border-l border-t border-neutral-200/90 dark:border-neutral-800 pointer-events-none"
               aria-hidden="true"
             />
 
-            <div className="flex items-center justify-between gap-2 pb-1.5 border-b border-charcoal/15 dark:border-neutral-700">
-              <span className="pixel-text text-[10px] font-bold text-charcoal dark:text-white truncate">
+            <div className="flex items-center justify-between gap-2 pb-2 border-b border-neutral-100 dark:border-neutral-800">
+              <span className="text-xs font-semibold text-neutral-900 dark:text-white truncate tabular-nums">
                 {name} · Lv.{level}
               </span>
-              <span className="pixel-text text-[8px] uppercase px-1.5 py-0.5 bg-juro-orange text-white border border-charcoal">
+              <span className="text-[11px] font-semibold text-juro-orange shrink-0">
                 {stateLabel}
               </span>
             </div>
-            <div className="space-y-1.5">
+            <div className="space-y-2">
               {compactStats.map((stat) => {
                 const Icon = stat.icon;
                 const isLow = stat.value < 30;
@@ -108,25 +108,25 @@ export const StatBars: React.FC<StatBarsProps> = ({
                   <div key={stat.key} className="flex items-center gap-2">
                     <div className="flex items-center gap-1.5 w-16 shrink-0">
                       <Icon
-                        size={11}
-                        strokeWidth={2.5}
+                        size={13}
+                        strokeWidth={2}
                         className={isLow ? "text-rose-500 shrink-0" : `${stat.iconColor} shrink-0`}
                       />
-                      <span className="pixel-text text-[8.5px] uppercase font-bold text-charcoal dark:text-neutral-200 truncate">
+                      <span className="text-xs font-medium text-neutral-700 dark:text-neutral-200 truncate">
                         {stat.label}
                       </span>
                     </div>
-                    <div className="flex-1 h-2 bg-neutral-200 dark:bg-neutral-700 border border-charcoal/40 overflow-hidden">
+                    <div className="flex-1 h-1.5 rounded-full bg-neutral-200 dark:bg-neutral-700 overflow-hidden">
                       <div
-                        className={`h-full transition-all duration-300 ${
+                        className={`h-full rounded-full transition-all duration-300 ${
                           isLow ? "bg-rose-500" : stat.barColor
                         }`}
                         style={{ width: `${Math.max(0, Math.min(100, stat.value))}%` }}
                       />
                     </div>
                     <span
-                      className={`pixel-text text-[8.5px] font-bold w-7 text-right shrink-0 ${
-                        isLow ? "text-rose-500" : "text-charcoal dark:text-neutral-200"
+                      className={`text-xs font-semibold tabular-nums w-9 text-right shrink-0 ${
+                        isLow ? "text-rose-500" : "text-neutral-600 dark:text-neutral-300"
                       }`}
                     >
                       {stat.value}%

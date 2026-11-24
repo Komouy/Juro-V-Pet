@@ -1,13 +1,19 @@
-import React, { useMemo } from "react";
+import React, { useMemo, useRef, useEffect } from "react";
+import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
 
 interface ToyProp3DProps {
   toyId?: string;
-  bounceHeight?: number;
 }
 
-export const MusicalNote3D: React.FC<{ progress: number; offset: number }> = React.memo(
-  ({ progress, offset }) => {
+export const MusicalNote3D: React.FC<{ progress?: number; offset: number }> = React.memo(
+  ({ progress = 0, offset }) => {
+    const groupRef = useRef<THREE.Group>(null);
+    const headMatRef = useRef<THREE.MeshBasicMaterial>(null);
+    const stemMatRef = useRef<THREE.MeshBasicMaterial>(null);
+    const flagMatRef = useRef<THREE.MeshBasicMaterial>(null);
+    const elapsedRef = useRef(progress);
+
     // Elegant 3D musical note (stem + filled head + flag)
     const noteGeo = useMemo(() => {
       const shape = new THREE.Shape();
@@ -22,56 +28,88 @@ export const MusicalNote3D: React.FC<{ progress: number; offset: number }> = Rea
       return geo;
     }, []);
 
-    const cycle = (progress + offset) % 1;
-    const x = Math.sin(cycle * Math.PI * 2) * 0.18 + (offset - 0.5) * 0.22;
-    const y = cycle * 0.75;
-    const s = Math.sin(cycle * Math.PI) * 1.1;
-    const opacity = cycle < 0.2 ? cycle / 0.2 : cycle > 0.75 ? (1 - cycle) / 0.25 : 1;
+    useEffect(() => {
+      return () => {
+        noteGeo.dispose();
+      };
+    }, [noteGeo]);
+
+    useFrame((_, delta) => {
+      elapsedRef.current += delta * 0.8;
+      const cycle = (elapsedRef.current + offset) % 1;
+      const x = Math.sin(cycle * Math.PI * 2) * 0.18 + (offset - 0.5) * 0.22;
+      const y = cycle * 0.75;
+      const s = Math.max(0.01, Math.sin(cycle * Math.PI) * 1.1);
+      const opacity = (cycle < 0.2 ? cycle / 0.2 : cycle > 0.75 ? (1 - cycle) / 0.25 : 1) * 0.9;
+
+      if (groupRef.current) {
+        groupRef.current.position.set(x, y, 0);
+        groupRef.current.scale.setScalar(s);
+      }
+      if (headMatRef.current) headMatRef.current.opacity = opacity;
+      if (stemMatRef.current) stemMatRef.current.opacity = opacity;
+      if (flagMatRef.current) flagMatRef.current.opacity = opacity;
+    });
 
     return (
-      <group position={[x, y, 0]} scale={[s, s, s]}>
+      <group ref={groupRef}>
         {/* Note Head */}
         <mesh geometry={noteGeo}>
-          <meshBasicMaterial color="#38BDF8" transparent opacity={opacity * 0.9} />
+          <meshBasicMaterial ref={headMatRef} color="#38BDF8" transparent opacity={0.9} />
         </mesh>
         {/* Note Stem */}
         <mesh position={[0.04, 0.065, 0]}>
           <cylinderGeometry args={[0.007, 0.007, 0.12, 8]} />
-          <meshBasicMaterial color="#38BDF8" transparent opacity={opacity * 0.9} />
+          <meshBasicMaterial ref={stemMatRef} color="#38BDF8" transparent opacity={0.9} />
         </mesh>
         {/* Note Flag */}
         <mesh position={[0.065, 0.11, 0]} rotation={[0, 0, -0.4]}>
           <boxGeometry args={[0.045, 0.012, 0.015]} />
-          <meshBasicMaterial color="#38BDF8" transparent opacity={opacity * 0.9} />
+          <meshBasicMaterial ref={flagMatRef} color="#38BDF8" transparent opacity={0.9} />
         </mesh>
       </group>
     );
   }
 );
 
-export const PlayBubble3D: React.FC<{ progress: number; index: number }> = React.memo(
-  ({ progress, index }) => {
-    const cycle = (progress + index * 0.125) % 1;
-    const angle = index * 0.95 + progress * 2.2;
-    const radius = 0.22 + (index % 4) * 0.14;
-    const x = Math.cos(angle) * radius + (index % 2 === 0 ? 0.18 : -0.18) * cycle;
-    const z = Math.sin(angle) * radius + (index % 3 === 0 ? 0.12 : -0.12) * cycle;
-    const y = cycle * 1.55;
-    const scale = (0.075 + (index % 3) * 0.035) * Math.sin(cycle * Math.PI);
-    const opacity = cycle < 0.12 ? cycle / 0.12 : cycle > 0.85 ? (1 - cycle) / 0.15 : 0.82;
+export const PlayBubble3D: React.FC<{ progress?: number; index: number }> = React.memo(
+  ({ progress = 0, index }) => {
+    const groupRef = useRef<THREE.Group>(null);
+    const shellMatRef = useRef<THREE.MeshStandardMaterial>(null);
+    const highlightMatRef = useRef<THREE.MeshBasicMaterial>(null);
+    const elapsedRef = useRef(progress);
+
+    useFrame((_, delta) => {
+      elapsedRef.current += delta * 0.75;
+      const p = elapsedRef.current;
+      const cycle = (p + index * 0.125) % 1;
+      const angle = index * 0.95 + p * 2.2;
+      const radius = 0.22 + (index % 4) * 0.14;
+      const x = Math.cos(angle) * radius + (index % 2 === 0 ? 0.18 : -0.18) * cycle;
+      const z = Math.sin(angle) * radius + (index % 3 === 0 ? 0.12 : -0.12) * cycle;
+      const y = cycle * 1.55;
+      const scale = Math.max(0.001, (0.075 + (index % 3) * 0.035) * Math.sin(cycle * Math.PI));
+      const opacity = cycle < 0.12 ? cycle / 0.12 : cycle > 0.85 ? (1 - cycle) / 0.15 : 0.82;
+
+      if (groupRef.current) {
+        groupRef.current.position.set(x, y, z);
+        groupRef.current.scale.setScalar(scale);
+      }
+      if (shellMatRef.current) shellMatRef.current.opacity = opacity;
+      if (highlightMatRef.current) highlightMatRef.current.opacity = opacity * 0.9;
+    });
 
     return (
-      <group position={[x, y, z]} scale={[scale, scale, scale]}>
+      <group ref={groupRef}>
         <mesh>
-          <sphereGeometry args={[1, 16, 16]} />
-          <meshPhysicalMaterial
+          <sphereGeometry args={[1, 14, 12]} />
+          <meshStandardMaterial
+            ref={shellMatRef}
             color="#E0F2FE"
-            roughness={0.04}
-            metalness={0.1}
-            clearcoat={1}
-            clearcoatRoughness={0.05}
+            roughness={0.08}
+            metalness={0.14}
             transparent
-            opacity={opacity}
+            opacity={0.82}
             emissive={index % 2 === 0 ? "#F472B6" : "#38BDF8"}
             emissiveIntensity={0.25}
           />
@@ -79,7 +117,7 @@ export const PlayBubble3D: React.FC<{ progress: number; index: number }> = React
         {/* Highlight Specular Dot */}
         <mesh position={[-0.32, 0.38, 0.65]} scale={0.22}>
           <sphereGeometry args={[1, 8, 8]} />
-          <meshBasicMaterial color="#FFFFFF" transparent opacity={opacity * 0.9} />
+          <meshBasicMaterial ref={highlightMatRef} color="#FFFFFF" transparent opacity={0.74} />
         </mesh>
       </group>
     );
@@ -96,38 +134,34 @@ export const ToyProp3D: React.FC<ToyProp3DProps> = React.memo(
         <group scale={[1, 1, 1]}>
           {/* Main Core Sphere - Perfectly Round */}
           <mesh>
-            <sphereGeometry args={[ballRadius, 24, 24]} />
-            <meshPhysicalMaterial
+            <sphereGeometry args={[ballRadius, 20, 18]} />
+            <meshStandardMaterial
               color="#EF4444"
-              roughness={0.18}
-              metalness={0.05}
-              clearcoat={1}
-              clearcoatRoughness={0.08}
+              roughness={0.14}
+              metalness={0.08}
             />
           </mesh>
           {/* Cyan Center Waist Band */}
           <mesh scale={[1.01, 0.36, 1.01]}>
-            <sphereGeometry args={[ballRadius, 24, 16]} />
-            <meshPhysicalMaterial
+            <sphereGeometry args={[ballRadius, 20, 14]} />
+            <meshStandardMaterial
               color="#06B6D4"
-              roughness={0.18}
-              metalness={0.05}
-              clearcoat={1}
+              roughness={0.14}
+              metalness={0.08}
             />
           </mesh>
           {/* Yellow Center Stripe Band */}
           <mesh scale={[1.02, 0.16, 1.02]}>
-            <sphereGeometry args={[ballRadius, 24, 16]} />
-            <meshPhysicalMaterial
+            <sphereGeometry args={[ballRadius, 20, 14]} />
+            <meshStandardMaterial
               color="#F59E0B"
-              roughness={0.18}
-              metalness={0.05}
-              clearcoat={1}
+              roughness={0.14}
+              metalness={0.08}
             />
           </mesh>
           {/* Glossy White Catchlight */}
           <mesh position={[-0.026, 0.032, 0.06]} scale={[0.016, 0.016, 0.008]}>
-            <sphereGeometry args={[1, 10, 10]} />
+            <sphereGeometry args={[1, 8, 8]} />
             <meshBasicMaterial color="#FFFFFF" />
           </mesh>
         </group>
@@ -155,25 +189,23 @@ export const ToyProp3D: React.FC<ToyProp3DProps> = React.memo(
           </mesh>
           {/* Bubble Wand Ring */}
           <mesh position={[0, 0.07, 0]} rotation={[Math.PI / 2, 0, 0]}>
-            <torusGeometry args={[0.072, 0.014, 12, 24]} />
-            <meshPhysicalMaterial
+            <torusGeometry args={[0.072, 0.014, 10, 20]} />
+            <meshStandardMaterial
               color="#38BDF8"
               roughness={0.15}
-              clearcoat={1}
-              metalness={0.2}
+              metalness={0.22}
             />
           </mesh>
           {/* Soap Film Membrane inside Ring */}
           <mesh position={[0, 0.07, 0]} rotation={[Math.PI / 2, 0, 0]}>
-            <circleGeometry args={[0.068, 20]} />
-            <meshPhysicalMaterial
+            <circleGeometry args={[0.068, 18]} />
+            <meshStandardMaterial
               color="#E0F2FE"
-              roughness={0.05}
-              metalness={0.1}
+              roughness={0.08}
+              metalness={0.12}
               transparent
               opacity={0.55}
               side={THREE.DoubleSide}
-              clearcoat={1}
             />
           </mesh>
         </group>

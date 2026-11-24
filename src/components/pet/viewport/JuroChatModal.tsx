@@ -68,11 +68,11 @@ export const JuroChatModal: React.FC<JuroChatModalProps> = (props) => {
   };
 
   return (
-    <div className="animate-tray-enter absolute bottom-16 sm:bottom-20 left-1/2 -translate-x-1/2 z-30 w-80 sm:w-96 max-w-[calc(100vw-1.5rem)] bg-warm-white/95 dark:bg-neutral-900/95 backdrop-blur-xs border-2 border-charcoal dark:border-neutral-600 shadow-[4px_4px_0px_#171717] dark:shadow-[4px_4px_0px_#000000] p-3 select-none">
-      <div className="flex items-center justify-between border-b border-charcoal/15 dark:border-neutral-700 pb-2 mb-2.5">
-        <div className="flex items-center gap-1.5">
-          <MessageSquare size={13} className="text-juro-orange" />
-          <span className="pixel-text text-[10px] uppercase font-bold text-charcoal dark:text-white">
+    <div className="animate-tray-enter absolute bottom-17 sm:bottom-19 left-1/2 -translate-x-1/2 z-30 w-84 sm:w-96 max-w-[calc(100vw-1.5rem)] rounded-2xl bg-white dark:bg-neutral-900 border border-neutral-200/90 dark:border-neutral-800 shadow-xl p-3.5 select-none">
+      <div className="flex items-center justify-between border-b border-neutral-200 dark:border-neutral-800 pb-2 mb-2.5">
+        <div className="flex items-center gap-2">
+          <MessageSquare size={15} className="text-juro-orange" />
+          <span className="text-sm font-semibold text-neutral-900 dark:text-white">
             {petName}
           </span>
         </div>
@@ -82,22 +82,22 @@ export const JuroChatModal: React.FC<JuroChatModalProps> = (props) => {
             soundEffects.playDismiss();
             onClose();
           }}
-          className="p-0.5 text-neutral-400 hover:text-charcoal dark:hover:text-white cursor-pointer"
+          className="p-1 rounded-lg text-neutral-400 hover:text-neutral-700 hover:bg-neutral-100 dark:hover:text-white dark:hover:bg-neutral-800 cursor-pointer"
           aria-label="Tutup obrolan"
         >
-          <X size={15} />
+          <X size={16} />
         </button>
       </div>
 
       {/* Dynamic Contextual Quick Prompts */}
-      <div className="flex flex-wrap gap-1.5 mb-2.5">
+      <div className="flex flex-wrap gap-1.5 mb-3">
         {quickPrompts.map((prompt) => (
           <button
             key={prompt}
             type="button"
             disabled={isLoading}
             onClick={() => handleQuickPrompt(prompt)}
-            className="px-2 py-1 bg-white dark:bg-neutral-800 border border-charcoal/40 dark:border-neutral-700 pixel-text text-[8px] text-charcoal dark:text-neutral-200 hover:border-juro-orange hover:text-juro-orange active:scale-95 transition-all cursor-pointer"
+            className="px-2.5 py-1 rounded-full bg-neutral-100 dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 text-xs text-neutral-700 dark:text-neutral-200 hover:border-juro-orange hover:text-juro-orange active:scale-95 transition-all cursor-pointer"
           >
             {prompt}
           </button>
@@ -105,7 +105,7 @@ export const JuroChatModal: React.FC<JuroChatModalProps> = (props) => {
       </div>
 
       {/* Input Form */}
-      <form onSubmit={handleSubmit} className="flex items-center gap-1.5">
+      <form onSubmit={handleSubmit} className="flex items-center gap-2">
         <input
           type="text"
           value={input}
@@ -113,18 +113,18 @@ export const JuroChatModal: React.FC<JuroChatModalProps> = (props) => {
           placeholder={`Kirim pesan untuk ${petName}...`}
           maxLength={100}
           disabled={isLoading}
-          className="flex-1 min-w-0 px-2.5 py-1.5 bg-white dark:bg-neutral-800 border-2 border-charcoal dark:border-neutral-600 pixel-text text-[9.5px] text-charcoal dark:text-white placeholder:text-neutral-400 focus:outline-none focus:border-juro-orange"
+          className="flex-1 min-w-0 px-3 py-2 rounded-xl bg-neutral-50 dark:bg-neutral-800 border border-neutral-300 dark:border-neutral-700 text-xs sm:text-sm text-neutral-900 dark:text-white placeholder:text-neutral-400 focus:outline-none focus:border-juro-orange focus:ring-2 focus:ring-juro-orange/20"
         />
         <button
           type="submit"
           disabled={!input.trim() || isLoading}
-          className={`px-3 py-1.5 border-2 border-charcoal dark:border-neutral-600 pixel-text text-[9.5px] uppercase font-bold flex items-center gap-1 transition-all ${
+          className={`px-3.5 py-2 rounded-xl text-xs sm:text-sm font-semibold flex items-center gap-1.5 transition-all ${
             input.trim() && !isLoading
-              ? "bg-juro-orange text-white hover:bg-orange-600 cursor-pointer shadow-[2px_2px_0px_#171717] active:translate-x-[1px] active:translate-y-[1px] active:shadow-none"
+              ? "bg-juro-orange text-white hover:bg-orange-600 cursor-pointer active:scale-95"
               : "bg-neutral-200 dark:bg-neutral-700 text-neutral-400 cursor-not-allowed opacity-60"
           }`}
         >
-          <Send size={11} strokeWidth={2.5} />
+          <Send size={13} strokeWidth={2} />
           <span>{isLoading ? "..." : "Kirim"}</span>
         </button>
       </form>

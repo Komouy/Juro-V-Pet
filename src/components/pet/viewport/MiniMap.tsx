@@ -12,15 +12,10 @@ import {
   isOnCobblePath,
   isOnTrail,
 } from "../../../engine/world/mapTerrain";
-import type { WorldPoint } from "../../../engine/world/pathfinding";
-
 export interface MiniMapProps {
   playerX: number;
   playerZ: number;
   yaw?: number;
-  routeWaypoints?: WorldPoint[];
-  activeDestination?: { x: number; z: number } | null;
-  onNavigatePoint?: (x: number, z: number) => void;
   juroWorldPosRef?: React.RefObject<THREE.Vector3>;
   juroYawRef?: React.RefObject<number>;
 }
@@ -32,9 +27,6 @@ export const MiniMap: React.FC<MiniMapProps> = ({
   playerX,
   playerZ,
   yaw = 0,
-  routeWaypoints = [],
-  activeDestination = null,
-  onNavigatePoint,
   juroWorldPosRef,
   juroYawRef,
 }) => {
@@ -106,47 +98,6 @@ export const MiniMap: React.FC<MiniMapProps> = ({
         ctx.stroke();
       }
 
-      // Active navigation route: dashed golden-orange trail with node markers
-      if (routeWaypoints && routeWaypoints.length > 0) {
-        ctx.strokeStyle = "#d97706";
-        ctx.lineWidth = 2.5;
-        ctx.setLineDash([4, 3]);
-        ctx.beginPath();
-        ctx.moveTo(toPx(curX), toPx(curZ));
-        for (const wp of routeWaypoints) {
-          ctx.lineTo(toPx(wp.x), toPx(wp.z));
-        }
-        ctx.stroke();
-        ctx.setLineDash([]);
-
-        // Waypoint circle nodes
-        for (const wp of routeWaypoints) {
-          const wx = Math.round(toPx(wp.x));
-          const wz = Math.round(toPx(wp.z));
-          ctx.fillStyle = "#ffffff";
-          ctx.beginPath();
-          ctx.arc(wx, wz, 3.2, 0, Math.PI * 2);
-          ctx.fill();
-          ctx.fillStyle = "#d97706";
-          ctx.beginPath();
-          ctx.arc(wx, wz, 2.0, 0, Math.PI * 2);
-          ctx.fill();
-        }
-      }
-
-      // Destination crosshair / circle
-      if (activeDestination) {
-        const dx = Math.round(toPx(activeDestination.x));
-        const dz = Math.round(toPx(activeDestination.z));
-        ctx.fillStyle = "#f59e0b";
-        ctx.beginPath();
-        ctx.arc(dx, dz, 4.5, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.strokeStyle = "#ffffff";
-        ctx.lineWidth = 1.5;
-        ctx.stroke();
-      }
-
       // Storybook Landmarks
       for (const lm of LANDMARKS) {
         const lx = Math.round(toPx(lm.position.x));
@@ -203,13 +154,29 @@ export const MiniMap: React.FC<MiniMapProps> = ({
       ctx.restore();
     };
 
-    let animId: number;
+    let animId = 0;
+    let lastX = Number.NaN;
+    let lastZ = Number.NaN;
+    let lastYaw = Number.NaN;
+    let needsInitialDraw = true;
 
     const tick = () => {
       const curX = juroWorldPosRef?.current ? juroWorldPosRef.current.x : playerX;
       const curZ = juroWorldPosRef?.current ? juroWorldPosRef.current.z : playerZ;
       const curYaw = juroYawRef?.current !== undefined ? juroYawRef.current : yaw;
-      drawOverlay(curX, curZ, curYaw);
+
+      const moved =
+        needsInitialDraw ||
+        Math.hypot(curX - lastX, curZ - lastZ) >= 0.015 ||
+        Math.abs(curYaw - lastYaw) >= 0.015;
+
+      if (moved) {
+        drawOverlay(curX, curZ, curYaw);
+        lastX = curX;
+        lastZ = curZ;
+        lastYaw = curYaw;
+        needsInitialDraw = false;
+      }
 
       if (juroWorldPosRef || juroYawRef) {
         animId = requestAnimationFrame(tick);
@@ -221,31 +188,18 @@ export const MiniMap: React.FC<MiniMapProps> = ({
     return () => {
       if (animId) cancelAnimationFrame(animId);
     };
-  }, [playerX, playerZ, yaw, routeWaypoints, activeDestination, juroWorldPosRef, juroYawRef]);
-
-  const handleCanvasClick = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    const canvas = canvasRef.current;
-    if (!canvas || !onNavigatePoint) return;
-    const rect = canvas.getBoundingClientRect();
-    const clickX = e.clientX - rect.left;
-    const clickY = e.clientY - rect.top;
-
-    const wx = (clickX / rect.width) * WORLD_SIZE - HALF_WORLD;
-    const wz = (clickY / rect.height) * WORLD_SIZE - HALF_WORLD;
-    onNavigatePoint(wx, wz);
-  };
+  }, [playerX, playerZ, yaw, juroWorldPosRef, juroYawRef]);
 
   return (
-    <div className="relative rounded-2xl border-2 sm:border-[2.5px] border-[#efe8d6] dark:border-neutral-700 bg-[#fbf9f2] dark:bg-neutral-800 p-1 shadow-md select-none pointer-events-auto">
+    <div className="relative rounded-2xl border border-neutral-200/80 dark:border-neutral-800 bg-white/95 dark:bg-neutral-900/95 p-1 shadow-sm select-none pointer-events-auto">
       <canvas
         ref={canvasRef}
         width={MAP_PX}
         height={MAP_PX}
-        onClick={handleCanvasClick}
-        className="w-[86px] h-[86px] sm:w-[96px] sm:h-[96px] block cursor-crosshair rounded-xl"
-        title="Ketuk radar untuk navigasi langsung"
+        className="w-[76px] h-[76px] sm:w-[88px] sm:h-[88px] block cursor-default rounded-xl"
+        title="Peta lembah"
       />
-      <span className="pointer-events-none absolute top-1.5 left-1/2 -translate-x-1/2 font-pixel text-[7.5px] font-bold text-[#2d3a2f] dark:text-neutral-200 bg-white/90 dark:bg-neutral-900/90 px-1.5 py-0.2 rounded-full border border-black/10 shadow-xs">
+      <span className="pointer-events-none absolute top-1.5 left-1/2 -translate-x-1/2 text-[9px] font-bold text-neutral-800 bg-white/85 px-1 rounded leading-tight">
         U
       </span>
     </div>

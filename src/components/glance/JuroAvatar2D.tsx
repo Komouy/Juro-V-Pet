@@ -33,7 +33,7 @@ export const JuroAvatar2D: React.FC<JuroAvatar2DProps> = ({
         width="100%"
         height="100%"
         shapeRendering="crispEdges"
-        className="w-full h-full drop-shadow-[2px_2px_0px_#18181B]"
+        className="w-full h-full drop-shadow-sm"
       >
         {/* Ground Drop Shadow */}
         <rect x="6" y="27" width="20" height="3" fill="#18181B" opacity="0.6" />

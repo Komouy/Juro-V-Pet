@@ -43,7 +43,7 @@ export const DesktopPetGlance: React.FC = () => {
   // 0. Render Native Android Picture-in-Picture full-viewport overlay
   if (desktopGlanceService.isNativePipActive()) {
     return (
-      <div className="fixed inset-0 z-[9999] bg-warm-white dark:bg-neutral-900 flex flex-col items-center justify-center p-2 overflow-hidden select-none">
+      <div className="fixed inset-0 z-[9999] bg-neutral-50 dark:bg-neutral-900 flex flex-col items-center justify-center p-2 overflow-hidden select-none">
         <PetGlanceCard
           isDetachedWindow={true}
           onClose={handleCloseGlance}
@@ -57,7 +57,7 @@ export const DesktopPetGlance: React.FC = () => {
   const pipContainer = desktopGlanceService.getPipContainer();
   if (desktopGlanceService.isPipActive() && pipContainer) {
     return ReactDOM.createPortal(
-      <div className="w-full h-full p-2 flex items-center justify-center bg-warm-white dark:bg-neutral-900">
+      <div className="w-full h-full p-2 flex items-center justify-center bg-neutral-50 dark:bg-neutral-900">
         <PetGlanceCard
           isDetachedWindow={true}
           onClose={handleCloseGlance}

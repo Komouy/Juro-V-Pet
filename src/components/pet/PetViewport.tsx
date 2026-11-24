@@ -19,7 +19,6 @@ import { useCaregiverStore } from "../../stores/caregiverStore";
 import { CaregiverOnboardingModal } from "../caregiver/CaregiverOnboardingModal";
 import { SHOP_FOODS } from "../../data/economyCatalog";
 import { soundEffects } from "../../engine/audio/soundEffects";
-import { findPath, getGlobalNavGrid } from "../../engine/world/pathfinding";
 import {
   getTimePhaseFromDate,
   isBedtimeHour,
@@ -38,8 +37,13 @@ import {
   normalizeWeather,
   isRainingWeather,
 } from "../../types/ui";
+import {
+  detectSoftwareWebGL,
+  readGraphicsEnvironment,
+  resolveGraphicsProfile,
+} from "../../engine/world/graphicsProfile";
 import { getCognitiveTier, computePetEmotionalState } from "../../engine/ai/cognitiveCore";
-import type { FoodItem, ToyItem } from "../../types/pet";
+import type { FoodItem, ToyItem, PetBehaviorState } from "../../types/pet";
 import { ResponsiveCamera, type CameraMode } from "./viewport/ResponsiveCamera";
 import { StatBars } from "./viewport/StatBars";
 import { MiniMap } from "./viewport/MiniMap";
@@ -133,6 +137,17 @@ export const PetViewport: React.FC = () => {
   const controlsRef = useRef<OrbitControlsImpl>(null);
   const isCameraDraggingRef = useRef(false);
   const cameraDragEndTimeRef = useRef(0);
+  const isUserOrbitGestureRef = useRef(false);
+  const didOrbitMoveRef = useRef(false);
+  const orbitStartCamDistRef = useRef(0);
+  const pointerGestureRef = useRef<{
+    x: number;
+    y: number;
+    maxDist: number;
+    isTouch: boolean;
+    dragged: boolean;
+  } | null>(null);
+  const lastJuroPointerDownAtRef = useRef(0);
   const juroScreenPosRef = useRef<JuroScreenTarget>({ x: 300, y: 240, radiusPx: 110 });
 
   // Live 60fps bath state ref read directly by JuroModel useFrame (ZERO React re-renders during drag!)
@@ -166,13 +181,13 @@ export const PetViewport: React.FC = () => {
   } = usePetStore();
   const { addLog, addCoins, foodInventory, ownedToys, consumeFood } = useGameStore();
   const weather = useUIStore((s) => s.weather);
+  const graphicsQuality = useUIStore((s) => s.graphicsQuality);
   const showToast = useUIStore((s) => s.showToast);
   const actionMenuStyle = useUIStore((s) => s.actionMenuStyle);
   const hasRegisteredName = useCaregiverStore((s) => s.hasRegisteredName);
   const partnerPet = useCaregiverStore((s) => s.partnerPet);
 
   const juroYawRef = useRef<number>(0);
-  const [routeWaypoints, setRouteWaypoints] = useState<Array<{ x: number; z: number }>>([]);
   const [activeTray, setActiveTray] = useState<ActiveTray>("none");
   const [showStatDetails, setShowStatDetails] = useState(false);
   const [isChatOpen, setIsChatOpen] = useState(false);
@@ -258,20 +273,33 @@ export const PetViewport: React.FC = () => {
   const [soapBadgePercent, setSoapBadgePercent] = useState(0);
   const [walkCommand, setWalkCommand] = useState<WalkCommand | null>(null);
 
-  const isMobileViewport = useMemo(() => {
-    if (typeof window === "undefined") return false;
-    return window.innerWidth < 768 || (typeof navigator !== "undefined" && navigator.maxTouchPoints > 0);
+  const [isSoftwareGl, setIsSoftwareGl] = useState(false);
+  const [viewportWidth, setViewportWidth] = useState(() =>
+    typeof window !== "undefined" ? window.innerWidth : 1024
+  );
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const onResize = () => setViewportWidth(window.innerWidth);
+    window.addEventListener("resize", onResize, { passive: true });
+    return () => window.removeEventListener("resize", onResize);
   }, []);
 
-  const adaptiveDpr = useMemo(() => {
-    if (typeof window === "undefined") return 1;
-    const maxDpr = isMobileViewport ? 1.2 : 1.45;
-    return Math.min(window.devicePixelRatio || 1, maxDpr);
-  }, [isMobileViewport]);
+  const graphicsProfile = useMemo(
+    () =>
+      resolveGraphicsProfile(
+        graphicsQuality,
+        readGraphicsEnvironment({
+          isSoftwareRenderer: isSoftwareGl,
+          viewportWidth,
+        })
+      ),
+    [graphicsQuality, isSoftwareGl, viewportWidth]
+  );
 
-  const shadowResolution = useMemo(() => {
-    return isMobileViewport ? 512 : 1024;
-  }, [isMobileViewport]);
+  // Real-time local clock tracking for automatic day/night nature atmosphere
+  const [now, setNow] = useState(() => new Date());
+  const isNightSleep = isBedtimeHour(now);
 
   const handleBedArrival = useCallback(() => {
     isHeadingToBedRef.current = false;
@@ -287,126 +315,140 @@ export const PetViewport: React.FC = () => {
     }
   }, [sleep, addLog]);
 
-  const handleWalkPointSelect = useCallback(
-    (x: number, z: number) => {
-      // Guard 1: Ignore if camera was actively being dragged/rotated (or within 250ms release buffer)
-      if (isCameraDraggingRef.current || Date.now() - cameraDragEndTimeRef.current < 250) {
+  const handlePetPointerDown = useCallback(() => {
+    lastJuroPointerDownAtRef.current = Date.now();
+  }, []);
+
+  const handlePetClick = useCallback(
+    (screenPos?: { x: number; y: number }) => {
+      // Guard: Ignore only if user genuinely dragged/zoomed the camera beyond tap threshold
+      if (isCameraDraggingRef.current || Date.now() - cameraDragEndTimeRef.current < 160) {
         return;
       }
 
-      // Guard 2: If Juro is sleeping, NEVER MAKE JURO WALK!
-      // Tapping anywhere while Juro is asleep opens the menu so the user can wake him up, chat, or check stats
-      if (currentState === "sleep") {
-        handlePetClick();
-        return;
-      }
-
-      // Guard 3: If Juro is sitting on bench or bouncing on trampoline, tap near Juro opens the landmark menu
-      if (isSittingOnBench) {
-        const juroPos = juroWorldPosRef.current;
-        const dist = juroPos ? Math.hypot(x - juroPos.x, z - juroPos.z) : 999;
-        if (dist < 1.8) {
-          setIsBenchMenuOpen(true);
-          return;
-        }
-      }
-      if (isBouncingOnTrampoline) {
-        const juroPos = juroWorldPosRef.current;
-        const dist = juroPos ? Math.hypot(x - juroPos.x, z - juroPos.z) : 999;
-        if (dist < 1.8) {
-          setIsTrampolineMenuOpen(true);
-          return;
-        }
-      }
-
-      // Guard 4: If Juro is awake and user clicks on or close to Juro (<1.75m), open Juro's menu/chat! DO NOT walk!
-      const currentPos = juroWorldPosRef.current;
-      if (currentPos) {
-        const distToJuro = Math.hypot(x - currentPos.x, z - currentPos.z);
-        if (distToJuro < 1.75) {
-          handlePetClick();
-          return;
-        }
-      }
-
-      // Guard 5: If clicked on or near the sofa bed (<2.2m), handle bed interaction
-      const distToBedCheck = Math.hypot(x - JURO_BED_POS.x, z - JURO_BED_POS.z);
-      if (distToBedCheck < 2.2) {
-        handleBedClick();
-        return;
-      }
-
-      if (isSittingOnBench) {
-        setIsSittingOnBench(false);
-      }
-      if (isBouncingOnTrampoline) {
-        setIsBouncingOnTrampoline(false);
-      }
+      // Stop any active walking so Juro pauses and interacts with player
+      isHeadingToBedRef.current = false;
       isHeadingToBenchRef.current = false;
       isHeadingToTrampolineRef.current = false;
-      if (isBenchMenuOpen) {
-        setIsBenchMenuOpen(false);
+      setWalkCommand(null);
+
+      // Dismiss active speech bubble immediately so menu takes priority
+      if (speechTimerRef.current) {
+        clearTimeout(speechTimerRef.current);
+        speechTimerRef.current = null;
       }
-      if (isTrampolineMenuOpen) {
-        setIsTrampolineMenuOpen(false);
-      }
-      soundEffects.playGuideTap();
-      setIsChatOpen(false);
-      setJuroMenu((prev) => ({ ...prev, open: false }));
-      setActiveTray("none");
-      setShowStatDetails(false);
+      setSpeechBubble({ visible: false, text: "", isLoading: false });
 
-      const startPt = juroWorldPosRef.current
-        ? { x: juroWorldPosRef.current.x, z: juroWorldPosRef.current.z }
-        : { x: lastPosition?.x ?? 0, z: lastPosition?.z ?? 0 };
+      if (actionMenuStyle === "floating") {
+        setShowStatDetails(false);
+        setActiveTray("none");
 
-      // Check if clicked target is at or near the bed terrace / Bukit Santai
-      const distToBed = Math.hypot(x - JURO_BED_POS.x, z - JURO_BED_POS.z);
-      const isBedTarget = distToBed < 2.0;
-
-      let targetX = x;
-      let targetZ = z;
-
-      if (isBedTarget) {
-        isHeadingToBedRef.current = true;
-        targetX = JURO_BED_SLOT_1.x;
-        targetZ = JURO_BED_SLOT_1.z;
-
-        // If Juro is already resting at or near the sofa bed (<0.85m), immediately trigger sleep!
-        const currentDistToBed = Math.hypot(startPt.x - JURO_BED_POS.x, startPt.z - JURO_BED_POS.z);
-        if (currentDistToBed < 0.85) {
-          handleBedArrival();
+        if (juroMenu.open) {
+          soundEffects.playDismiss();
+          setJuroMenu((prev) => ({ ...prev, open: false }));
           return;
         }
-        addLog("sleep", "Juro melompat menuju kasur untuk tidur lelap.");
-        useCaregiverStore.getState().recordAction(
-          "sleep",
-          "Menuntun Juro menuju tempat tidur di Bukit Santai.",
-          { energy: 35 }
-        );
+
+        soundEffects.playPop();
+
+        const contRect = containerRef.current?.getBoundingClientRect();
+        const contW = contRect?.width || window.innerWidth;
+        const contH = contRect?.height || window.innerHeight;
+
+        const rawX = screenPos?.x ?? (juroScreenPosRef.current?.x ?? contW / 2);
+        const rawY = screenPos?.y ?? (juroScreenPosRef.current?.headY ?? contH / 2);
+
+        const menuEl = juroMenuRef.current;
+        const menuW = menuEl?.offsetWidth || Math.min(280, contW - 24);
+        const menuH = menuEl?.offsetHeight || 52;
+        const halfMenuW = menuW / 2;
+        const pad = 12;
+        const clampedX = Math.max(halfMenuW + pad, Math.min(contW - halfMenuW - pad, rawX));
+
+        const isNearTop = rawY < menuH + 30;
+        let targetY: number;
+        let clampedY: number;
+        if (isNearTop) {
+          targetY = rawY + 45;
+          clampedY = Math.max(10, Math.min(contH - menuH - 20, targetY));
+        } else {
+          targetY = rawY - 14;
+          clampedY = Math.max(menuH + 10, Math.min(contH - 20, targetY));
+        }
+
+        setJuroMenu({
+          open: true,
+          x: clampedX,
+          y: clampedY,
+          isNearTop,
+        });
       } else {
-        isHeadingToBedRef.current = false;
-        // If Juro is sleeping and user taps elsewhere, wake up and walk!
-        if (usePetStore.getState().currentState === "sleep") {
-          wakeUp();
-          soundEffects.playWakeUp();
-          addLog("interaction", "Juro bangun dari kasur dan melangkah menuju tujuan baru.");
-          useCaregiverStore.getState().recordAction(
-            "wake",
-            "Membangunkan Juro dari kasur untuk menjelajah.",
-            {}
-          );
-          wakeCooldownUntilRef.current = Date.now() + 180_000;
+        // "dock" style: clicking Juro directly opens chat modal cleanly
+        setShowStatDetails(false);
+        setActiveTray("none");
+        setIsChatOpen(true);
+        soundEffects.playPop();
+      }
+    },
+    [actionMenuStyle, juroMenu.open]
+  );
+
+  const handleToggleSleep = useCallback(() => {
+    if (isSittingOnBench) setIsSittingOnBench(false);
+    if (isBouncingOnTrampoline) setIsBouncingOnTrampoline(false);
+    isHeadingToBenchRef.current = false;
+    isHeadingToTrampolineRef.current = false;
+    setIsBenchMenuOpen(false);
+    setIsTrampolineMenuOpen(false);
+    if (currentState === "sleep") {
+      wakeUp();
+      soundEffects.playWakeUp();
+      if (isNightSleep && energy < 35) {
+        showToast("Juro masih mengantuk dan butuh tidur penuh", "info");
+      }
+      addLog("interaction", "Juro bangun dari waktu istirahatnya.");
+      useCaregiverStore.getState().recordAction(
+        "wake",
+        "Membangunkan Juro dari tidurnya.",
+        {}
+      );
+      wakeCooldownUntilRef.current = Date.now() + 180_000;
+      isHeadingToBedRef.current = false;
+    } else {
+      isHeadingToBedRef.current = true;
+      setWalkCommand({ x: JURO_BED_SLOT_1.x, z: JURO_BED_SLOT_1.z, nonce: Date.now() });
+      addLog("sleep", "Juro berjalan menuju sofa untuk tidur lelap.");
+      useCaregiverStore.getState().recordAction(
+        "sleep",
+        "Menuntun Juro tidur di sofa empuk.",
+        { energy: 35 }
+      );
+      soundEffects.playClick();
+      // If Juro is already resting or near the sofa bed (<0.85m), immediately trigger sleep!
+      if (juroWorldPosRef.current) {
+        const distToSlot = Math.hypot(
+          juroWorldPosRef.current.x - JURO_BED_SLOT_1.x,
+          juroWorldPosRef.current.z - JURO_BED_SLOT_1.z
+        );
+        const distToCenter = Math.hypot(
+          juroWorldPosRef.current.x - JURO_BED_POS.x,
+          juroWorldPosRef.current.z - JURO_BED_POS.z
+        );
+        if (distToSlot < 0.85 || distToCenter < 0.85) {
+          handleBedArrival();
         }
       }
+    }
+    setActiveTray("none");
+  }, [currentState, wakeUp, addLog, isSittingOnBench, isBouncingOnTrampoline, handleBedArrival, isNightSleep, energy, showToast]);
 
-      const navPath = findPath(getGlobalNavGrid(), startPt, { x: targetX, z: targetZ });
-      const finalWaypoints = navPath.length > 0 ? navPath : [{ x: targetX, z: targetZ }];
-      setRouteWaypoints(finalWaypoints);
-      setWalkCommand({ x: targetX, z: targetZ, nonce: Date.now() });
-    },
-    [isSittingOnBench, isBouncingOnTrampoline, isBenchMenuOpen, isTrampolineMenuOpen, setActiveTray, setShowStatDetails, lastPosition, handleBedArrival, addLog, wakeUp, currentState]
-  );
+  const handleBedClick = useCallback(() => {
+    if (currentState === "sleep") {
+      handlePetClick();
+    } else {
+      handleToggleSleep();
+    }
+  }, [currentState, handlePetClick, handleToggleSleep]);
 
   const handleOpenShopFromMap = useCallback(() => {
     if (isSittingOnBench) setIsSittingOnBench(false);
@@ -576,7 +618,7 @@ export const PetViewport: React.FC = () => {
         isDizzy,
         isNight,
         isNightSleepy,
-        isRaining: weather === "rain",
+        isRaining: isRainingWeather(weather),
         isSittingOnBench,
         isInWater: inWater,
         isSpontaneous,
@@ -758,78 +800,6 @@ export const PetViewport: React.FC = () => {
     [speechBubble.isLoading, getLiveChatContext]
   );
 
-  const handlePetClick = useCallback(
-    (screenPos?: { x: number; y: number }) => {
-      // Guard: Ignore if camera was actively being dragged/rotated (or within 250ms release buffer)
-      if (isCameraDraggingRef.current || Date.now() - cameraDragEndTimeRef.current < 250) {
-        return;
-      }
-
-      // Stop any active walking so Juro pauses and interacts with player
-      setWalkCommand(null);
-      setRouteWaypoints([]);
-
-      // Dismiss active speech bubble immediately so menu takes priority
-      if (speechTimerRef.current) {
-        clearTimeout(speechTimerRef.current);
-        speechTimerRef.current = null;
-      }
-      setSpeechBubble({ visible: false, text: "", isLoading: false });
-
-      if (actionMenuStyle === "floating") {
-        setShowStatDetails(false);
-        setActiveTray("none");
-
-        if (juroMenu.open) {
-          soundEffects.playDismiss();
-          setJuroMenu((prev) => ({ ...prev, open: false }));
-          return;
-        }
-
-        soundEffects.playPop();
-
-        const contRect = containerRef.current?.getBoundingClientRect();
-        const contW = contRect?.width || window.innerWidth;
-        const contH = contRect?.height || window.innerHeight;
-
-        const rawX = screenPos?.x ?? (juroScreenPosRef.current?.x ?? contW / 2);
-        const rawY = screenPos?.y ?? (juroScreenPosRef.current?.headY ?? contH / 2);
-
-        const menuEl = juroMenuRef.current;
-        const menuW = menuEl?.offsetWidth || Math.min(280, contW - 24);
-        const menuH = menuEl?.offsetHeight || 52;
-        const halfMenuW = menuW / 2;
-        const pad = 12;
-        const clampedX = Math.max(halfMenuW + pad, Math.min(contW - halfMenuW - pad, rawX));
-
-        const isNearTop = rawY < menuH + 30;
-        let targetY: number;
-        let clampedY: number;
-        if (isNearTop) {
-          targetY = rawY + 45;
-          clampedY = Math.max(10, Math.min(contH - menuH - 20, targetY));
-        } else {
-          targetY = rawY - 14;
-          clampedY = Math.max(menuH + 10, Math.min(contH - 20, targetY));
-        }
-
-        setJuroMenu({
-          open: true,
-          x: clampedX,
-          y: clampedY,
-          isNearTop,
-        });
-      } else {
-        // "dock" style: clicking Juro directly opens chat modal cleanly
-        setShowStatDetails(false);
-        setActiveTray("none");
-        setIsChatOpen(true);
-        soundEffects.playPop();
-      }
-    },
-    [actionMenuStyle, juroMenu.open, currentState, wakeUp, addLog]
-  );
-
   // Keep Juro Context Menu smoothly anchored above Juro's head during animations/walking
   useEffect(() => {
     if (!juroMenu.open || actionMenuStyle !== "floating") return;
@@ -876,10 +846,13 @@ export const PetViewport: React.FC = () => {
     return () => cancelAnimationFrame(animId);
   }, [juroMenu.open, actionMenuStyle]);
 
-  // Dismiss Juro menu when tapping/clicking outside
+  // Dismiss Juro menu when tapping/clicking outside (skip if pointerdown landed on Juro so click toggles cleanly)
   useEffect(() => {
     if (!juroMenu.open || actionMenuStyle !== "floating") return;
     const onWindowPointer = (e: Event) => {
+      if (Date.now() - lastJuroPointerDownAtRef.current < 80) {
+        return;
+      }
       const target = e.target as HTMLElement | null;
       if (target?.closest?.('[data-juro-menu="true"]') || juroMenuRef.current?.contains(target)) {
         return;
@@ -981,43 +954,96 @@ export const PetViewport: React.FC = () => {
     };
   }, [speechBubble.visible]);
 
-  // Dismiss bench menu, trampoline menu & Juro menu when user actively rotates or zooms camera with OrbitControls
+  // Track genuine screen-pixel pointer drags so micro tap tremor never blocks clicking Juro
   useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+
+    const onDown = (e: PointerEvent) => {
+      pointerGestureRef.current = {
+        x: e.clientX,
+        y: e.clientY,
+        maxDist: 0,
+        isTouch: e.pointerType === "touch",
+        dragged: false,
+      };
+      isCameraDraggingRef.current = false;
+    };
+
+    const onMove = (e: PointerEvent) => {
+      const g = pointerGestureRef.current;
+      if (!g) return;
+      const dist = Math.hypot(e.clientX - g.x, e.clientY - g.y);
+      if (dist > g.maxDist) g.maxDist = dist;
+      const threshold = g.isTouch ? 22 : 12;
+      if (!g.dragged && g.maxDist > threshold) {
+        g.dragged = true;
+        didOrbitMoveRef.current = true;
+        isCameraDraggingRef.current = true;
+        cameraDragEndTimeRef.current = Date.now();
+        setIsBenchMenuOpen(false);
+        setIsTrampolineMenuOpen(false);
+        setJuroMenu((prev) => (prev.open ? { ...prev, open: false } : prev));
+      }
+    };
+
+    const onUp = () => {
+      if (pointerGestureRef.current?.dragged || didOrbitMoveRef.current) {
+        cameraDragEndTimeRef.current = Date.now();
+      }
+      pointerGestureRef.current = null;
+      isCameraDraggingRef.current = false;
+    };
+
+    el.addEventListener("pointerdown", onDown, { capture: true, passive: true });
+    window.addEventListener("pointermove", onMove, { passive: true });
+    window.addEventListener("pointerup", onUp, { passive: true });
+    window.addEventListener("pointercancel", onUp, { passive: true });
+
+    return () => {
+      el.removeEventListener("pointerdown", onDown, { capture: true });
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+      window.removeEventListener("pointercancel", onUp);
+    };
+  }, []);
+
+  // Track genuine user OrbitControls pinch/zoom or confirmed drag gestures only
+  const handleOrbitStart = useCallback(() => {
+    const controls = controlsRef.current;
+    isUserOrbitGestureRef.current = true;
+    didOrbitMoveRef.current = false;
+    if (controls) {
+      orbitStartCamDistRef.current = controls.object.position.distanceTo(controls.target);
+    }
+  }, []);
+
+  const handleOrbitChange = useCallback(() => {
+    if (!isUserOrbitGestureRef.current) return;
     const controls = controlsRef.current;
     if (!controls) return;
 
-    let didCameraMove = false;
+    const currDist = controls.object.position.distanceTo(controls.target);
+    const zoomChanged = Math.abs(currDist - orbitStartCamDistRef.current) > 0.45;
+    const pointerDragged = pointerGestureRef.current?.dragged ?? false;
 
-    const onOrbitStart = () => {
-      didCameraMove = false;
-    };
-
-    const onOrbitChange = () => {
-      didCameraMove = true;
+    if (pointerDragged || zoomChanged) {
+      didOrbitMoveRef.current = true;
       isCameraDraggingRef.current = true;
       cameraDragEndTimeRef.current = Date.now();
       setIsBenchMenuOpen(false);
       setIsTrampolineMenuOpen(false);
       setJuroMenu((prev) => (prev.open ? { ...prev, open: false } : prev));
-    };
+    }
+  }, []);
 
-    const onOrbitEnd = () => {
-      if (didCameraMove) {
-        cameraDragEndTimeRef.current = Date.now();
-      }
-      isCameraDraggingRef.current = false;
-      didCameraMove = false;
-    };
-
-    controls.addEventListener("start", onOrbitStart);
-    controls.addEventListener("change", onOrbitChange);
-    controls.addEventListener("end", onOrbitEnd);
-
-    return () => {
-      controls.removeEventListener("start", onOrbitStart);
-      controls.removeEventListener("change", onOrbitChange);
-      controls.removeEventListener("end", onOrbitEnd);
-    };
+  const handleOrbitEnd = useCallback(() => {
+    if (didOrbitMoveRef.current) {
+      cameraDragEndTimeRef.current = Date.now();
+    }
+    isUserOrbitGestureRef.current = false;
+    isCameraDraggingRef.current = false;
+    didOrbitMoveRef.current = false;
   }, []);
 
   // Imperative drag tracking refs (zero allocations, zero layout thrash, zero re-renders)
@@ -1066,10 +1092,6 @@ export const PetViewport: React.FC = () => {
       }
     }
   }, [recentlyLeveledUp, clearLevelUpAlert, addCoins, addLog, level, pendingEvolutionAlert, showToast]);
-
-  // Real-time local clock tracking for automatic day/night nature atmosphere
-  const [now, setNow] = useState(() => new Date());
-  const isNightSleep = isBedtimeHour(now);
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -1584,63 +1606,6 @@ export const PetViewport: React.FC = () => {
     addLog("interaction", "Juro selesai bermain trampolin dan melangkah kembali ke padang rumput.");
   }, [addLog]);
 
-  const handleToggleSleep = useCallback(() => {
-    if (isSittingOnBench) setIsSittingOnBench(false);
-    if (isBouncingOnTrampoline) setIsBouncingOnTrampoline(false);
-    isHeadingToBenchRef.current = false;
-    isHeadingToTrampolineRef.current = false;
-    setIsBenchMenuOpen(false);
-    setIsTrampolineMenuOpen(false);
-    if (currentState === "sleep") {
-      wakeUp();
-      soundEffects.playWakeUp();
-      if (isNightSleep && energy < 35) {
-        showToast("Juro masih mengantuk dan butuh tidur penuh", "info");
-      }
-      addLog("interaction", "Juro bangun dari waktu istirahatnya.");
-      useCaregiverStore.getState().recordAction(
-        "wake",
-        "Membangunkan Juro dari tidurnya.",
-        {}
-      );
-      wakeCooldownUntilRef.current = Date.now() + 180_000;
-      isHeadingToBedRef.current = false;
-    } else {
-      isHeadingToBedRef.current = true;
-      setWalkCommand({ x: JURO_BED_SLOT_1.x, z: JURO_BED_SLOT_1.z, nonce: Date.now() });
-      addLog("sleep", "Juro berjalan menuju sofa untuk tidur lelap.");
-      useCaregiverStore.getState().recordAction(
-        "sleep",
-        "Menuntun Juro tidur di sofa empuk.",
-        { energy: 35 }
-      );
-      soundEffects.playClick();
-      // If Juro is already resting or near the sofa bed (<0.85m), immediately trigger sleep!
-      if (juroWorldPosRef.current) {
-        const distToSlot = Math.hypot(
-          juroWorldPosRef.current.x - JURO_BED_SLOT_1.x,
-          juroWorldPosRef.current.z - JURO_BED_SLOT_1.z
-        );
-        const distToCenter = Math.hypot(
-          juroWorldPosRef.current.x - JURO_BED_POS.x,
-          juroWorldPosRef.current.z - JURO_BED_POS.z
-        );
-        if (distToSlot < 0.85 || distToCenter < 0.85) {
-          handleBedArrival();
-        }
-      }
-    }
-    setActiveTray("none");
-  }, [currentState, wakeUp, addLog, isSittingOnBench, isBouncingOnTrampoline, handleBedArrival, isNightSleep, energy, showToast]);
-
-  const handleBedClick = useCallback(() => {
-    if (currentState === "sleep") {
-      handlePetClick();
-    } else {
-      handleToggleSleep();
-    }
-  }, [currentState, handlePetClick, handleToggleSleep]);
-
   const handleMenuAction = useCallback(
     (action: "food" | "toy" | "sleep" | "bath") => {
       if (isSittingOnBench) setIsSittingOnBench(false);
@@ -1800,39 +1765,40 @@ export const PetViewport: React.FC = () => {
         onToggleStatDetails={() => setShowStatDetails((prev) => !prev)}
       />
 
-      {/* Floating Retro Radar MiniMap Widget (Top-Right, docked neatly below navbar) */}
-      <div className="absolute top-2 sm:top-2.5 right-2 sm:right-3 z-30 pointer-events-auto">
+      {/* Floating Radar MiniMap Widget (Top-Right, docked neatly below navbar) */}
+      <div className="absolute top-3 right-3 z-30 pointer-events-auto">
         <MiniMap
           playerX={lastPosition?.x ?? 0}
           playerZ={lastPosition?.z ?? 0}
-          routeWaypoints={routeWaypoints}
-          activeDestination={walkCommand ? { x: walkCommand.x, z: walkCommand.z } : null}
-          onNavigatePoint={(x, z) => handleWalkPointSelect(x, z)}
           juroWorldPosRef={juroWorldPosRef}
           juroYawRef={juroYawRef}
         />
       </div>
 
-      {/* Partner Pet Presence Pill in 2-Player Shared Meadow */}
+      {/* Partner Pet Presence Indicator in 2-Player Shared Meadow */}
       {partnerPet && (
-        <div className="absolute top-[104px] sm:top-[114px] right-2 sm:right-3 z-20 pointer-events-auto flex items-center gap-1.5 px-2.5 py-1 bg-warm-white/95 dark:bg-neutral-900/90 backdrop-blur-xs border-2 border-charcoal dark:border-neutral-600 shadow-[2px_2px_0px_#171717] dark:shadow-[2px_2px_0px_#000000]">
+        <div className="absolute top-[98px] sm:top-[110px] right-3 z-20 pointer-events-auto flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-white/95 dark:bg-neutral-900/95 border border-neutral-200/80 dark:border-neutral-800 shadow-sm">
           <span
-            className={`w-2 h-2 rounded-full shrink-0 ${
-              partnerPet.isOnline ? "bg-emerald-500 animate-pulse" : "bg-neutral-400"
+            className={`w-1.5 h-1.5 rounded-full shrink-0 ${
+              partnerPet.isOnline ? "bg-emerald-500" : "bg-neutral-400"
             }`}
           />
-          <span className="pixel-text text-[9px] text-charcoal dark:text-neutral-200">
-            {partnerPet.name} ({partnerPet.ownerName}) · Lv.{partnerPet.level} {partnerPet.isOnline ? "(Online)" : "(Istirahat)"}
+          <span className="text-[11px] font-medium text-neutral-700 dark:text-neutral-200 tabular-nums">
+            {partnerPet.name} · Lv.{partnerPet.level}
           </span>
         </div>
       )}
 
-      {/* 3D Canvas with Realistic Soft Shadows, Atmospheric Sky & Fog */}
+      {/* 3D Canvas with Sharp HiDPI Support, Atmospheric Sky & Adaptive Lighting */}
       <Canvas
-        shadows={{ type: THREE.PCFShadowMap }}
+        shadows={graphicsProfile.shadowsEnabled ? { type: THREE.PCFShadowMap } : false}
         camera={{ position: [11.5, 13.5, 13.5], fov: 42, near: 0.5, far: 180 }}
-        dpr={[1, adaptiveDpr]}
-        performance={{ min: 0.75, max: 1.4 }}
+        dpr={graphicsProfile.dpr}
+        onCreated={({ gl }) => {
+          if (detectSoftwareWebGL(gl)) {
+            setIsSoftwareGl(true);
+          }
+        }}
         gl={{
           antialias: true,
           alpha: false,
@@ -1866,8 +1832,8 @@ export const PetViewport: React.FC = () => {
             position={[22, 30, 14]}
             color={activePalette.sunColor}
             intensity={activePalette.sunIntensity}
-            castShadow
-            shadow-mapSize={[shadowResolution, shadowResolution]}
+            castShadow={graphicsProfile.shadowsEnabled}
+            shadow-mapSize={[graphicsProfile.shadowMapSize || 512, graphicsProfile.shadowMapSize || 512]}
             shadow-camera-near={4}
             shadow-camera-far={80}
             shadow-camera-left={-28}
@@ -1889,14 +1855,11 @@ export const PetViewport: React.FC = () => {
             color="#FFF5EA"
           />
 
-          {/* Outdoor Nature Environment (Clickable Map, Interactive Shop & Mine Cave!) */}
+          {/* Outdoor Nature Environment (Interactive Landmarks: Shop, Mine Cave, Bed, Bench, Trampoline) */}
           <OutdoorEnvironment
             theme={activeTheme}
             weather={normalizedWeather}
-            onWalkPointSelect={handleWalkPointSelect}
-            walkCommand={walkCommand}
-            routeWaypoints={routeWaypoints}
-            juroWorldPosRef={juroWorldPosRef}
+            graphicsProfile={graphicsProfile}
             onOpenShop={handleOpenShopFromMap}
             onOpenMine={handleOpenMineFromMap}
             onBedClick={handleBedClick}
@@ -1923,6 +1886,7 @@ export const PetViewport: React.FC = () => {
             juroYawRef={juroYawRef}
             walkCommand={walkCommand}
             onPetClick={handlePetClick}
+            onPetPointerDown={handlePetPointerDown}
             isHeadingToBedRef={isHeadingToBedRef}
             onBedArrival={handleBedArrival}
             isHeadingToBenchRef={isHeadingToBenchRef}
@@ -1931,9 +1895,12 @@ export const PetViewport: React.FC = () => {
             isHeadingToTrampolineRef={isHeadingToTrampolineRef}
             onTrampolineArrival={handleTrampolineArrival}
             isBouncingOnTrampoline={isBouncingOnTrampoline}
-            isRaining={weather === "rain"}
+            isRaining={isRainingWeather(weather)}
             isDizzyRef={isDizzyRef}
             level={level}
+            sphereSegments={graphicsProfile.juroSphereSegs}
+            usePhysicalMaterial={graphicsProfile.usePhysicalJuroBody}
+            shadowsEnabled={graphicsProfile.shadowsEnabled}
             isBlowingBubbles={
               dragVisual !== null &&
               dragVisual.moved &&
@@ -1954,11 +1921,14 @@ export const PetViewport: React.FC = () => {
               customSkin={partnerPet.activeSkin}
               customHat={partnerPet.activeHat}
               level={partnerPet.level}
-              partnerState={partnerPet.currentState as any}
+              partnerState={partnerPet.currentState as PetBehaviorState}
               isPartnerOnline={partnerPet.isOnline}
               initialPosition={JURO_BED_SLOT_2}
               partnerName={partnerPet.name}
-              isRaining={weather === "rain"}
+              isRaining={isRainingWeather(weather)}
+              sphereSegments={graphicsProfile.juroSphereSegs}
+              usePhysicalMaterial={graphicsProfile.usePhysicalJuroBody}
+              shadowsEnabled={graphicsProfile.shadowsEnabled}
               onPetClick={() => {
                 soundEffects.playPop();
                 showToast(`Menyapa ${partnerPet.name} milik ${partnerPet.ownerName}!`, "info");
@@ -1978,6 +1948,9 @@ export const PetViewport: React.FC = () => {
             enablePan={cameraMode === "free"}
             enableZoom={true}
             enableRotate={cameraMode !== "isometric"}
+            onStart={handleOrbitStart}
+            onChange={handleOrbitChange}
+            onEnd={handleOrbitEnd}
             mouseButtons={{
               LEFT: THREE.MOUSE.ROTATE,
               MIDDLE: THREE.MOUSE.DOLLY,
@@ -2143,7 +2116,7 @@ export const PetViewport: React.FC = () => {
             b.popped ? "animate-soap-pop" : "animate-soap-bubble"
           }`}
         >
-          <div className="relative w-full h-full rounded-full border border-white/70 shadow-[inset_0_0_8px_rgba(255,255,255,0.7),0_0_12px_rgba(56,189,248,0.4),inset_-3px_-3px_8px_rgba(244,114,182,0.45)] bg-[radial-gradient(circle_at_32%_28%,rgba(255,255,255,0.92)_0%,rgba(224,242,254,0.55)_32%,rgba(244,114,182,0.35)_68%,rgba(56,189,248,0.5)_100%)] backdrop-blur-[0.5px]">
+          <div className="relative w-full h-full rounded-full border border-white/70 shadow-[inset_0_0_8px_rgba(255,255,255,0.7),0_0_12px_rgba(56,189,248,0.4),inset_-3px_-3px_8px_rgba(244,114,182,0.45)] bg-[radial-gradient(circle_at_32%_28%,rgba(255,255,255,0.92)_0%,rgba(224,242,254,0.55)_32%,rgba(244,114,182,0.35)_68%,rgba(56,189,248,0.5)_100%)]">
             {/* Glossy specular reflection highlights */}
             <div className="absolute top-[16%] left-[20%] w-[26%] h-[26%] rounded-full bg-white/95" />
             <div className="absolute bottom-[20%] right-[22%] w-[14%] h-[14%] rounded-full bg-pink-200/60" />
@@ -2151,12 +2124,11 @@ export const PetViewport: React.FC = () => {
         </div>
       ))}
 
-      {/* Simple Retro Evolution Alert (Level 5 & Level 10 Milestones) */}
+      {/* Evolution Alert (Level 5 & Level 10 Milestones) */}
       {pendingEvolutionAlert && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-charcoal/50 backdrop-blur-xs p-4">
-          <div className="animate-tray-enter w-full max-w-xs bg-warm-white dark:bg-neutral-900 border-2 border-charcoal dark:border-neutral-600 shadow-[4px_4px_0px_#171717] dark:shadow-[4px_4px_0px_#000000] p-4 text-center space-y-3">
-            {/* Crisp Pixel Art Stage Icon */}
-            <div className="w-12 h-12 mx-auto bg-neutral-100 dark:bg-neutral-800 border-2 border-charcoal dark:border-neutral-600 shadow-[2px_2px_0px_#171717] dark:shadow-[2px_2px_0px_#000000] flex items-center justify-center">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-neutral-950/55 p-4">
+          <div className="animate-tray-enter w-full max-w-xs rounded-2xl bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-700 shadow-xl p-5 text-center space-y-4">
+            <div className="w-12 h-12 mx-auto rounded-xl bg-orange-50 dark:bg-neutral-800 border border-orange-200 dark:border-neutral-700 flex items-center justify-center">
               <svg width="32" height="32" viewBox="0 0 16 16" shapeRendering="crispEdges">
                 {pendingEvolutionAlert.stageNumber === 2 && (
                   <>
@@ -2188,21 +2160,21 @@ export const PetViewport: React.FC = () => {
               </svg>
             </div>
 
-            <div className="space-y-1">
-              <h2 className="pixel-text text-xs uppercase font-bold text-charcoal dark:text-white tracking-wider">
+            <div className="space-y-1.5">
+              <h2 className="text-base font-bold text-neutral-900 dark:text-white">
                 Juro Berevolusi!
               </h2>
-              <p className="pixel-text text-[10px] text-neutral-600 dark:text-neutral-300">
-                Wujud Baru:{" "}
-                <span className="text-juro-orange font-bold uppercase">
+              <p className="text-sm text-neutral-600 dark:text-neutral-300">
+                Wujud baru:{" "}
+                <span className="text-juro-orange font-semibold">
                   {pendingEvolutionAlert.stageName}
                 </span>{" "}
                 (Level {pendingEvolutionAlert.level})
               </p>
-              <p className="pixel-text text-[8px] text-neutral-500 dark:text-neutral-400">
+              <p className="text-xs text-neutral-500 dark:text-neutral-400 leading-relaxed">
                 {pendingEvolutionAlert.stageNumber === 3
-                  ? "Juro kini berukuran dewasa megah dengan mahkota emas!"
-                  : "Tubuh Juro membesar dan makin lincah membal!"}
+                  ? "Juro kini berukuran dewasa megah dengan mahkota emas."
+                  : "Tubuh Juro membesar dan makin lincah membal."}
               </p>
             </div>
 
@@ -2212,7 +2184,7 @@ export const PetViewport: React.FC = () => {
                 soundEffects.playClick();
                 clearEvolutionAlert();
               }}
-              className="w-full py-2 bg-juro-orange text-white border-2 border-charcoal dark:border-neutral-700 shadow-[2px_2px_0px_#171717] hover:bg-orange-600 active:translate-x-[1px] active:translate-y-[1px] pixel-text text-[9px] uppercase font-bold cursor-pointer transition-colors"
+              className="w-full py-2.5 rounded-xl bg-juro-orange text-white text-sm font-semibold hover:bg-orange-600 active:scale-[0.98] cursor-pointer transition-all"
             >
               Lanjutkan
             </button>

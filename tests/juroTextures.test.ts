@@ -61,20 +61,24 @@ describe("Juro Textures & Procedural Canvas Assets", () => {
     expect(tex?.colorSpace).toBe(THREE.SRGBColorSpace);
   });
 
-  it("creates cartoon spiral eye texture with sRGB colorSpace", () => {
+  it("creates cartoon spiral eye texture with sRGB colorSpace and LinearFilter", () => {
     const tex = createDizzyEyeTexture();
     expect(tex).toBeInstanceOf(THREE.CanvasTexture);
     expect(tex?.image.width).toBe(128);
     expect(tex?.image.height).toBe(128);
     expect(tex?.colorSpace).toBe(THREE.SRGBColorSpace);
+    expect(tex?.minFilter).toBe(THREE.LinearFilter);
+    expect(tex?.magFilter).toBe(THREE.LinearFilter);
   });
 
-  it("creates wavy mouth texture with sRGB colorSpace", () => {
+  it("creates wavy mouth texture with sRGB colorSpace and LinearFilter", () => {
     const tex = createDizzyMouthTexture();
     expect(tex).toBeInstanceOf(THREE.CanvasTexture);
     expect(tex?.image.width).toBe(128);
     expect(tex?.image.height).toBe(64);
     expect(tex?.colorSpace).toBe(THREE.SRGBColorSpace);
+    expect(tex?.minFilter).toBe(THREE.LinearFilter);
+    expect(tex?.magFilter).toBe(THREE.LinearFilter);
   });
 
   it("creates crisp golden pixel star texture with sRGB colorSpace and NearestFilter", () => {

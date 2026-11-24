@@ -33,13 +33,13 @@ export function PixelSegmented<T extends string = string>({
   };
 
   const sizeClasses = {
-    sm: "px-2 py-1 text-[9px] gap-1",
-    md: "px-2 sm:px-3 py-1.5 text-[9px] sm:text-[10px] gap-1 sm:gap-1.5",
+    sm: "px-3 py-1.5 text-xs gap-1.5",
+    md: "px-3.5 py-2 text-xs sm:text-sm gap-2",
   };
 
   return (
     <div
-      className={`bg-neutral-100 dark:bg-neutral-900/60 p-1 border-2 border-charcoal/30 dark:border-neutral-700 ${
+      className={`rounded-xl bg-neutral-100 dark:bg-neutral-800/80 p-1 border border-neutral-200/80 dark:border-neutral-700/70 ${
         fullWidthOnMobile
           ? "grid grid-flow-col auto-cols-fr gap-1 w-full sm:inline-flex sm:w-fit sm:flex-nowrap overflow-x-auto"
           : "inline-flex flex-nowrap items-center gap-1 w-fit max-w-full overflow-x-auto shrink-0"
@@ -53,13 +53,13 @@ export function PixelSegmented<T extends string = string>({
             type="button"
             onClick={() => handleSelect(opt.value)}
             className={`
-              pixel-text uppercase tracking-wider font-bold transition-all duration-75 select-none
-              inline-flex items-center justify-center whitespace-nowrap cursor-pointer border-2 min-w-0
+              rounded-lg font-medium transition-all duration-150 select-none
+              inline-flex items-center justify-center whitespace-nowrap cursor-pointer min-w-0
               ${sizeClasses[size]}
               ${
                 isSelected
-                  ? "bg-charcoal text-white border-charcoal shadow-[2px_2px_0px_#F97316] dark:border-neutral-600"
-                  : "bg-white dark:bg-dark-surface text-charcoal/80 dark:text-neutral-300 border-charcoal/20 hover:border-charcoal dark:hover:border-neutral-500"
+                  ? "bg-white dark:bg-neutral-900 text-neutral-900 dark:text-white shadow-xs font-semibold"
+                  : "bg-transparent text-neutral-600 dark:text-neutral-300 hover:text-neutral-900 dark:hover:text-white"
               }
             `}
           >
@@ -67,11 +67,11 @@ export function PixelSegmented<T extends string = string>({
             {opt.badge && (
               <span
                 className={`
-                  text-[8px] px-1 border shrink-0
+                  text-[11px] px-1.5 py-0.5 rounded-full shrink-0 tabular-nums font-semibold
                   ${
                     isSelected
-                      ? "bg-juro-orange text-white border-white/40"
-                      : "bg-neutral-200 dark:bg-neutral-800 text-charcoal dark:text-neutral-300 border-charcoal/30"
+                      ? "bg-orange-100 text-orange-700 dark:bg-orange-500/20 dark:text-orange-300"
+                      : "bg-neutral-200/80 dark:bg-neutral-700 text-neutral-600 dark:text-neutral-300"
                   }
                 `}
               >

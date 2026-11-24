@@ -1,6 +1,6 @@
 /**
  * Juro Living - Gemini AI Chat Service
- * Connects Juro to Google Gemini 2.5 Flash API for cute, witty, and contextual pet replies.
+ * Connects Juro to the server-side Gemini API endpoint for cute, witty, and contextual pet replies.
  */
 
 import {
@@ -53,10 +53,7 @@ export interface PetChatContext {
   caregiverRelationship?: import("../types/caregiver").CaregiverRelationshipInfo;
 }
 
-const STORAGE_KEY = "juro_gemini_api_key";
-const GEMINI_MODEL = "gemini-3.5-flash-lite";
-
-// Canned in-character witty fallbacks when offline or before API key is provided
+// Canned in-character witty fallbacks when offline or server is unreachable
 export const JURO_FALLBACK_REPLIES = [
   "Senang bisa berbincang denganmu. Ada yang ingin kita lakukan bersama hari ini?",
   "Juro siap menemani aktivitasmu di lembah hari ini.",
@@ -457,82 +454,6 @@ export function getContextualFallbackReply(
 }
 
 /**
- * Retrieve the active Gemini API key:
- * Priority #1: Built-in web key from Vercel / .env.local (always used for all visitors)
- * Priority #2: Fallback to localStorage personal key if no built-in web key is set
- */
-export function getGeminiApiKey(): string | null {
-  // 1. Built-in web key takes top priority so the website always uses the site's default key
-  const fromEnv = import.meta.env.VITE_GEMINI_API_KEY;
-  if (fromEnv && fromEnv.trim().length > 0) {
-    return fromEnv.trim();
-  }
-
-  // 2. Fallback to localStorage if no environment key is embedded
-  try {
-    const fromStorage = localStorage.getItem(STORAGE_KEY);
-    if (fromStorage && fromStorage.trim().length > 0) {
-      return fromStorage.trim();
-    }
-  } catch {
-    // LocalStorage unavailable (e.g. sandboxed test)
-  }
-
-  return null;
-}
-
-/**
- * Determine the source of the active Gemini API key:
- * - "env": global site key provided via VITE_GEMINI_API_KEY (always used)
- * - "custom": personal key stored in this browser's localStorage
- * - "none": no key set, running in offline/default fallback mode
- */
-export function getGeminiKeySource(): "env" | "custom" | "none" {
-  const fromEnv = import.meta.env.VITE_GEMINI_API_KEY;
-  if (fromEnv && fromEnv.trim().length > 0) {
-    return "env";
-  }
-
-  try {
-    const fromStorage = localStorage.getItem(STORAGE_KEY);
-    if (fromStorage && fromStorage.trim().length > 0) {
-      return "custom";
-    }
-  } catch {
-    // Ignored
-  }
-
-  return "none";
-}
-
-/**
- * Retrieve only the user's custom personal key from localStorage
- */
-export function getCustomGeminiApiKey(): string {
-  try {
-    return localStorage.getItem(STORAGE_KEY) || "";
-  } catch {
-    return "";
-  }
-}
-
-/**
- * Store user-provided Gemini API key in localStorage
- */
-export function setGeminiApiKey(apiKey: string): void {
-  try {
-    const trimmed = apiKey.trim();
-    if (trimmed.length > 0) {
-      localStorage.setItem(STORAGE_KEY, trimmed);
-    } else {
-      localStorage.removeItem(STORAGE_KEY);
-    }
-  } catch {
-    // Ignored in restricted environments
-  }
-}
-
-/**
  * Build a contextual system instruction prompt tailored to Juro's pet personality
  */
 export function buildJuroSystemPrompt(context?: PetChatContext): string {
@@ -684,7 +605,7 @@ export function sanitizeJuroReply(rawText: string): string {
 }
 
 /**
- * Send a chat message to Gemini API and receive Juro's cute in-character reply
+ * Send a chat message to the server-side Gemini API endpoint and receive Juro's cute in-character reply
  */
 export async function chatWithJuro(
   userMessage: string,
@@ -705,43 +626,24 @@ export async function chatWithJuro(
     trimmedInput ||
     "Sampaikan tanggapan singkat dan ramah sesuai aktivitas yang sedang kamu lakukan!";
 
-  const apiKey = getGeminiApiKey();
-
-  // If no Gemini API key is configured, respond with a contextual in-character fallback
-  if (!apiKey) {
-    const fallbackReply = getContextualFallbackReply(context, promptText);
-    addChatMessage("juro", fallbackReply);
-    return fallbackReply;
-  }
-
   const systemInstruction = buildJuroSystemPrompt(context);
 
   try {
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${apiKey}`;
-
     // Format multi-turn conversation history with alternating turns
     const formattedContents = getFormattedGeminiHistory(promptText);
 
-    const requestBody = {
-      systemInstruction: {
-        parts: [{ text: systemInstruction }],
-      },
-      contents: formattedContents,
-      generationConfig: {
-        temperature: 0.85,
-        maxOutputTokens: 45,
-      },
-    };
-
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 9000);
+    const timeoutId = setTimeout(() => controller.abort(), 12000);
 
-    const response = await fetch(url, {
+    const response = await fetch("/api/gemini/chat", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
       },
-      body: JSON.stringify(requestBody),
+      body: JSON.stringify({
+        systemInstruction,
+        contents: formattedContents,
+      }),
       signal: controller.signal,
     });
 
@@ -749,17 +651,16 @@ export async function chatWithJuro(
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.warn("Gemini API error:", response.status, errorText);
+      console.warn("Gemini server API error:", response.status, errorText);
       const fallback = getContextualFallbackReply(context, promptText);
       addChatMessage("juro", fallback);
       return fallback;
     }
 
-    const data = await response.json();
-    const replyText =
-      data.candidates?.[0]?.content?.parts?.[0]?.text;
+    const data = (await response.json()) as { text?: unknown };
+    const replyText = typeof data.text === "string" ? data.text : "";
 
-    if (replyText && typeof replyText === "string") {
+    if (replyText) {
       const sanitized = sanitizeJuroReply(replyText);
       addChatMessage("juro", sanitized);
       return sanitized;

@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import type { ThemeMode, WeatherMode } from "../types/ui";
+import type { GraphicsQualitySetting } from "../engine/world/graphicsProfile";
 
 export type ToastTone = "success" | "warn" | "info";
 export type ActionMenuStyle = "floating" | "dock";
@@ -18,6 +19,7 @@ interface UIState {
   soundEnabled: boolean;
   isMobileNavOpen: boolean;
   actionMenuStyle: ActionMenuStyle;
+  graphicsQuality: GraphicsQualitySetting;
   toast: UIToast | null;
   cameraResetNonce: number;
   toggleTheme: () => void;
@@ -26,6 +28,7 @@ interface UIState {
   toggleSound: () => void;
   setMobileNav: (open: boolean) => void;
   setActionMenuStyle: (style: ActionMenuStyle) => void;
+  setGraphicsQuality: (quality: GraphicsQualitySetting) => void;
   showToast: (text: string, tone?: ToastTone) => void;
   clearToast: () => void;
   triggerCameraReset: () => void;
@@ -41,12 +44,23 @@ const getInitialActionMenuStyle = (): ActionMenuStyle => {
   return "floating";
 };
 
+const getInitialGraphicsQuality = (): GraphicsQualitySetting => {
+  if (typeof window !== "undefined" && window.localStorage) {
+    const saved = window.localStorage.getItem("juro_graphics_quality");
+    if (saved === "auto" || saved === "low" || saved === "balanced" || saved === "high") {
+      return saved;
+    }
+  }
+  return "auto";
+};
+
 export const useUIStore = create<UIState>((set) => ({
   theme: "light",
   weather: "clear",
   soundEnabled: true,
   isMobileNavOpen: false,
   actionMenuStyle: getInitialActionMenuStyle(),
+  graphicsQuality: getInitialGraphicsQuality(),
   toast: null,
   cameraResetNonce: 0,
   toggleTheme: () =>
@@ -84,6 +98,12 @@ export const useUIStore = create<UIState>((set) => ({
       window.localStorage.setItem("juro_action_menu_style", style);
     }
     set({ actionMenuStyle: style });
+  },
+  setGraphicsQuality: (quality) => {
+    if (typeof window !== "undefined" && window.localStorage) {
+      window.localStorage.setItem("juro_graphics_quality", quality);
+    }
+    set({ graphicsQuality: quality });
   },
   showToast: (text, tone = "success") =>
     set({

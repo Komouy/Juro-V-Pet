@@ -13,29 +13,29 @@ export const Badge: React.FC<BadgeProps> = ({
 }) => {
   const variantStyles = {
     default:
-      "bg-white text-charcoal border-charcoal shadow-[2px_2px_0px_#171717] dark:bg-dark-surface dark:text-white dark:border-neutral-600 dark:shadow-[2px_2px_0px_#000000]",
+      "bg-neutral-100 text-neutral-700 border-neutral-200 dark:bg-neutral-800 dark:text-neutral-200 dark:border-neutral-700",
     orange:
-      "bg-juro-orange text-white border-charcoal shadow-[2px_2px_0px_#171717] dark:border-neutral-600 dark:shadow-[2px_2px_0px_#000000]",
+      "bg-orange-50 text-orange-700 border-orange-200 dark:bg-orange-500/15 dark:text-orange-300 dark:border-orange-500/30",
     success:
-      "bg-emerald-500 text-white border-charcoal shadow-[2px_2px_0px_#171717] dark:border-neutral-600 dark:shadow-[2px_2px_0px_#000000]",
+      "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-500/15 dark:text-emerald-300 dark:border-emerald-500/30",
     good:
-      "bg-emerald-500 text-white border-charcoal shadow-[2px_2px_0px_#171717] dark:border-neutral-600 dark:shadow-[2px_2px_0px_#000000]",
+      "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-500/15 dark:text-emerald-300 dark:border-emerald-500/30",
     warning:
-      "bg-amber-400 text-charcoal border-charcoal shadow-[2px_2px_0px_#171717] dark:border-neutral-600 dark:shadow-[2px_2px_0px_#000000]",
+      "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-500/15 dark:text-amber-300 dark:border-amber-500/30",
     charcoal:
-      "bg-charcoal text-white border-charcoal shadow-[2px_2px_0px_#F97316] dark:bg-neutral-800 dark:border-neutral-600 dark:shadow-[2px_2px_0px_#F97316]",
+      "bg-neutral-900 text-white border-neutral-900 dark:bg-neutral-700 dark:text-neutral-100 dark:border-neutral-600",
   };
 
   const sizeStyles = {
-    sm: "px-1.5 py-0.5 text-[8px]",
-    md: "px-2.5 py-1 text-[9px]",
+    sm: "px-2 py-0.5 text-[11px]",
+    md: "px-2.5 py-0.5 text-xs",
   };
 
   return (
     <span
       className={`
-        pixel-text inline-flex items-center uppercase tracking-wider font-bold
-        border-2 select-none
+        inline-flex items-center rounded-full font-medium
+        border select-none whitespace-nowrap
         ${sizeStyles[size]}
         ${variantStyles[variant]}
       `}

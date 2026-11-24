@@ -35,9 +35,6 @@ function lazyWithRetry<T extends React.ComponentType<any>>(
   });
 }
 
-const HomePage = lazyWithRetry(() =>
-  import("../pages/HomePage").then((m) => ({ default: m.HomePage }))
-);
 const ShopPage = lazyWithRetry(() =>
   import("../pages/ShopPage").then((m) => ({ default: m.ShopPage }))
 );
@@ -52,10 +49,10 @@ const SettingsPage = lazyWithRetry(() =>
 );
 
 const PageLoader: React.FC = () => (
-  <div className="flex flex-col items-center justify-center min-h-[50vh] gap-3">
-    <div className="w-5 h-5 bg-juro-orange border-2 border-charcoal animate-bounce shadow-[2px_2px_0px_#171717]" />
-    <span className="pixel-text text-[10px] text-charcoal dark:text-neutral-200 uppercase tracking-wider">
-      Memuat Halaman...
+  <div className="flex flex-col items-center justify-center py-16 gap-3">
+    <div className="w-6 h-6 rounded-full border-2 border-juro-orange border-t-transparent animate-spin" />
+    <span className="text-xs sm:text-sm font-medium text-neutral-600 dark:text-neutral-300">
+      Memuat...
     </span>
   </div>
 );
@@ -86,15 +83,15 @@ export const RouteErrorBoundary: React.FC = () => {
   }, [isChunkError]);
 
   return (
-    <div className="min-h-screen bg-sand dark:bg-charcoal flex items-center justify-center p-4">
-      <div className="max-w-md w-full bg-white dark:bg-neutral-900 border-2 border-charcoal dark:border-neutral-700 shadow-[4px_4px_0px_#171717] p-6 text-center space-y-4">
-        <div className="w-12 h-12 mx-auto bg-amber-100 dark:bg-amber-950/40 border-2 border-charcoal flex items-center justify-center">
+    <div className="min-h-screen bg-neutral-50 dark:bg-dark-bg flex items-center justify-center p-4">
+      <div className="max-w-md w-full bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-2xl shadow-md p-6 text-center space-y-4">
+        <div className="w-12 h-12 mx-auto rounded-xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 flex items-center justify-center">
           <AlertTriangle className="text-amber-600 dark:text-amber-400" size={24} />
         </div>
-        <h1 className="pixel-text text-sm font-bold text-charcoal dark:text-white uppercase tracking-wider">
+        <h1 className="text-base font-bold text-neutral-900 dark:text-white">
           {isChunkError ? "Pembaruan Versi Baru" : "Terjadi Kendala Memuat"}
         </h1>
-        <p className="pixel-text text-[9.5px] text-neutral-600 dark:text-neutral-400 leading-relaxed">
+        <p className="text-sm text-neutral-600 dark:text-neutral-400 leading-relaxed">
           {isChunkError
             ? "Aplikasi baru saja diperbarui ke versi terbaru. Halaman akan dimuat ulang secara otomatis."
             : "Halaman ini mengalami kendala sementara saat dimuat."}
@@ -126,7 +123,7 @@ export const router = createBrowserRouter([
     children: [
       {
         index: true,
-        element: withSuspense(HomePage),
+        element: null,
       },
       {
         path: "shop",
@@ -150,7 +147,7 @@ export const router = createBrowserRouter([
       },
       {
         path: "*",
-        element: withSuspense(HomePage),
+        element: <Navigate to="/" replace />,
       },
     ],
   },

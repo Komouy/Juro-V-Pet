@@ -18,6 +18,7 @@ export interface PixelTextureSet {
   signCafe: THREE.CanvasTexture;
   signPost: THREE.CanvasTexture;
   contactShadow: THREE.CanvasTexture;
+  applyAnisotropy: (anisotropy: number) => void;
   dispose: () => void;
 }
 
@@ -354,19 +355,19 @@ export function createPixelTextureSet(): PixelTextureSet {
   // 14. Signs (keep crisp retro legibility)
   const signTunnel = track(
     makeSoftCanvas(
-      128,
-      32,
+      256,
+      64,
       (ctx) => {
         ctx.fillStyle = "#473629";
-        ctx.fillRect(0, 0, 128, 32);
+        ctx.fillRect(0, 0, 256, 64);
         ctx.strokeStyle = "#f2c15a";
-        ctx.lineWidth = 3;
-        ctx.strokeRect(2, 2, 124, 28);
+        ctx.lineWidth = 5;
+        ctx.strokeRect(4, 4, 248, 56);
         ctx.fillStyle = "#ffe599";
-        ctx.font = "bold 14px sans-serif";
+        ctx.font = "bold 26px sans-serif";
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";
-        ctx.fillText("TEROWONGAN", 64, 17);
+        ctx.fillText("TEROWONGAN", 128, 34);
       },
       1,
       1,
@@ -377,19 +378,19 @@ export function createPixelTextureSet(): PixelTextureSet {
 
   const signCafe = track(
     makeSoftCanvas(
-      128,
-      32,
+      256,
+      64,
       (ctx) => {
         ctx.fillStyle = "#633926";
-        ctx.fillRect(0, 0, 128, 32);
+        ctx.fillRect(0, 0, 256, 64);
         ctx.strokeStyle = "#fae8cb";
-        ctx.lineWidth = 3;
-        ctx.strokeRect(2, 2, 124, 28);
+        ctx.lineWidth = 5;
+        ctx.strokeRect(4, 4, 248, 56);
         ctx.fillStyle = "#ffdf9e";
-        ctx.font = "bold 14px sans-serif";
+        ctx.font = "bold 28px sans-serif";
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";
-        ctx.fillText("KAFE SENJA", 64, 17);
+        ctx.fillText("KAFE SENJA", 128, 34);
       },
       1,
       1,
@@ -400,19 +401,19 @@ export function createPixelTextureSet(): PixelTextureSet {
 
   const signPost = track(
     makeSoftCanvas(
-      96,
-      32,
+      192,
+      64,
       (ctx) => {
         ctx.fillStyle = "#b4743f";
-        ctx.fillRect(0, 0, 96, 32);
+        ctx.fillRect(0, 0, 192, 64);
         ctx.fillStyle = "#8b5428";
-        ctx.fillRect(0, 0, 96, 4);
-        ctx.fillRect(0, 28, 96, 4);
+        ctx.fillRect(0, 0, 192, 8);
+        ctx.fillRect(0, 56, 192, 8);
         ctx.fillStyle = "#fff6e0";
-        ctx.font = "bold 11px sans-serif";
+        ctx.font = "bold 20px sans-serif";
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";
-        ctx.fillText("POS PANDANG", 48, 17);
+        ctx.fillText("POS PANDANG", 96, 33);
       },
       1,
       1,
@@ -459,6 +460,13 @@ export function createPixelTextureSet(): PixelTextureSet {
     signCafe,
     signPost,
     contactShadow,
+    applyAnisotropy: (anisotropy: number) => {
+      const clamped = Math.max(1, Math.min(16, anisotropy));
+      for (const tex of created) {
+        tex.anisotropy = clamped;
+        tex.needsUpdate = true;
+      }
+    },
     dispose: () => {
       for (const tex of created) {
         tex.dispose();

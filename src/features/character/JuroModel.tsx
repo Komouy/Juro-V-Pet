@@ -33,6 +33,8 @@ import {
 import { findPath, getGlobalNavGrid } from "../../engine/world/pathfinding";
 import { isBedtimeHour } from "../../utils/timeOfDay";
 import { shouldShowRainLeaf } from "./juroHelpers";
+import { buildJuroBodyGeometry } from "./juroBodyGeometry";
+import { JuroHeadwear } from "./JuroHats";
 
 // Well-proportioned chibi storybook scale matching valley landmarks, bridge and furniture
 const JURO_BASE_SCALE = 1.05;
@@ -49,6 +51,8 @@ const _bedTargetVec = new THREE.Vector3();
 const _benchTargetVec = new THREE.Vector3();
 const _trampolineTargetVec = new THREE.Vector3();
 const _wanderTargetVec = new THREE.Vector3();
+const _impulseDown = new THREE.Vector3(0, -0.35, 0);
+const _impulseJump = new THREE.Vector3(0, 2.8, 0);
 
 /**
  * Framerate-independent exponential damping for scalar values.
@@ -94,6 +98,7 @@ export interface JuroModelProps {
   juroScreenPosRef?: React.RefObject<JuroScreenTarget>;
   walkCommand?: WalkCommand | null;
   onPetClick?: (screenPos: { x: number; y: number }) => void;
+  onPetPointerDown?: () => void;
   juroWorldPosRef?: React.RefObject<THREE.Vector3>;
   juroYawRef?: React.RefObject<number>;
   isHeadingToBedRef?: React.RefObject<boolean>;
@@ -109,6 +114,9 @@ export interface JuroModelProps {
   isRaining?: boolean;
   isDizzyRef?: React.RefObject<boolean>;
   level?: number;
+  sphereSegments?: [number, number];
+  usePhysicalMaterial?: boolean;
+  shadowsEnabled?: boolean;
   // Dual-Pet 2-Player Properties
   customSkin?: string;
   customHat?: string;
@@ -127,6 +135,7 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
   juroScreenPosRef,
   walkCommand,
   onPetClick,
+  onPetPointerDown,
   juroWorldPosRef,
   juroYawRef,
   isHeadingToBedRef,
@@ -142,6 +151,9 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
   isRaining = false,
   isDizzyRef,
   level = 1,
+  sphereSegments = [44, 32],
+  usePhysicalMaterial = true,
+  shadowsEnabled = true,
   customSkin,
   customHat,
   isPartner = false,
@@ -256,7 +268,14 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
   // Interactive Bath 3D effects (GPU-instanced for smooth mobile performance)
   const soapFoamInstRef = useRef<THREE.InstancedMesh>(null);
   const waterDropsInstRef = useRef<THREE.InstancedMesh>(null);
-  const petPointerDownPosRef = useRef<{ x: number; y: number; time: number } | null>(null);
+  const petPointerDownPosRef = useRef<{
+    x: number;
+    y: number;
+    time: number;
+    pointerId: number;
+    isTouch: boolean;
+    clicked: boolean;
+  } | null>(null);
 
   const {
     currentState: storeState,
@@ -276,21 +295,25 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
   // Behavior Finite State Machine
   const fsm = useMemo(() => new BehaviorStateMachine("idle"), []);
 
-  // Crisp Zzz sprite, soft shadow & dizzy sprite textures (disposed cleanly on unmount)
+  // Cached singleton Zzz, contact shadow & dizzy textures (retained across route transitions)
   const sleepZTexture = useMemo(() => createSleepZTexture(), []);
   const softShadowTexture = useMemo(() => createSoftShadowTexture(), []);
   const dizzyEyeTexture = useMemo(() => createDizzyEyeTexture(), []);
   const dizzyMouthTexture = useMemo(() => createDizzyMouthTexture(), []);
   const dizzyStarTexture = useMemo(() => createDizzyStarTexture(), []);
+
+  // Cache prefers-reduced-motion preference instead of querying DOM every frame
+  const prefersReducedMotionRef = useRef(false);
   useEffect(() => {
-    return () => {
-      sleepZTexture?.dispose();
-      softShadowTexture?.dispose();
-      dizzyEyeTexture?.dispose();
-      dizzyMouthTexture?.dispose();
-      dizzyStarTexture?.dispose();
+    if (typeof window === "undefined" || typeof window.matchMedia !== "function") return;
+    const mq = window.matchMedia("(prefers-reduced-motion: reduce)");
+    prefersReducedMotionRef.current = mq.matches;
+    const onChange = (e: MediaQueryListEvent) => {
+      prefersReducedMotionRef.current = e.matches;
     };
-  }, [sleepZTexture, softShadowTexture, dizzyEyeTexture, dizzyMouthTexture, dizzyStarTexture]);
+    mq.addEventListener("change", onChange);
+    return () => mq.removeEventListener("change", onChange);
+  }, []);
 
   // 3D Spring oscillator for realistic gelatin physics (persists across all behavior states)
   const spring = useMemo(() => {
@@ -524,80 +547,101 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
 
   const { camera, size } = useThree();
 
-  // 1. Sculpted Chubby Jelly Body Geometry with Smooth Vertex Colors
-  const hasHat = Boolean(activeHat && activeHat !== "hat-none");
-  const outerBodyGeometry = useMemo(() => {
-    const geo = new THREE.SphereGeometry(1.0, 64, 48);
-    const pos = geo.attributes.position;
-    const colors = new Float32Array(pos.count * 3);
-    const v = new THREE.Vector3();
-
-    const faceCenter = new THREE.Vector3(0, 0.02, 1.02);
-    const cCenter = new THREE.Color(skinPalette.centerColor);
-    const cMid = new THREE.Color(skinPalette.midColor);
-    const cEdge = new THREE.Color(skinPalette.edgeColor);
-    const tempColor = new THREE.Color();
-
-    for (let i = 0; i < pos.count; i++) {
-      v.fromBufferAttribute(pos, i);
-
-      // Chubby wide cushion proportions
-      v.x *= 1.15;
-      v.y *= 0.94;
-      v.z *= 1.02;
-
-      // Smoothly flatten bottom base so Juro rests snugly like pudding
-      if (v.y < -0.44) {
-        const flat = (-v.y - 0.44) / 0.5;
-        v.y += flat * 0.13;
-        v.x *= 1 + flat * 0.05;
-        v.z *= 1 + flat * 0.05;
-      }
-
-      // Gentle soft dumpling wave on top-right crown (only when not wearing hat, ensuring flush fit under hats)
-      if (!hasHat && v.y > 0.48) {
-        const topH = (v.y - 0.48) / 0.46;
-        const smoothTop = topH * topH;
-        const crestWave =
-          Math.exp(-Math.pow((v.x - 0.28) * 2.1 + (v.z - 0.05) * 1.8, 2)) * 0.1 * smoothTop;
-        const indent =
-          Math.exp(-Math.pow((v.x + 0.15) * 2.4 + (v.z - 0.15) * 2.0, 2)) * -0.045 * smoothTop;
-        v.y += crestWave + indent;
-      }
-
-      pos.setXYZ(i, v.x, v.y, v.z);
-
-      // Luminous vertex color gradient (milky center -> glossy honey orange rim)
-      const distFromFace = v.distanceTo(faceCenter);
-      const radialT = THREE.MathUtils.clamp((distFromFace - 0.12) / 1.15, 0, 1);
-      const smoothRadial = radialT * radialT * (3 - 2 * radialT);
-
-      const bottomOrange = THREE.MathUtils.clamp((-v.y - 0.42) / 0.42, 0, 1);
-      const topOrange = THREE.MathUtils.clamp((v.y - 0.56) / 0.36, 0, 1);
-
-      const t = THREE.MathUtils.clamp(
-        smoothRadial * 0.88 + bottomOrange * 0.45 + topOrange * 0.55,
-        0,
-        1
-      );
-
-      if (t < 0.5) {
-        tempColor.lerpColors(cCenter, cMid, t * 2);
-      } else {
-        tempColor.lerpColors(cMid, cEdge, (t - 0.5) * 2);
-      }
-
-      colors[i * 3] = tempColor.r;
-      colors[i * 3 + 1] = tempColor.g;
-      colors[i * 3 + 2] = tempColor.b;
+  const triggerPetTapRef = useRef<() => void>(() => {});
+  triggerPetTapRef.current = () => {
+    if (petPointerDownPosRef.current) {
+      if (petPointerDownPosRef.current.clicked) return;
+      petPointerDownPosRef.current.clicked = true;
     }
 
-    geo.setAttribute("color", new THREE.BufferAttribute(colors, 3));
-    geo.computeVertexNormals();
-    geo.computeBoundingSphere();
-    geo.computeBoundingBox();
-    return geo;
-  }, [skinPalette.centerColor, skinPalette.midColor, skinPalette.edgeColor, hasHat]);
+    if (!isPartner) {
+      wakeCooldownRef.current = Date.now() + 60_000;
+      waypointQueueRef.current = [];
+      if (fsm.currentState === "wander") {
+        jumpRef.current.active = false;
+        fsm.transitionTo("idle", true);
+        setBehaviorState("idle");
+      }
+    }
+    soundEffects.playPet();
+
+    _projCenter
+      .set(
+        spring.position.x,
+        spring.position.y + 1.15 * currentPetScaleRef.current,
+        spring.position.z
+      )
+      .project(camera);
+    const screenX = (_projCenter.x * 0.5 + 0.5) * size.width;
+    const screenY = (-_projCenter.y * 0.5 + 0.5) * size.height;
+
+    onPetClick?.({ x: screenX, y: screenY });
+  };
+
+  // Fallback for fast-moving/hopping Juro: if pointerdown hit Juro and pointerup stayed within tap slop, trigger click even if Juro hopped away mid-tap
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    let fallbackTimer: number | null = null;
+
+    const onWindowPointerUp = (e: PointerEvent) => {
+      const down = petPointerDownPosRef.current;
+      if (!down || down.clicked || down.pointerId !== e.pointerId) return;
+
+      const dist = Math.hypot(e.clientX - down.x, e.clientY - down.y);
+      const elapsed = Date.now() - down.time;
+      const maxSlop = down.isTouch ? 24 : 14;
+
+      if (dist <= maxSlop && elapsed <= 900) {
+        if (fallbackTimer !== null) window.clearTimeout(fallbackTimer);
+        fallbackTimer = window.setTimeout(() => {
+          if (petPointerDownPosRef.current && !petPointerDownPosRef.current.clicked) {
+            triggerPetTapRef.current();
+          }
+          petPointerDownPosRef.current = null;
+        }, 0);
+      } else {
+        petPointerDownPosRef.current = null;
+      }
+    };
+
+    const onWindowPointerCancel = (e: PointerEvent) => {
+      if (petPointerDownPosRef.current?.pointerId === e.pointerId) {
+        petPointerDownPosRef.current = null;
+      }
+    };
+
+    window.addEventListener("pointerup", onWindowPointerUp, { passive: true });
+    window.addEventListener("pointercancel", onWindowPointerCancel, { passive: true });
+    return () => {
+      if (fallbackTimer !== null) window.clearTimeout(fallbackTimer);
+      window.removeEventListener("pointerup", onWindowPointerUp);
+      window.removeEventListener("pointercancel", onWindowPointerCancel);
+    };
+  }, []);
+
+  // 1. Sculpted Chubby Jelly Body Geometry with Smooth Vertex Colors
+  const hasHat = Boolean(activeHat && activeHat !== "hat-none");
+  const sphereWidthSegs = sphereSegments[0];
+  const sphereHeightSegs = sphereSegments[1];
+  const outerBodyGeometry = useMemo(
+    () =>
+      buildJuroBodyGeometry({
+        centerColor: skinPalette.centerColor,
+        midColor: skinPalette.midColor,
+        edgeColor: skinPalette.edgeColor,
+        hasHat,
+        widthSegments: sphereWidthSegs,
+        heightSegments: sphereHeightSegs,
+      }),
+    [
+      skinPalette.centerColor,
+      skinPalette.midColor,
+      skinPalette.edgeColor,
+      hasHat,
+      sphereWidthSegs,
+      sphereHeightSegs,
+    ]
+  );
 
   // Dispose custom sculpted body geometry on unmount or skin change (prevents WebGL GPU memory leak)
   useEffect(() => {
@@ -740,10 +784,7 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
     const isSleepingNow = currentState === "sleep";
     const isEatingNow = currentState === "eating";
     const isPlayingToyNow = currentToyBeingPlayed !== null;
-    const prefersReduced =
-      typeof window !== "undefined" &&
-      window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
-    const motionScale = prefersReduced ? 0.3 : 1;
+    const motionScale = prefersReducedMotionRef.current ? 0.3 : 1;
     const isNightSleepy = isBedtimeHour();
     const isSleepy = isNightSleepy || liveAttributes.energy < 45;
 
@@ -918,7 +959,7 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
           if (p >= 1) {
             j.active = false;
             soundEffects.playPlop();
-            spring.applyImpulse(new THREE.Vector3(0, -0.35, 0));
+            spring.applyImpulse(_impulseDown);
           }
         } else {
           // If autonomous FSM picked a new wander target while waypoint queue is empty, route it via A* path
@@ -1257,7 +1298,7 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
                 fb.timer = 0;
                 soundEffects.playHappy();
                 soundEffects.playHop();
-                spring.applyImpulse(new THREE.Vector3(0, 2.8, 0));
+                spring.applyImpulse(_impulseJump);
                 _targetVec.set(spring.position.x, restY, spring.position.z);
                 spring.setTarget(_targetVec);
               }
@@ -2485,12 +2526,16 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
 
     // Dirty Skin Material Reaction
     if (bodyMeshRef.current) {
-      const mat = bodyMeshRef.current.material as THREE.MeshPhysicalMaterial;
+      const mat = bodyMeshRef.current.material as
+        | THREE.MeshStandardMaterial
+        | THREE.MeshPhysicalMaterial;
       if (mat) {
         // Dynamic jelly luster based on cleanliness (clean = crystal clear gloss, dirty = matte dusty finish)
         const cleanRatio = Math.max(0, Math.min(1, liveAttributes.cleanliness / 100));
-        mat.roughness = THREE.MathUtils.lerp(0.42, 0.10, cleanRatio);
-        mat.clearcoat = THREE.MathUtils.lerp(0.22, 1.0, cleanRatio);
+        mat.roughness = THREE.MathUtils.lerp(0.42, 0.12, cleanRatio);
+        if ("clearcoat" in mat && typeof mat.clearcoat === "number") {
+          mat.clearcoat = THREE.MathUtils.lerp(0.22, 1.0, cleanRatio);
+        }
       }
     }
 
@@ -2687,10 +2732,14 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
         }}
         onPointerDown={(e) => {
           e.stopPropagation();
+          onPetPointerDown?.();
           petPointerDownPosRef.current = {
             x: e.nativeEvent.clientX,
             y: e.nativeEvent.clientY,
             time: Date.now(),
+            pointerId: e.nativeEvent.pointerId,
+            isTouch: e.nativeEvent.pointerType === "touch",
+            clicked: false,
           };
           const now = performance.now();
           rapidTapHistoryRef.current = rapidTapHistoryRef.current.filter((ts) => now - ts < 1100);
@@ -2714,52 +2763,50 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
             const dy = e.nativeEvent.clientY - petPointerDownPosRef.current.y;
             const dist = Math.hypot(dx, dy);
             const elapsed = Date.now() - petPointerDownPosRef.current.time;
-            const isTouch = typeof window !== "undefined" && ("ontouchstart" in window || navigator.maxTouchPoints > 0);
-            const maxSlop = isTouch ? 24 : 12;
+            const maxSlop = petPointerDownPosRef.current.isTouch ? 24 : 14;
             if (dist > maxSlop || elapsed > 1200) {
+              petPointerDownPosRef.current = null;
               return;
             }
           }
 
-          wakeCooldownRef.current = Date.now() + 60_000;
-          soundEffects.playPet();
-          if (fsm.currentState === "wander") {
-            jumpRef.current.active = false;
-            fsm.transitionTo("idle", true);
-            setBehaviorState("idle");
-          }
-          // Project Juro's crown/head to screen coordinates immediately
-          _projCenter
-            .set(
-              spring.position.x,
-              spring.position.y + 1.15 * currentPetScaleRef.current,
-              spring.position.z
-            )
-            .project(camera);
-          const screenX = (_projCenter.x * 0.5 + 0.5) * size.width;
-          const screenY = (-_projCenter.y * 0.5 + 0.5) * size.height;
-
-          onPetClick?.({ x: screenX, y: screenY });
+          triggerPetTapRef.current();
+          petPointerDownPosRef.current = null;
         }}
       >
-        {/* Invisible Comfortable Hitbox (Radius 1.6) so tapping Juro is effortless on all screens */}
-        <mesh position={[0, 0.45, 0]}>
-          <sphereGeometry args={[1.6, 16, 12]} />
+        {/* Invisible Comfortable Hitbox (Radius 1.85) so tapping Juro is effortless on all screens & states */}
+        <mesh position={[0, 0.48, 0]}>
+          <sphereGeometry args={[1.85, 16, 12]} />
           <meshBasicMaterial transparent opacity={0} depthWrite={false} side={THREE.DoubleSide} />
         </mesh>
         {/* Main Sculpted Chubby Jelly Body (Casts soft directional shadow on terrain/bridge) */}
-        <mesh ref={bodyMeshRef} geometry={outerBodyGeometry} castShadow receiveShadow>
-          <meshPhysicalMaterial
-            vertexColors={true}
-            roughness={0.14}
-            metalness={0.02}
-            clearcoat={1.0}
-            clearcoatRoughness={0.06}
-            sheen={0.55}
-            sheenColor={skinPalette.centerColor}
-            emissive={skinPalette.emissiveColor}
-            emissiveIntensity={0.08}
-          />
+        <mesh
+          ref={bodyMeshRef}
+          geometry={outerBodyGeometry}
+          castShadow={shadowsEnabled}
+          receiveShadow={shadowsEnabled}
+        >
+          {usePhysicalMaterial ? (
+            <meshPhysicalMaterial
+              vertexColors={true}
+              roughness={0.14}
+              metalness={0.02}
+              clearcoat={1.0}
+              clearcoatRoughness={0.06}
+              sheen={0.55}
+              sheenColor={skinPalette.centerColor}
+              emissive={skinPalette.emissiveColor}
+              emissiveIntensity={0.08}
+            />
+          ) : (
+            <meshStandardMaterial
+              vertexColors={true}
+              roughness={0.14}
+              metalness={0.08}
+              emissive={skinPalette.emissiveColor}
+              emissiveIntensity={0.1}
+            />
+          )}
         </mesh>
 
         {/* Top-Right Soft Glossy Jelly Swirl Fold (Disembunyikan rapi saat memakai topi agar topi menempel pas di kepala) */}
@@ -2769,12 +2816,11 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
             rotation={[0.22, 0.35, -0.2]}
             scale={[1.0, 0.72, 1.0]}
           >
-            <torusGeometry args={[0.3, 0.088, 16, 32, Math.PI * 0.85]} />
-            <meshPhysicalMaterial
+            <torusGeometry args={[0.3, 0.088, 12, 24, Math.PI * 0.85]} />
+            <meshStandardMaterial
               color={skinPalette.limbColor}
-              roughness={0.1}
-              clearcoat={1.0}
-              clearcoatRoughness={0.05}
+              roughness={0.12}
+              metalness={0.06}
               emissive={skinPalette.emissiveColor}
               emissiveIntensity={0.12}
             />
@@ -2783,12 +2829,11 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
 
         {/* Left Jelly Droplet Arm */}
         <mesh position={[-1.16, -0.22, 0.04]} rotation={[0, 0, 0.35]} scale={[1.22, 0.85, 0.85]}>
-          <sphereGeometry args={[0.21, 24, 24]} />
-          <meshPhysicalMaterial
+          <sphereGeometry args={[0.21, 18, 16]} />
+          <meshStandardMaterial
             color={skinPalette.limbColor}
-            roughness={0.12}
-            clearcoat={1.0}
-            clearcoatRoughness={0.05}
+            roughness={0.14}
+            metalness={0.06}
             emissive={skinPalette.emissiveColor}
             emissiveIntensity={0.1}
           />
@@ -2796,12 +2841,11 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
 
         {/* Right Jelly Droplet Arm */}
         <mesh position={[1.16, -0.2, 0.02]} rotation={[0, 0, -0.35]} scale={[1.22, 0.85, 0.85]}>
-          <sphereGeometry args={[0.21, 24, 24]} />
-          <meshPhysicalMaterial
+          <sphereGeometry args={[0.21, 18, 16]} />
+          <meshStandardMaterial
             color={skinPalette.limbColor}
-            roughness={0.12}
-            clearcoat={1.0}
-            clearcoatRoughness={0.05}
+            roughness={0.14}
+            metalness={0.06}
             emissive={skinPalette.emissiveColor}
             emissiveIntensity={0.1}
           />
@@ -2980,11 +3024,11 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
 
         {/* Translucent Breathing Sleep Bubble */}
         <mesh ref={sleepBubbleRef} position={[0.06, -0.06, 1.12]} visible={false}>
-          <sphereGeometry args={[0.088, 20, 20]} />
-          <meshPhysicalMaterial
+          <sphereGeometry args={[0.088, 16, 14]} />
+          <meshStandardMaterial
             color="#E0F2FE"
-            roughness={0.05}
-            clearcoat={1.0}
+            roughness={0.08}
+            metalness={0.1}
             transparent
             opacity={0.62}
             emissive="#BAE6FD"
@@ -2992,7 +3036,7 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
           />
           {/* Tiny shiny highlight dot on sleep bubble */}
           <mesh position={[-0.025, 0.03, 0.072]}>
-            <sphereGeometry args={[0.018, 10, 10]} />
+            <sphereGeometry args={[0.018, 8, 8]} />
             <meshBasicMaterial color="#FFFFFF" />
           </mesh>
         </mesh>
@@ -3107,11 +3151,11 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
         {/* Pleading Hungry Droplet at mouth corner */}
         <group ref={salivaDripRef} position={[-0.08, -0.15, 1.05]} visible={false}>
           <mesh scale={[0.024, 0.048, 0.024]}>
-            <sphereGeometry args={[1, 12, 12]} />
-            <meshPhysicalMaterial
+            <sphereGeometry args={[1, 10, 10]} />
+            <meshStandardMaterial
               color="#BAE6FD"
-              roughness={0.06}
-              clearcoat={1.0}
+              roughness={0.08}
+              metalness={0.1}
               transparent
               opacity={0.85}
               emissive="#E0F2FE"
@@ -3120,10 +3164,10 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
           </mesh>
           <mesh position={[0, 0.032, 0]} scale={[0.014, 0.028, 0.014]}>
             <coneGeometry args={[1, 1.5, 8]} />
-            <meshPhysicalMaterial
+            <meshStandardMaterial
               color="#BAE6FD"
-              roughness={0.06}
-              clearcoat={1.0}
+              roughness={0.08}
+              metalness={0.1}
               transparent
               opacity={0.85}
             />
@@ -3133,11 +3177,11 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
         {/* Anime Weary Sweat Droplet on forehead */}
         <group ref={sweatDropRef} position={[0.42, 0.48, 0.82]} rotation={[0, 0, -0.28]} visible={false}>
           <mesh scale={[0.038, 0.062, 0.03]}>
-            <sphereGeometry args={[1, 12, 12]} />
-            <meshPhysicalMaterial
+            <sphereGeometry args={[1, 10, 10]} />
+            <meshStandardMaterial
               color="#38BDF8"
-              roughness={0.05}
-              clearcoat={1.0}
+              roughness={0.08}
+              metalness={0.12}
               transparent
               opacity={0.88}
               emissive="#7DD3FC"
@@ -3145,11 +3189,11 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
             />
           </mesh>
           <mesh position={[0, 0.048, 0]} rotation={[0, 0, Math.PI]} scale={[0.028, 0.045, 0.024]}>
-            <coneGeometry args={[1, 1.6, 10]} />
-            <meshPhysicalMaterial
+            <coneGeometry args={[1, 1.6, 8]} />
+            <meshStandardMaterial
               color="#38BDF8"
-              roughness={0.05}
-              clearcoat={1.0}
+              roughness={0.08}
+              metalness={0.12}
               transparent
               opacity={0.88}
             />
@@ -3273,323 +3317,14 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
             ))}
         </group>
 
-        {/* === 3D COZY LEAF PARASOL / UMBRELLA (Worn during Pixel Rain) === */}
-        <group
-          ref={leafUmbrellaRef}
-          visible={false}
-          position={[0.22, 0.52, 0.08]}
-        >
-          {/* Stem reaching up from right flank */}
-          <group position={[-0.04, -0.16, 0.02]} rotation={[0.12, 0, -0.28]}>
-            {/* Lower stalk */}
-            <mesh position={[0, 0.16, 0]}>
-              <cylinderGeometry args={[0.024, 0.028, 0.36, 7]} />
-              <meshLambertMaterial color="#15803D" />
-            </mesh>
-            {/* Upper arching stem */}
-            <mesh position={[0.04, 0.38, 0.02]} rotation={[0, 0, 0.36]}>
-              <cylinderGeometry args={[0.018, 0.024, 0.24, 7]} />
-              <meshLambertMaterial color="#166534" />
-            </mesh>
-          </group>
-
-          {/* Broad organic leaf canopy sheltering Juro's head */}
-          <group position={[0.04, 0.46, 0.05]} rotation={[0.22, 0.12, -0.22]}>
-            {/* Main leaf blade: gentle domed disc */}
-            <mesh scale={[1.45, 0.14, 1.7]}>
-              <sphereGeometry args={[0.36, 16, 12]} />
-              <meshStandardMaterial
-                color="#22C55E"
-                roughness={0.28}
-                metalness={0.06}
-              />
-            </mesh>
-            {/* Dark green leaf rim */}
-            <mesh scale={[1.5, 0.06, 1.76]}>
-              <sphereGeometry args={[0.355, 14, 10]} />
-              <meshBasicMaterial color="#16A34A" />
-            </mesh>
-            {/* Leaf central spine / vein */}
-            <mesh position={[0, 0.022, 0]} scale={[0.038, 0.038, 0.88]}>
-              <boxGeometry args={[1, 1, 1]} />
-              <meshLambertMaterial color="#15803D" />
-            </mesh>
-            {/* Left lateral leaf vein */}
-            <mesh position={[-0.15, 0.018, -0.06]} rotation={[0, 0.65, 0]} scale={[0.26, 0.024, 0.02]}>
-              <boxGeometry args={[1, 1, 1]} />
-              <meshLambertMaterial color="#166534" />
-            </mesh>
-            {/* Right lateral leaf vein */}
-            <mesh position={[0.15, 0.018, -0.06]} rotation={[0, -0.65, 0]} scale={[0.26, 0.024, 0.02]}>
-              <boxGeometry args={[1, 1, 1]} />
-              <meshLambertMaterial color="#166534" />
-            </mesh>
-            {/* Glistening rain dewdrop sitting on leaf tip */}
-            <mesh position={[0, 0.035, 0.5]}>
-              <sphereGeometry args={[0.042, 8, 8]} />
-              <meshStandardMaterial
-                color="#E0F2FE"
-                roughness={0.05}
-                metalness={0.2}
-                transparent
-                opacity={0.88}
-                emissive="#BAE6FD"
-                emissiveIntensity={0.25}
-              />
-            </mesh>
-          </group>
-        </group>
-
-        {/* === MINI NOBLE GOLDEN CROWN (Evolution Stage 3: Juro Mulia, Lv. 10+) === */}
-        <group
-          ref={crownRef}
-          visible={level >= 10}
-          position={[0, 0.86, 0.04]}
-          rotation={[-0.05, 0, 0]}
-        >
-          {/* Crown Base Circlet */}
-          <mesh position={[0, 0, 0]}>
-            <cylinderGeometry args={[0.22, 0.25, 0.08, 12]} />
-            <meshStandardMaterial color="#CA8A04" roughness={0.3} metalness={0.7} />
-          </mesh>
-          {/* Crown Golden Body */}
-          <mesh position={[0, 0.07, 0]}>
-            <cylinderGeometry args={[0.27, 0.22, 0.09, 12]} />
-            <meshStandardMaterial color="#FACC15" roughness={0.25} metalness={0.8} />
-          </mesh>
-          {/* 3 Crown Spikes (Front, Left, Right) */}
-          <mesh position={[0, 0.16, 0.22]} rotation={[0.15, 0, 0]}>
-            <coneGeometry args={[0.07, 0.14, 5]} />
-            <meshStandardMaterial color="#FDE047" roughness={0.2} metalness={0.85} />
-          </mesh>
-          <mesh position={[-0.18, 0.15, 0.08]} rotation={[0.1, 0, 0.2]}>
-            <coneGeometry args={[0.06, 0.12, 5]} />
-            <meshStandardMaterial color="#FDE047" roughness={0.2} metalness={0.85} />
-          </mesh>
-          <mesh position={[0.18, 0.15, 0.08]} rotation={[0.1, 0, -0.2]}>
-            <coneGeometry args={[0.06, 0.12, 5]} />
-            <meshStandardMaterial color="#FDE047" roughness={0.2} metalness={0.85} />
-          </mesh>
-          {/* Center Ruby Gem Accent */}
-          <mesh position={[0, 0.06, 0.24]}>
-            <sphereGeometry args={[0.038, 8, 8]} />
-            <meshStandardMaterial color="#EF4444" roughness={0.15} metalness={0.4} />
-          </mesh>
-        </group>
-
-        {/* === 3D WEARABLE HATS (PROPORTIONALLY SCALED & SNUGLY FITTED TO JURO'S HEAD) === */}
-        {/* 1. Topi Baling-baling (hat-propeller) */}
-        {activeHat === "hat-propeller" && (
-          <group position={[0, 0.77, 0.03]} rotation={[-0.06, 0, 0]}>
-            {/* Base Red Cap Dome: hollow hemisphere perfectly encapsulating head */}
-            <mesh position={[0, 0, 0]} scale={[1.22, 0.72, 1.16]}>
-              <sphereGeometry args={[0.62, 32, 20, 0, Math.PI * 2, 0, Math.PI * 0.5]} />
-              <meshStandardMaterial color="#DC2626" roughness={0.55} />
-            </mesh>
-            {/* Green Quarter Panel */}
-            <mesh position={[0, 0.003, 0]} scale={[1.224, 0.724, 1.164]}>
-              <sphereGeometry args={[0.62, 20, 16, 0, Math.PI * 0.52, 0, Math.PI * 0.5]} />
-              <meshStandardMaterial color="#16A34A" roughness={0.55} />
-            </mesh>
-            {/* Yellow Quarter Panel */}
-            <mesh position={[0, 0.003, 0]} scale={[1.224, 0.724, 1.164]}>
-              <sphereGeometry args={[0.62, 20, 16, Math.PI * 0.95, Math.PI * 0.55, 0, Math.PI * 0.5]} />
-              <meshStandardMaterial color="#EAB308" roughness={0.55} />
-            </mesh>
-            {/* Blue Visor / Cap Brim */}
-            <mesh position={[0, 0.02, 0.52]} rotation={[0.22, 0, 0]}>
-              <boxGeometry args={[0.82, 0.035, 0.44]} />
-              <meshStandardMaterial color="#2563EB" roughness={0.5} />
-            </mesh>
-            {/* Stalk & Beads on Top */}
-            <mesh position={[0, 0.45, 0]}>
-              <sphereGeometry args={[0.065, 14, 14]} />
-              <meshStandardMaterial color="#1D4ED8" roughness={0.4} />
-            </mesh>
-            <mesh position={[0, 0.55, 0]}>
-              <sphereGeometry args={[0.06, 14, 14]} />
-              <meshStandardMaterial color="#FACC15" roughness={0.4} />
-            </mesh>
-            <mesh position={[0, 0.63, 0]}>
-              <cylinderGeometry args={[0.012, 0.012, 0.12, 10]} />
-              <meshStandardMaterial color="#18181B" roughness={0.3} metalness={0.7} />
-            </mesh>
-            {/* Animated Spinning Propeller */}
-            <group ref={propellerRef} position={[0, 0.70, 0]}>
-              {/* Hub */}
-              <mesh>
-                <sphereGeometry args={[0.065, 14, 14]} />
-                <meshStandardMaterial color="#0F172A" roughness={0.2} metalness={0.8} />
-              </mesh>
-              {/* Blades */}
-              <mesh position={[0.34, 0.008, 0]} rotation={[0, 0, 0.08]}>
-                <boxGeometry args={[0.62, 0.025, 0.11]} />
-                <meshStandardMaterial color="#18181B" roughness={0.3} metalness={0.5} />
-              </mesh>
-              <mesh position={[-0.34, -0.008, 0]} rotation={[0, 0, -0.08]}>
-                <boxGeometry args={[0.62, 0.025, 0.11]} />
-                <meshStandardMaterial color="#18181B" roughness={0.3} metalness={0.5} />
-              </mesh>
-            </group>
-          </group>
-        )}
-
-        {/* 2. Topi Koki (hat-chef) */}
-        {activeHat === "hat-chef" && (
-          <group position={[0, 0.76, 0.02]} rotation={[-0.05, 0, 0]}>
-            {/* White Headband Cylinder */}
-            <mesh position={[0, 0.10, 0]} scale={[1.16, 1.0, 1.08]}>
-              <cylinderGeometry args={[0.62, 0.66, 0.20, 32]} />
-              <meshStandardMaterial color="#F1F5F9" roughness={0.7} />
-            </mesh>
-            {/* Main Puffy Billowing Toque Body */}
-            <mesh position={[0, 0.38, 0]} scale={[1.36, 0.85, 1.30]}>
-              <sphereGeometry args={[0.58, 24, 20]} />
-              <meshStandardMaterial color="#FFFFFF" roughness={0.85} />
-            </mesh>
-            {/* Pleat Puff Folds around Crown */}
-            <mesh position={[0.36, 0.46, 0.12]} scale={[0.9, 0.8, 0.9]}>
-              <sphereGeometry args={[0.28, 16, 16]} />
-              <meshStandardMaterial color="#FFFFFF" roughness={0.85} />
-            </mesh>
-            <mesh position={[-0.36, 0.46, 0.12]} scale={[0.9, 0.8, 0.9]}>
-              <sphereGeometry args={[0.28, 16, 16]} />
-              <meshStandardMaterial color="#FFFFFF" roughness={0.85} />
-            </mesh>
-            <mesh position={[0, 0.50, 0.34]} scale={[0.9, 0.8, 0.9]}>
-              <sphereGeometry args={[0.28, 16, 16]} />
-              <meshStandardMaterial color="#FFFFFF" roughness={0.85} />
-            </mesh>
-            <mesh position={[0, 0.48, -0.30]} scale={[0.9, 0.8, 0.9]}>
-              <sphereGeometry args={[0.28, 16, 16]} />
-              <meshStandardMaterial color="#FFFFFF" roughness={0.85} />
-            </mesh>
-          </group>
-        )}
-
-        {/* 3. Topi Jerami (hat-straw) */}
-        {activeHat === "hat-straw" && (
-          <group position={[0, 0.78, 0.02]} rotation={[-0.06, 0, -0.04]}>
-            {/* Wide Straw Brim: ring with hole so Juro's head goes inside crown */}
-            <mesh position={[0, 0, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-              <ringGeometry args={[0.63, 1.10, 40]} />
-              <meshStandardMaterial color="#E6D5AC" roughness={0.9} side={THREE.DoubleSide} />
-            </mesh>
-            {/* Brim Outer Edge Torus for soft retro thickness */}
-            <mesh position={[0, 0, 0]} rotation={[Math.PI / 2, 0, 0]}>
-              <torusGeometry args={[1.08, 0.024, 12, 40]} />
-              <meshStandardMaterial color="#D4B982" roughness={0.9} />
-            </mesh>
-            {/* Cylindrical Straw Crown */}
-            <mesh position={[0, 0.15, 0]}>
-              <cylinderGeometry args={[0.64, 0.66, 0.30, 36]} />
-              <meshStandardMaterial color="#D4B982" roughness={0.85} />
-            </mesh>
-            {/* Straw Crown Flat Top */}
-            <mesh position={[0, 0.30, 0]}>
-              <cylinderGeometry args={[0.64, 0.64, 0.015, 36]} />
-              <meshStandardMaterial color="#E6D5AC" roughness={0.9} />
-            </mesh>
-            {/* Black Ribbon Band Around Crown */}
-            <mesh position={[0, 0.06, 0]}>
-              <cylinderGeometry args={[0.66, 0.67, 0.10, 36]} />
-              <meshStandardMaterial color="#18181B" roughness={0.5} />
-            </mesh>
-            {/* Black Ribbon Knot on Side */}
-            <group position={[0.66, 0.06, 0.16]} rotation={[0, 0.3, 0]}>
-              <mesh position={[0, 0, 0]}>
-                <boxGeometry args={[0.06, 0.07, 0.06]} />
-                <meshStandardMaterial color="#18181B" roughness={0.5} />
-              </mesh>
-              <mesh position={[0, 0.04, 0.07]} rotation={[0.4, 0, 0]}>
-                <boxGeometry args={[0.04, 0.08, 0.04]} />
-                <meshStandardMaterial color="#27272A" roughness={0.5} />
-              </mesh>
-              <mesh position={[0, -0.04, 0.07]} rotation={[-0.4, 0, 0]}>
-                <boxGeometry args={[0.04, 0.08, 0.04]} />
-                <meshStandardMaterial color="#27272A" roughness={0.5} />
-              </mesh>
-            </group>
-          </group>
-        )}
-
-        {/* 4. Topi Pesulap (hat-top) */}
-        {activeHat === "hat-top" && (
-          <group position={[0, 0.78, 0.02]} rotation={[-0.06, 0, 0.04]}>
-            {/* Wide Black Silk Brim: ring with hole so Juro's head fits inside crown */}
-            <mesh position={[0, 0, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-              <ringGeometry args={[0.60, 1.02, 40]} />
-              <meshStandardMaterial color="#18181B" roughness={0.4} metalness={0.15} side={THREE.DoubleSide} />
-            </mesh>
-            {/* Brim Outer Edge Torus */}
-            <mesh position={[0, 0, 0]} rotation={[Math.PI / 2, 0, 0]}>
-              <torusGeometry args={[1.00, 0.022, 12, 40]} />
-              <meshStandardMaterial color="#18181B" roughness={0.4} metalness={0.15} />
-            </mesh>
-            {/* Tall Flared Top Hat Crown */}
-            <mesh position={[0, 0.38, 0]}>
-              <cylinderGeometry args={[0.68, 0.62, 0.76, 36]} />
-              <meshStandardMaterial color="#242428" roughness={0.35} metalness={0.2} />
-            </mesh>
-            {/* Flat Top Cap */}
-            <mesh position={[0, 0.765, 0]}>
-              <cylinderGeometry args={[0.68, 0.68, 0.015, 36]} />
-              <meshStandardMaterial color="#18181B" roughness={0.4} metalness={0.2} />
-            </mesh>
-            {/* Crimson Satin Ribbon Band */}
-            <mesh position={[0, 0.08, 0]}>
-              <cylinderGeometry args={[0.635, 0.625, 0.14, 36]} />
-              <meshStandardMaterial color="#DC2626" roughness={0.25} metalness={0.35} />
-            </mesh>
-          </group>
-        )}
-
-        {/* 5. Topi Pesta (hat-party) */}
-        {activeHat === "hat-party" && (
-          <group position={[0.02, 0.82, 0.02]} rotation={[-0.08, 0.08, -0.10]}>
-            {/* Open-Ended Cone Body (hollow base so head enters naturally) */}
-            <mesh position={[0, 0.45, 0]}>
-              <coneGeometry args={[0.48, 0.90, 32, 1, true]} />
-              <meshStandardMaterial color="#7DD3FC" roughness={0.5} side={THREE.DoubleSide} />
-            </mesh>
-            {/* Bottom Scalloped Rim Accent: Torus ring hugging head */}
-            <mesh position={[0, 0.01, 0]} rotation={[Math.PI / 2, 0, 0]}>
-              <torusGeometry args={[0.48, 0.028, 12, 32]} />
-              <meshStandardMaterial color="#F43F5E" roughness={0.6} />
-            </mesh>
-            {/* Middle Warm Yellow Ring Accent */}
-            <mesh position={[0, 0.06, 0]} rotation={[Math.PI / 2, 0, 0]}>
-              <torusGeometry args={[0.45, 0.018, 12, 32]} />
-              <meshStandardMaterial color="#FACC15" roughness={0.6} />
-            </mesh>
-            {/* Top Fluffy Pom-Pom */}
-            <mesh position={[0, 0.93, 0]}>
-              <sphereGeometry args={[0.11, 16, 16]} />
-              <meshStandardMaterial color="#FB7185" roughness={0.8} />
-            </mesh>
-            {/* Polka Dot Accents on Cone Surface */}
-            <mesh position={[0.22, 0.32, 0.20]}>
-              <sphereGeometry args={[0.04, 10, 10]} />
-              <meshStandardMaterial color="#FACC15" roughness={0.4} />
-            </mesh>
-            <mesh position={[-0.20, 0.48, 0.16]}>
-              <sphereGeometry args={[0.04, 10, 10]} />
-              <meshStandardMaterial color="#FFFFFF" roughness={0.4} />
-            </mesh>
-            <mesh position={[0.04, 0.64, 0.18]}>
-              <sphereGeometry args={[0.036, 10, 10]} />
-              <meshStandardMaterial color="#F43F5E" roughness={0.4} />
-            </mesh>
-            <mesh position={[-0.16, 0.28, 0.24]}>
-              <sphereGeometry args={[0.04, 10, 10]} />
-              <meshStandardMaterial color="#FB7185" roughness={0.4} />
-            </mesh>
-            <mesh position={[0.16, 0.52, 0.14]}>
-              <sphereGeometry args={[0.036, 10, 10]} />
-              <meshStandardMaterial color="#FFFFFF" roughness={0.4} />
-            </mesh>
-          </group>
-        )}
+        {/* Leaf Umbrella, Evolution Crown, and 3D Hats */}
+        <JuroHeadwear
+          activeHat={activeHat}
+          level={level}
+          leafUmbrellaRef={leafUmbrellaRef}
+          crownRef={crownRef}
+          propellerRef={propellerRef}
+        />
 
         {/* === 3D SOAP FOAM BUBBLES CLINGING TO JURO (1 Draw Call) === */}
         <instancedMesh
@@ -3650,26 +3385,19 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
       {isPlayingToy && currentToyBeingPlayed && (
         <group ref={worldToyRef} visible={false}>
           <group ref={worldToyMeshRef}>
-            <ToyProp3D
-              toyId={currentToyBeingPlayed.id}
-              bounceHeight={playTimer.current}
-            />
+            <ToyProp3D toyId={currentToyBeingPlayed.id} />
           </group>
           {currentToyBeingPlayed.id === "music-box" && (
             <>
-              <MusicalNote3D progress={playTimer.current * 0.8} offset={0} />
-              <MusicalNote3D progress={playTimer.current * 0.8} offset={0.33} />
-              <MusicalNote3D progress={playTimer.current * 0.8} offset={0.66} />
+              <MusicalNote3D offset={0} />
+              <MusicalNote3D offset={0.33} />
+              <MusicalNote3D offset={0.66} />
             </>
           )}
           {currentToyBeingPlayed.id === "bubble-blower" && (
             <>
               {[0, 1, 2, 3, 4, 5, 6, 7].map((idx) => (
-                <PlayBubble3D
-                  key={idx}
-                  index={idx}
-                  progress={playTimer.current * 0.75}
-                />
+                <PlayBubble3D key={idx} index={idx} />
               ))}
             </>
           )}

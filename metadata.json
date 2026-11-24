@@ -1,0 +1,6 @@
+{
+  "name": "JURO — 3D Virtual Pet",
+  "description": "JURO adalah virtual pet 3D interaktif berbasis web dengan karakter jeli oranye hidup, fisika gelatin, dan estetika pixel modern.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

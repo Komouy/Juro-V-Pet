@@ -38,13 +38,13 @@ export const PixelInput: React.FC<PixelInputProps> = ({
       {(label || maxLength) && (
         <div className="flex items-center justify-between">
           {label && (
-            <label className="pixel-text text-[10px] uppercase text-charcoal dark:text-neutral-200 tracking-wider font-bold">
+            <label className="text-xs font-medium text-neutral-700 dark:text-neutral-200">
               {label}
             </label>
           )}
           {maxLength && (
-            <span className="pixel-text text-[9px] text-muted dark:text-neutral-400">
-              [{currentLength}/{maxLength}]
+            <span className="text-xs tabular-nums text-neutral-500 dark:text-neutral-400">
+              {currentLength}/{maxLength}
             </span>
           )}
         </div>
@@ -53,8 +53,8 @@ export const PixelInput: React.FC<PixelInputProps> = ({
       {/* Input Outer Frame */}
       <div className="relative flex items-center">
         {Icon && (
-          <div className="absolute left-3 pointer-events-none text-charcoal/70 dark:text-neutral-400 z-10">
-            <Icon size={14} strokeWidth={2.5} />
+          <div className="absolute left-3.5 pointer-events-none text-neutral-400 dark:text-neutral-400 z-10">
+            <Icon size={16} strokeWidth={2} />
           </div>
         )}
 
@@ -63,21 +63,21 @@ export const PixelInput: React.FC<PixelInputProps> = ({
           maxLength={maxLength}
           disabled={disabled}
           className={`
-            w-full bg-white dark:bg-dark-surface
-            border-2 transition-all duration-75 pixel-text text-[11px]
-            text-charcoal dark:text-white
-            placeholder:text-muted/60 dark:placeholder:text-neutral-500
-            py-2.5 px-3
-            ${Icon ? "pl-9" : "pl-3"}
-            ${onClear || isSuccess || error ? "pr-9" : "pr-3"}
+            w-full rounded-xl bg-white dark:bg-dark-surface
+            border transition-all duration-150 text-sm
+            text-neutral-900 dark:text-white
+            placeholder:text-neutral-400 dark:placeholder:text-neutral-500
+            py-2.5 px-3.5
+            ${Icon ? "pl-10" : "pl-3.5"}
+            ${onClear || isSuccess || error ? "pr-10" : "pr-3.5"}
             ${
               error
-                ? "border-rose-600 shadow-[2px_2px_0px_#E11D48] dark:shadow-[2px_2px_0px_#E11D48]"
+                ? "border-rose-500 focus:ring-2 focus:ring-rose-500/20"
                 : isSuccess
-                ? "border-emerald-600 shadow-[2px_2px_0px_#059669] dark:shadow-[2px_2px_0px_#059669]"
-                : "border-charcoal dark:border-neutral-600 shadow-[3px_3px_0px_#171717] dark:shadow-[3px_3px_0px_#000000]"
+                ? "border-emerald-500 focus:ring-2 focus:ring-emerald-500/20"
+                : "border-neutral-300 dark:border-neutral-700 focus:border-juro-orange focus:ring-2 focus:ring-juro-orange/20"
             }
-            focus:outline-none focus:border-juro-orange focus:shadow-[3px_3px_0px_#F97316]
+            focus:outline-none
             disabled:opacity-50 disabled:cursor-not-allowed
             ${className}
           `}
@@ -86,36 +86,36 @@ export const PixelInput: React.FC<PixelInputProps> = ({
         />
 
         {/* Action / Status Icons on Right */}
-        <div className="absolute right-2.5 flex items-center gap-1">
+        <div className="absolute right-3 flex items-center gap-1.5">
           {onClear && currentLength > 0 && !disabled && (
             <button
               type="button"
               onClick={onClear}
-              className="p-1 text-muted hover:text-charcoal dark:hover:text-white transition-colors cursor-pointer"
+              className="p-1 rounded-md text-neutral-400 hover:text-neutral-700 dark:hover:text-white transition-colors cursor-pointer"
               title="Bersihkan input"
             >
-              <X size={13} strokeWidth={2.5} />
+              <X size={14} strokeWidth={2} />
             </button>
           )}
 
           {isSuccess && !error && (
-            <CheckCircle2 size={14} strokeWidth={2.5} className="text-emerald-500" />
+            <CheckCircle2 size={16} strokeWidth={2} className="text-emerald-500" />
           )}
 
           {error && (
-            <AlertCircle size={14} strokeWidth={2.5} className="text-rose-600" />
+            <AlertCircle size={16} strokeWidth={2} className="text-rose-500" />
           )}
         </div>
       </div>
 
       {/* Helper / Error Text */}
       {error ? (
-        <p className="pixel-text text-[9px] text-rose-600 dark:text-rose-400 flex items-center gap-1">
-          <AlertCircle size={11} strokeWidth={2.5} />
+        <p className="text-xs text-rose-600 dark:text-rose-400 flex items-center gap-1.5">
+          <AlertCircle size={13} strokeWidth={2} />
           <span>{error}</span>
         </p>
       ) : hint ? (
-        <p className="pixel-text text-[9px] text-muted dark:text-neutral-400">
+        <p className="text-xs text-neutral-500 dark:text-neutral-400">
           {hint}
         </p>
       ) : null}

@@ -18,10 +18,10 @@ export const PixelToast: React.FC = () => {
 
   const toneStyles =
     toast.tone === "warn"
-      ? "bg-rose-600 text-white border-charcoal dark:border-neutral-600"
+      ? "bg-rose-600 text-white border-rose-700"
       : toast.tone === "info"
-      ? "bg-charcoal text-white border-charcoal dark:bg-dark-surface dark:border-neutral-600"
-      : "bg-emerald-600 text-white border-charcoal dark:border-neutral-600";
+      ? "bg-neutral-900 text-white border-neutral-800 dark:bg-neutral-800 dark:border-neutral-700"
+      : "bg-emerald-600 text-white border-emerald-700";
 
   const Icon =
     toast.tone === "warn" ? AlertCircle : toast.tone === "info" ? Info : Check;
@@ -30,13 +30,13 @@ export const PixelToast: React.FC = () => {
     <div
       role="status"
       aria-live="polite"
-      className="fixed inset-x-0 bottom-18 md:bottom-5 z-50 flex justify-center px-4 pointer-events-none"
+      className="fixed inset-x-0 bottom-18 md:bottom-5 z-[110] flex justify-center px-4 pointer-events-none"
     >
       <div
         key={toast.id}
-        className={`animate-toast-enter max-w-full sm:max-w-md px-3 py-1.5 border-2 shadow-[3px_3px_0px_#171717] dark:shadow-[3px_3px_0px_#000000] inline-flex items-center gap-1.5 pixel-text text-[9px] sm:text-[10px] uppercase font-bold tracking-wider ${toneStyles}`}
+        className={`animate-toast-enter max-w-full sm:max-w-md px-4 py-2 rounded-full border shadow-lg inline-flex items-center gap-2 text-xs sm:text-sm font-medium ${toneStyles}`}
       >
-        <Icon size={12} strokeWidth={3} className="shrink-0" />
+        <Icon size={15} strokeWidth={2.2} className="shrink-0" />
         <span className="truncate">{toast.text}</span>
       </div>
     </div>

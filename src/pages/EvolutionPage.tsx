@@ -1,9 +1,9 @@
 import React from "react";
+import { useNavigate } from "react-router-dom";
 import { Card } from "../components/ui/Card";
-import { Badge } from "../components/ui/Badge";
 import { ProgressBar } from "../components/ui/ProgressBar";
 import { usePetStore } from "../stores/petStore";
-import { TrendingUp, CheckCircle2 } from "lucide-react";
+import { TrendingUp, CheckCircle2, X } from "lucide-react";
 import { soundEffects } from "../engine/audio/soundEffects";
 
 const StageEmblem: React.FC<{ stage: 1 | 2 | 3; unlocked: boolean }> = ({
@@ -14,7 +14,7 @@ const StageEmblem: React.FC<{ stage: 1 | 2 | 3; unlocked: boolean }> = ({
   const fillLight = unlocked ? "#FDBA74" : "#D1D5DB";
 
   return (
-    <div className="w-11 h-11 bg-warm-white dark:bg-neutral-900 border-2 border-charcoal dark:border-neutral-600 shadow-[2px_2px_0px_#171717] dark:shadow-[2px_2px_0px_#000000] flex items-center justify-center shrink-0">
+    <div className="w-12 h-12 rounded-xl bg-orange-50/70 dark:bg-neutral-800 border border-orange-200/70 dark:border-neutral-700 flex items-center justify-center shrink-0">
       <svg
         width="28"
         height="28"
@@ -66,6 +66,7 @@ const StageEmblem: React.FC<{ stage: 1 | 2 | 3; unlocked: boolean }> = ({
 };
 
 export const EvolutionPage: React.FC = () => {
+  const navigate = useNavigate();
   const { name, level, xp, xpToNextLevel } = usePetStore();
 
   const xpPercent = Math.min(100, Math.round((xp / xpToNextLevel) * 100));
@@ -117,25 +118,39 @@ export const EvolutionPage: React.FC = () => {
   ];
 
   return (
-    <main className="w-full max-w-5xl mx-auto px-4 py-4 md:py-6 space-y-6">
-      {/* Header */}
-      <div className="border-b-2 border-charcoal/15 dark:border-neutral-700 pb-3 flex items-center justify-between gap-2">
-        <h1 className="pixel-text text-sm md:text-base text-charcoal dark:text-white uppercase tracking-wider flex items-center gap-2 shrink-0">
-          <TrendingUp size={16} strokeWidth={2.5} className="text-juro-orange" />
+    <section className="w-full px-4 sm:px-6 py-4 sm:py-5 space-y-4">
+      {/* Compact Overlay Header */}
+      <div className="border-b border-neutral-200/80 dark:border-neutral-800 pb-3.5 flex items-center justify-between gap-3">
+        <h1 className="text-base sm:text-lg font-bold text-neutral-900 dark:text-white tracking-tight flex items-center gap-2 shrink-0">
+          <TrendingUp size={18} strokeWidth={2.2} className="text-juro-orange" />
           <span>Evolusi</span>
         </h1>
-        <span className="pixel-text text-[9px] text-muted">
-          Tahapan Pertumbuhan Juro
-        </span>
+        <div className="flex items-center gap-2.5">
+          <span className="text-xs text-neutral-500 dark:text-neutral-400 hidden sm:inline">
+            Tahapan pertumbuhan Juro
+          </span>
+          <button
+            type="button"
+            onClick={() => {
+              soundEffects.playDismiss();
+              navigate("/");
+            }}
+            className="w-8 h-8 rounded-xl inline-flex items-center justify-center text-neutral-500 hover:text-neutral-900 hover:bg-neutral-100 dark:text-neutral-400 dark:hover:text-white dark:hover:bg-neutral-800 transition-colors cursor-pointer"
+            aria-label="Tutup dan kembali ke Home"
+            title="Kembali ke Home"
+          >
+            <X size={17} strokeWidth={2} />
+          </button>
+        </div>
       </div>
 
       {/* Progress Level Card */}
-      <Card shadowOffset="sm" variant="warm" className="p-4">
-        <div className="flex items-center justify-between gap-3 mb-3">
-          <h2 className="pixel-text text-xs sm:text-sm text-charcoal dark:text-white font-bold">
+      <Card shadowOffset="sm" variant="warm" className="p-4 shadow-none">
+        <div className="flex items-center justify-between gap-3 mb-2.5">
+          <h2 className="text-sm sm:text-base font-semibold text-neutral-900 dark:text-white">
             {name} · Level {level}
           </h2>
-          <span className="pixel-text text-[10px] text-muted font-mono">
+          <span className="text-xs font-medium text-neutral-500 dark:text-neutral-400 tabular-nums">
             {xp}/{xpToNextLevel} XP
           </span>
         </div>
@@ -149,17 +164,17 @@ export const EvolutionPage: React.FC = () => {
       </Card>
 
       {/* Section: Wujud Fisik */}
-      <section className="space-y-3">
-        <div className="flex items-center justify-between">
-          <h2 className="pixel-text text-xs sm:text-sm text-charcoal dark:text-white font-bold uppercase tracking-wider">
+      <div className="space-y-3.5">
+        <div className="flex items-center justify-between border-b border-neutral-200/80 dark:border-neutral-800 pb-2.5">
+          <h2 className="text-sm font-semibold text-neutral-900 dark:text-white">
             Wujud Fisik
           </h2>
-          <span className="pixel-text text-[9px] text-muted">
-            3 Tahap Pertumbuhan Tubuh
+          <span className="text-xs text-neutral-500 dark:text-neutral-400">
+            3 tahap pertumbuhan
           </span>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5">
           {physicalStages.map((stage) => {
             const isUnlocked = stage.completed || stage.current;
             return (
@@ -167,9 +182,9 @@ export const EvolutionPage: React.FC = () => {
                 key={stage.stageName}
                 shadowOffset="sm"
                 onClick={() => soundEffects.playClick()}
-                className={`p-3.5 flex flex-col justify-between gap-3 transition-all cursor-pointer ${
+                className={`p-4 shadow-none flex flex-col justify-between gap-3 transition-all cursor-pointer ${
                   stage.current
-                    ? "border-juro-orange ring-2 ring-juro-orange/25"
+                    ? "border-juro-orange ring-1 ring-juro-orange/25"
                     : !isUnlocked
                     ? "opacity-75"
                     : ""
@@ -179,32 +194,36 @@ export const EvolutionPage: React.FC = () => {
                   <div className="flex items-center gap-3 min-w-0">
                     <StageEmblem stage={stage.num} unlocked={isUnlocked} />
                     <div className="min-w-0">
-                      <span className="pixel-text text-[8px] text-muted block uppercase">
+                      <span className="text-xs text-neutral-500 dark:text-neutral-400 block tabular-nums">
                         {stage.levelRange}
                       </span>
-                      <h3 className="pixel-text text-[11px] text-charcoal dark:text-white font-bold mt-0.5 truncate">
+                      <h3 className="text-sm font-semibold text-neutral-900 dark:text-white mt-0.5 truncate">
                         {stage.stageName}
                       </h3>
                     </div>
                   </div>
-                  {stage.completed ? (
-                    <Badge label="Selesai" variant="good" size="sm" />
-                  ) : stage.current ? (
-                    <Badge label="Aktif" variant="orange" size="sm" />
-                  ) : (
-                    <Badge label="Kunci" variant="charcoal" size="sm" />
-                  )}
+                  <span
+                    className={`text-xs font-semibold shrink-0 ${
+                      stage.completed
+                        ? "text-emerald-600 dark:text-emerald-400"
+                        : stage.current
+                        ? "text-juro-orange"
+                        : "text-neutral-400"
+                    }`}
+                  >
+                    {stage.completed ? "Selesai" : stage.current ? "Aktif" : "Terkunci"}
+                  </span>
                 </div>
 
-                <div className="pt-2.5 border-t border-charcoal/10 dark:border-neutral-700 space-y-1.5">
+                <div className="pt-3 border-t border-neutral-100 dark:border-neutral-800 space-y-1.5">
                   {stage.perks.map((perk) => (
                     <div
                       key={perk}
-                      className="flex items-center gap-1.5 pixel-text text-[9px] text-charcoal/90 dark:text-neutral-200"
+                      className="flex items-center gap-2 text-xs text-neutral-700 dark:text-neutral-200"
                     >
                       <CheckCircle2
-                        size={11}
-                        strokeWidth={2.5}
+                        size={13}
+                        strokeWidth={2.2}
                         className={
                           isUnlocked
                             ? "text-emerald-600 shrink-0"
@@ -219,7 +238,7 @@ export const EvolutionPage: React.FC = () => {
             );
           })}
         </div>
-      </section>
-    </main>
+      </div>
+    </section>
   );
 };

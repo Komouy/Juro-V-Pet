@@ -45,65 +45,42 @@ export const PixelSwitch: React.FC<PixelSwitchProps> = ({
       {(label || description) && (
         <div className="flex-1 min-w-0">
           {label && (
-            <p className="pixel-text text-xs text-charcoal dark:text-neutral-100 uppercase tracking-wider font-bold group-hover:text-juro-orange transition-colors">
+            <p className="text-sm font-medium text-neutral-900 dark:text-neutral-100 group-hover:text-juro-orange transition-colors">
               {label}
             </p>
           )}
           {description && (
-            <p className="pixel-text text-[9px] text-muted dark:text-neutral-400 mt-1">
+            <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-0.5 leading-relaxed">
               {description}
             </p>
           )}
         </div>
       )}
 
-      {/* Tactile Retro Pixel Track */}
+      {/* Smooth Modern Pill Switch */}
       <div
         role="switch"
         aria-checked={checked}
         tabIndex={disabled ? -1 : 0}
         onKeyDown={handleKeyDown}
         className={`
-          relative w-14 h-7 border-2 border-charcoal dark:border-neutral-600
-          transition-colors duration-100 flex items-center px-0.5
-          shadow-[2px_2px_0px_#171717] dark:shadow-[2px_2px_0px_#000000]
-          focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-juro-orange
+          relative w-11 h-6 rounded-full shrink-0
+          transition-colors duration-200 flex items-center p-0.5
+          focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-juro-orange focus-visible:ring-offset-1
           ${
             checked
               ? "bg-juro-orange"
-              : "bg-neutral-200 dark:bg-neutral-800"
+              : "bg-neutral-300 dark:bg-neutral-700"
           }
         `}
       >
-        {/* State Label Text Inside Track */}
-        <span
-          className={`
-            pixel-text text-[8px] font-bold absolute tracking-tighter
-            ${
-              checked
-                ? "left-1.5 text-white"
-                : "right-1.5 text-charcoal/60 dark:text-neutral-400"
-            }
-          `}
-        >
-          {checked ? "ON" : "OFF"}
-        </span>
-
-        {/* Sliding Mechanical Pixel Thumb */}
         <div
           className={`
-            w-5 h-5 bg-white dark:bg-neutral-200 border-2 border-charcoal
-            shadow-[1px_1px_0px_#171717]
-            transition-transform duration-100 flex items-center justify-center
-            ${checked ? "translate-x-7" : "translate-x-0"}
+            w-5 h-5 rounded-full bg-white shadow-sm
+            transition-transform duration-200
+            ${checked ? "translate-x-5" : "translate-x-0"}
           `}
-        >
-          {/* Subtle tactile grip lines on thumb */}
-          <div className="flex flex-col gap-[2px]">
-            <div className="w-2 h-[2px] bg-charcoal/40" />
-            <div className="w-2 h-[2px] bg-charcoal/40" />
-          </div>
-        </div>
+        />
       </div>
     </div>
   );
