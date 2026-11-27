@@ -25,6 +25,7 @@ import {
   Copy,
   MessageSquare,
   LayoutGrid,
+  Play,
   X,
 } from "lucide-react";
 
@@ -189,6 +190,13 @@ export const SettingsPage: React.FC = () => {
     setConfirmingReset(false);
     soundEffects.playWarning();
     showToast("Seluruh data diatur ulang", "info");
+    navigate("/");
+  };
+
+  const handleReplayIntro = () => {
+    soundEffects.playClick();
+    useUIStore.getState().resetIntro();
+    navigate("/");
   };
 
   return (
@@ -451,6 +459,20 @@ export const SettingsPage: React.FC = () => {
                 className="hidden"
               />
             </div>
+          </div>
+
+          <div className="pt-3 border-t-2 border-dashed border-charcoal/15 dark:border-[#3F424E] flex flex-wrap items-center justify-between gap-3">
+            <span className="text-xs font-semibold text-charcoal dark:text-neutral-200 flex items-center gap-1.5">
+              <Play size={14} strokeWidth={2.2} className="text-juro-orange" />
+              <span>Animasi Pembuka</span>
+            </span>
+            <Button
+              label="Putar Ulang Intro"
+              icon={Play}
+              size="sm"
+              variant="secondary"
+              onClick={handleReplayIntro}
+            />
           </div>
 
           <div className="pt-3 border-t-2 border-dashed border-charcoal/15 dark:border-[#3F424E] flex flex-wrap items-center justify-between gap-3">

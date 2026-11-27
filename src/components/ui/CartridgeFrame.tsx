@@ -33,7 +33,7 @@ export const NotchedSlot: React.FC<NotchedSlotProps> = ({
       } ${className}`}
     >
       <div
-        className={`cartridge-chamfer w-full flex items-center bg-[#EFE9DC] dark:bg-[#101114] transition-colors ${innerClassName}`}
+        className={`cartridge-chamfer w-full flex items-center bg-[#EFE9DC] dark:bg-[#101114] group-focus-within:bg-[#FDFBF7] dark:group-focus-within:bg-[#161820] transition-colors ${innerClassName}`}
       >
         {children}
       </div>

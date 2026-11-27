@@ -7,6 +7,7 @@ import type {
   WalkCommand,
 } from "../../features/character/JuroModel";
 import { ItemIllustration } from "../items/ItemIllustration";
+import { useShallow } from "zustand/react/shallow";
 import { usePetStore } from "../../stores/petStore";
 import { useGameStore } from "../../stores/gameStore";
 import { useUIStore } from "../../stores/uiStore";
@@ -40,6 +41,7 @@ import { JuroSpeechBubble } from "./viewport/JuroSpeechBubble";
 import { SceneCanvas } from "./viewport/SceneCanvas";
 import { SceneErrorBoundary } from "./viewport/SceneErrorBoundary";
 import { EvolutionModal } from "./viewport/EvolutionModal";
+import { IntroOverlayHUD } from "./viewport/IntroOverlayHUD";
 import { usePetSpeech } from "./viewport/usePetSpeech";
 import { usePetItemDrag } from "./viewport/usePetItemDrag";
 import { useLandmarkInteractions } from "./viewport/useLandmarkInteractions";
@@ -92,8 +94,24 @@ export const PetViewport: React.FC<PetViewportProps> = ({ isPaused = false }) =>
     clearEvolutionAlert,
     recoverSleepEnergy,
     decayNightSleep,
-    lastPosition,
-  } = usePetStore();
+  } = usePetStore(
+    useShallow((s) => ({
+      name: s.name,
+      hunger: s.hunger,
+      energy: s.energy,
+      happiness: s.happiness,
+      cleanliness: s.cleanliness,
+      affection: s.affection,
+      level: s.level,
+      currentState: s.currentState,
+      recentlyLeveledUp: s.recentlyLeveledUp,
+      clearLevelUpAlert: s.clearLevelUpAlert,
+      pendingEvolutionAlert: s.pendingEvolutionAlert,
+      clearEvolutionAlert: s.clearEvolutionAlert,
+      recoverSleepEnergy: s.recoverSleepEnergy,
+      decayNightSleep: s.decayNightSleep,
+    }))
+  );
   const { addLog, addCoins, foodInventory, ownedToys } = useGameStore();
   const weather = useUIStore((s) => s.weather);
   const autoRaining = useUIStore((s) => s.autoRaining);
@@ -101,8 +119,11 @@ export const PetViewport: React.FC<PetViewportProps> = ({ isPaused = false }) =>
   const showToast = useUIStore((s) => s.showToast);
   const actionMenuStyle = useUIStore((s) => s.actionMenuStyle);
   const cameraResetNonce = useUIStore((s) => s.cameraResetNonce);
+  const hasSeenIntro = useUIStore((s) => s.hasSeenIntro);
+  const markIntroSeen = useUIStore((s) => s.markIntroSeen);
   const hasRegisteredName = useCaregiverStore((s) => s.hasRegisteredName);
   const partnerPet = useCaregiverStore((s) => s.partnerPet);
+  const isIntroActive = !hasSeenIntro;
 
   const savedInitialPos = usePetStore.getState().lastPosition;
   const juroWorldPosRef = useRef<THREE.Vector3>(
@@ -307,19 +328,44 @@ export const PetViewport: React.FC<PetViewportProps> = ({ isPaused = false }) =>
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [activeTray, showStatDetails, landmarks, speech, isChatOpen, juroMenu.open, closeJuroMenu]);
 
-  // Keep Juro Context Menu anchored above Juro's head
+  // Keep Juro Context Menu anchored above Juro's head without per-frame layout thrashing
   useEffect(() => {
     if (!juroMenu.open || actionMenuStyle !== "floating") return;
     let animId: number;
+    let lastX = -9999;
+    let lastY = -9999;
+    let lastTailX = -9999;
+
+    let cachedContW = containerRef.current?.clientWidth || window.innerWidth;
+    let cachedContH = containerRef.current?.clientHeight || window.innerHeight;
+    let cachedMenuW = juroMenuRef.current?.offsetWidth || Math.min(280, cachedContW - 24);
+    let cachedMenuH = juroMenuRef.current?.offsetHeight || 52;
+
+    const measure = () => {
+      if (containerRef.current) {
+        cachedContW = containerRef.current.clientWidth || window.innerWidth;
+        cachedContH = containerRef.current.clientHeight || window.innerHeight;
+      }
+      if (juroMenuRef.current) {
+        cachedMenuW = juroMenuRef.current.offsetWidth || Math.min(280, cachedContW - 24);
+        cachedMenuH = juroMenuRef.current.offsetHeight || 52;
+      }
+    };
+
+    const resizeObserver =
+      typeof ResizeObserver !== "undefined" ? new ResizeObserver(measure) : null;
+    if (resizeObserver) {
+      if (containerRef.current) resizeObserver.observe(containerRef.current);
+      if (juroMenuRef.current) resizeObserver.observe(juroMenuRef.current);
+    }
+
     const update = () => {
-      if (juroMenuRef.current && juroScreenPosRef.current && containerRef.current) {
-        const contRect = containerRef.current.getBoundingClientRect();
+      if (juroMenuRef.current && juroScreenPosRef.current) {
         const pos = juroScreenPosRef.current;
-        const contW = contRect.width || window.innerWidth;
-        const contH = contRect.height || window.innerHeight;
-        const menuEl = juroMenuRef.current;
-        const menuW = menuEl.offsetWidth || Math.min(280, contW - 24);
-        const menuH = menuEl.offsetHeight || 52;
+        const contW = cachedContW;
+        const contH = cachedContH;
+        const menuW = cachedMenuW;
+        const menuH = cachedMenuH;
         const halfMenuW = menuW / 2;
         const pad = 12;
         const clampedX = Math.max(halfMenuW + pad, Math.min(contW - halfMenuW - pad, pos.x));
@@ -330,19 +376,29 @@ export const PetViewport: React.FC<PetViewportProps> = ({ isPaused = false }) =>
           ? Math.max(10, Math.min(contH - menuH - 20, crownY + 45))
           : Math.max(menuH + 10, Math.min(contH - 20, crownY - 14));
 
-        juroMenuRef.current.style.left = `${clampedX}px`;
-        juroMenuRef.current.style.top = `${clampedY}px`;
+        if (Math.abs(clampedX - lastX) >= 0.4 || Math.abs(clampedY - lastY) >= 0.4) {
+          lastX = clampedX;
+          lastY = clampedY;
+          juroMenuRef.current.style.left = `${clampedX}px`;
+          juroMenuRef.current.style.top = `${clampedY}px`;
+        }
 
         if (tailRef.current) {
           const menuLeft = clampedX - halfMenuW;
           const clampedTailOffset = Math.max(20, Math.min(menuW - 20, pos.x - menuLeft));
-          tailRef.current.style.left = `${clampedTailOffset}px`;
+          if (Math.abs(clampedTailOffset - lastTailX) >= 0.4) {
+            lastTailX = clampedTailOffset;
+            tailRef.current.style.left = `${clampedTailOffset}px`;
+          }
         }
       }
       animId = requestAnimationFrame(update);
     };
     update();
-    return () => cancelAnimationFrame(animId);
+    return () => {
+      cancelAnimationFrame(animId);
+      resizeObserver?.disconnect();
+    };
   }, [juroMenu.open, actionMenuStyle]);
 
   // Dismiss Juro menu when tapping outside
@@ -572,7 +628,7 @@ export const PetViewport: React.FC<PetViewportProps> = ({ isPaused = false }) =>
   const activeTheme = TIME_THEMES[activePhase];
   const activePalette = getEffectiveWeatherPalette(dayTimeWeather, isRaining);
   const totalFoodStock = SHOP_FOODS.reduce((acc, f) => acc + (foodInventory[f.id] ?? 0), 0);
-  const orbitEnabled = !isDraggingPet && !dragSystem.isDraggingTool;
+  const orbitEnabled = !isIntroActive && !isDraggingPet && !dragSystem.isDraggingTool;
 
   return (
     <div
@@ -582,45 +638,51 @@ export const PetViewport: React.FC<PetViewportProps> = ({ isPaused = false }) =>
         isDraggingPet ? "cursor-grabbing" : "cursor-default"
       }`}
     >
-      <StatBars
-        name={name}
-        level={level}
-        hunger={hunger}
-        energy={energy}
-        happiness={happiness}
-        cleanliness={cleanliness}
-        affection={affection}
-        currentState={currentState}
-        showStatDetails={showStatDetails}
-        onToggleStatDetails={() => setShowStatDetails((prev) => !prev)}
-      />
-
-      <div className="absolute top-3 right-3 z-30 pointer-events-auto">
-        <MiniMap
-          playerX={lastPosition?.x ?? 0}
-          playerZ={lastPosition?.z ?? 0}
-          juroWorldPosRef={juroWorldPosRef}
-          juroYawRef={juroYawRef}
-        />
-      </div>
-
-      {partnerPet && (
-        <div className="absolute top-[98px] sm:top-[110px] right-3 z-20 pointer-events-auto flex items-center gap-1.5 px-2.5 py-1 rounded-[4px] bg-[#FDFBF7] dark:bg-[#1E2028] border-2 border-charcoal dark:border-[#4A4E5E] shadow-[0_2px_0_#18181B]">
-          <span
-            className={`w-2 h-2 rounded-[1px] border border-charcoal shrink-0 ${
-              partnerPet.isOnline ? "bg-emerald-500" : "bg-neutral-400"
-            }`}
+      {!isIntroActive && (
+        <>
+          <StatBars
+            name={name}
+            level={level}
+            hunger={hunger}
+            energy={energy}
+            happiness={happiness}
+            cleanliness={cleanliness}
+            affection={affection}
+            currentState={currentState}
+            showStatDetails={showStatDetails}
+            onToggleStatDetails={() => setShowStatDetails((prev) => !prev)}
           />
-          <span className="font-mono-hud text-[11px] font-bold text-charcoal dark:text-neutral-200">
-            {partnerPet.name} · Lv.{partnerPet.level}
-          </span>
-        </div>
+
+          <div className="absolute top-3 right-3 z-30 pointer-events-auto">
+            <MiniMap
+              playerX={savedInitialPos?.x ?? 0}
+              playerZ={savedInitialPos?.z ?? 0}
+              juroWorldPosRef={juroWorldPosRef}
+              juroYawRef={juroYawRef}
+            />
+          </div>
+
+          {partnerPet && (
+            <div className="absolute top-[98px] sm:top-[110px] right-3 z-20 pointer-events-auto flex items-center gap-1.5 px-2.5 py-1 rounded-[4px] bg-[#FDFBF7] dark:bg-[#1E2028] border-2 border-charcoal dark:border-[#4A4E5E] shadow-[0_2px_0_#18181B]">
+              <span
+                className={`w-2 h-2 rounded-[1px] border border-charcoal shrink-0 ${
+                  partnerPet.isOnline ? "bg-emerald-500" : "bg-neutral-400"
+                }`}
+              />
+              <span className="font-mono-hud text-[11px] font-bold text-charcoal dark:text-neutral-200">
+                {partnerPet.name} · Lv.{partnerPet.level}
+              </span>
+            </div>
+          )}
+        </>
       )}
 
       <SceneErrorBoundary>
         <SceneCanvas
           graphicsProfile={graphicsProfile}
           isPaused={isPaused || isTabHidden}
+          isIntroPlaying={isIntroActive}
+          onIntroComplete={markIntroSeen}
           onAdaptiveDowngrade={handleAdaptiveDowngrade}
           setIsSoftwareGl={setIsSoftwareGl}
           activePalette={activePalette}
@@ -671,65 +733,70 @@ export const PetViewport: React.FC<PetViewportProps> = ({ isPaused = false }) =>
         />
       </SceneErrorBoundary>
 
-      {dragSystem.dragVisual && dragSystem.dragVisual.moved && (
-        <div
-          ref={ghostRef}
-          className="absolute top-0 left-0 z-40 pointer-events-none select-none will-change-transform"
-        >
-          <div
-            className={`transition-transform duration-150 ${
-              dragSystem.dragVisual.payload.kind === "bucket" && dragSystem.dragVisual.overJuro
-                ? "-rotate-35 scale-115"
-                : dragSystem.dragVisual.payload.kind === "soap" && dragSystem.dragVisual.overJuro
-                ? "rotate-12 scale-110"
-                : dragSystem.dragVisual.overJuro
-                ? "scale-120"
-                : "scale-105"
-            }`}
-          >
-            <ItemIllustration
-              id={getDraggedIllustrationId(dragSystem.dragVisual.payload)}
-              size={60}
-              className="drop-shadow-[3px_4px_0px_rgba(23,23,23,0.45)]"
-            />
-          </div>
-        </div>
-      )}
-
-      <ActionTray
-        activeTray={activeTray}
-        onClose={() => setActiveTray("none")}
-        foodInventory={foodInventory}
-        ownedToys={ownedToys}
-        soapBadgePercent={dragSystem.soapBadgePercent}
-        dragVisualMoved={dragSystem.dragVisual?.moved}
-        isDockMode={actionMenuStyle === "dock"}
-        onStartItemDrag={dragSystem.handleStartItemDrag}
-        onDirectUse={dragSystem.handleDirectUse}
-      />
-
-      {actionMenuStyle === "dock" && (
+      {isIntroActive ? (
+        <IntroOverlayHUD onSkip={markIntroSeen} />
+      ) : (
         <>
-          <ActionDock
+          {dragSystem.dragVisual && dragSystem.dragVisual.moved && (
+            <div
+              ref={ghostRef}
+              className="absolute top-0 left-0 z-40 pointer-events-none select-none will-change-transform"
+            >
+              <div
+                className={`transition-transform duration-150 ${
+                  dragSystem.dragVisual.payload.kind === "bucket" && dragSystem.dragVisual.overJuro
+                    ? "-rotate-35 scale-115"
+                    : dragSystem.dragVisual.payload.kind === "soap" && dragSystem.dragVisual.overJuro
+                    ? "rotate-12 scale-110"
+                    : dragSystem.dragVisual.overJuro
+                    ? "scale-120"
+                    : "scale-105"
+                }`}
+              >
+                <ItemIllustration
+                  id={getDraggedIllustrationId(dragSystem.dragVisual.payload)}
+                  size={60}
+                  className="drop-shadow-[3px_4px_0px_rgba(23,23,23,0.45)]"
+                />
+              </div>
+            </div>
+          )}
+
+          <ActionTray
             activeTray={activeTray}
-            onSelectTray={(tray) => {
-              setIsChatOpen(false);
-              setActiveTray((prev) => (prev === tray ? "none" : tray));
-            }}
-            onToggleSleep={landmarks.handleToggleSleep}
-            onToggleChat={() => {
-              setActiveTray("none");
-              setIsChatOpen((prev) => !prev);
-            }}
-            isChatOpen={isChatOpen}
-            currentState={currentState}
-            hunger={hunger}
-            energy={energy}
-            happiness={happiness}
-            cleanliness={cleanliness}
-            totalFoodStock={totalFoodStock}
+            onClose={() => setActiveTray("none")}
+            foodInventory={foodInventory}
+            ownedToys={ownedToys}
+            soapBadgePercent={dragSystem.soapBadgePercent}
+            dragVisualMoved={dragSystem.dragVisual?.moved}
+            isDockMode={actionMenuStyle === "dock"}
+            onStartItemDrag={dragSystem.handleStartItemDrag}
+            onDirectUse={dragSystem.handleDirectUse}
           />
 
+          {actionMenuStyle === "dock" && (
+            <ActionDock
+              activeTray={activeTray}
+              onSelectTray={(tray) => {
+                setIsChatOpen(false);
+                setActiveTray((prev) => (prev === tray ? "none" : tray));
+              }}
+              onToggleSleep={landmarks.handleToggleSleep}
+              onToggleChat={() => {
+                setActiveTray("none");
+                setIsChatOpen((prev) => !prev);
+              }}
+              isChatOpen={isChatOpen}
+              currentState={currentState}
+              hunger={hunger}
+              energy={energy}
+              happiness={happiness}
+              cleanliness={cleanliness}
+              totalFoodStock={totalFoodStock}
+            />
+          )}
+
+          {/* JuroChatModal tersedia di semua mode UI (dock maupun floating) */}
           <JuroChatModal
             isOpen={isChatOpen}
             onClose={() => setIsChatOpen(false)}
@@ -742,62 +809,62 @@ export const PetViewport: React.FC<PetViewportProps> = ({ isPaused = false }) =>
             happiness={happiness}
             isSleeping={currentState === "sleep"}
           />
+
+          {actionMenuStyle === "floating" && (
+            <JuroContextMenu
+              open={juroMenu.open}
+              x={juroMenu.x}
+              y={juroMenu.y}
+              isNearTop={juroMenu.isNearTop}
+              currentState={currentState}
+              totalFoodStock={totalFoodStock}
+              onAction={handleMenuAction}
+              onSendMessage={speech.handleSendMessage}
+              isChatLoading={speech.speechBubble.isLoading}
+              menuRef={juroMenuRef}
+              tailRef={tailRef}
+            />
+          )}
+
+          <JuroSpeechBubble
+            open={speech.speechBubble.visible}
+            text={speech.speechBubble.text}
+            isLoading={speech.speechBubble.isLoading}
+            targetPosRef={juroScreenPosRef}
+            containerRef={containerRef}
+            isDockMode={actionMenuStyle === "dock"}
+            onClose={speech.hideSpeechBubble}
+            petName={name}
+          />
+
+          {dragSystem.dragBubbles.map((b) => (
+            <div
+              key={b.id}
+              onClick={() => dragSystem.handlePopBubble(b.id)}
+              style={
+                {
+                  left: `${b.x}px`,
+                  top: `${b.y}px`,
+                  width: `${b.size}px`,
+                  height: `${b.size}px`,
+                  "--bubble-dx": `${b.dx}px`,
+                } as React.CSSProperties
+              }
+              className={`cursor-pointer absolute z-40 select-none will-change-transform ${
+                b.popped ? "animate-soap-pop" : "animate-soap-bubble"
+              }`}
+            >
+              <div className="relative w-full h-full rounded-full border border-white/80 bg-sky-200/45 shadow-sm">
+                <div className="absolute top-[16%] left-[20%] w-[26%] h-[26%] rounded-full bg-white/90" />
+                <div className="absolute bottom-[20%] right-[22%] w-[14%] h-[14%] rounded-full bg-pink-200/60" />
+              </div>
+            </div>
+          ))}
+
+          <EvolutionModal pendingEvolutionAlert={pendingEvolutionAlert} onClear={clearEvolutionAlert} />
+          {!hasRegisteredName && <CaregiverOnboardingModal />}
         </>
       )}
-
-      {actionMenuStyle === "floating" && (
-        <JuroContextMenu
-          open={juroMenu.open}
-          x={juroMenu.x}
-          y={juroMenu.y}
-          isNearTop={juroMenu.isNearTop}
-          currentState={currentState}
-          totalFoodStock={totalFoodStock}
-          onAction={handleMenuAction}
-          onSendMessage={speech.handleSendMessage}
-          isChatLoading={speech.speechBubble.isLoading}
-          menuRef={juroMenuRef}
-          tailRef={tailRef}
-        />
-      )}
-
-      <JuroSpeechBubble
-        open={speech.speechBubble.visible}
-        text={speech.speechBubble.text}
-        isLoading={speech.speechBubble.isLoading}
-        targetPosRef={juroScreenPosRef}
-        containerRef={containerRef}
-        isDockMode={actionMenuStyle === "dock"}
-        onClose={speech.hideSpeechBubble}
-        petName={name}
-      />
-
-      {dragSystem.dragBubbles.map((b) => (
-        <div
-          key={b.id}
-          onClick={() => dragSystem.handlePopBubble(b.id)}
-          style={
-            {
-              left: `${b.x}px`,
-              top: `${b.y}px`,
-              width: `${b.size}px`,
-              height: `${b.size}px`,
-              "--bubble-dx": `${b.dx}px`,
-            } as React.CSSProperties
-          }
-          className={`cursor-pointer absolute z-40 select-none will-change-transform ${
-            b.popped ? "animate-soap-pop" : "animate-soap-bubble"
-          }`}
-        >
-          <div className="relative w-full h-full rounded-full border border-white/70 shadow-[inset_0_0_8px_rgba(255,255,255,0.7),0_0_12px_rgba(56,189,248,0.4),inset_-3px_-3px_8px_rgba(244,114,182,0.45)] bg-[radial-gradient(circle_at_32%_28%,rgba(255,255,255,0.92)_0%,rgba(224,242,254,0.55)_32%,rgba(244,114,182,0.35)_68%,rgba(56,189,248,0.5)_100%)]">
-            <div className="absolute top-[16%] left-[20%] w-[26%] h-[26%] rounded-full bg-white/95" />
-            <div className="absolute bottom-[20%] right-[22%] w-[14%] h-[14%] rounded-full bg-pink-200/60" />
-          </div>
-        </div>
-      ))}
-
-      <EvolutionModal pendingEvolutionAlert={pendingEvolutionAlert} onClear={clearEvolutionAlert} />
-      {!hasRegisteredName && <CaregiverOnboardingModal />}
     </div>
   );
 };

@@ -26,12 +26,15 @@ import {
   normalizeWeather,
 } from "../../types/ui";
 import type { GraphicsProfile } from "../../engine/world/graphicsProfile";
+import { evaluateTimeLapseAtmosphere } from "../../features/intro/introTimeline";
 
 interface OutdoorEnvironmentProps {
   theme: TimeThemeConfig;
   weather?: WeatherMode;
   isRaining?: boolean;
   graphicsProfile?: GraphicsProfile;
+  introActive?: boolean;
+  introProgressRef?: React.RefObject<number>;
   onOpenShop?: () => void;
   onOpenMine?: () => void;
   onBedClick?: () => void;
@@ -49,8 +52,6 @@ interface OutdoorEnvironmentProps {
   isBouncingOnTrampoline?: boolean;
   onGroundClick?: (point: { x: number; z: number }) => void;
 }
-
-const _dummy = new THREE.Object3D();
 
 export const OutdoorEnvironment: React.FC<OutdoorEnvironmentProps> = React.memo(
   ({
@@ -74,6 +75,8 @@ export const OutdoorEnvironment: React.FC<OutdoorEnvironmentProps> = React.memo(
     onCloseTrampolineMenu,
     isBouncingOnTrampoline = false,
     onGroundClick,
+    introActive = false,
+    introProgressRef,
   }) => {
     const [hoveredLandmark, setHoveredLandmark] = useState<
       "none" | "shop" | "mine" | "bed" | "bench" | "trampoline"
@@ -277,8 +280,13 @@ export const OutdoorEnvironment: React.FC<OutdoorEnvironmentProps> = React.memo(
         }
       }
 
+      const introAtmo =
+        introActive && introProgressRef
+          ? evaluateTimeLapseAtmosphere(introProgressRef.current)
+          : null;
+
       // Animate rain & water ripples during rain
-      const isRaining = isRainingProp ?? isRainingWeather(weather);
+      const isRaining = introAtmo ? introAtmo.isRaining : (isRainingProp ?? isRainingWeather(weather));
       if (rain.mesh.visible !== isRaining) {
         rain.mesh.visible = isRaining;
         rain.ripples.forEach((r) => (r.visible = isRaining));
@@ -288,14 +296,15 @@ export const OutdoorEnvironment: React.FC<OutdoorEnvironmentProps> = React.memo(
         const pos = rain.positions;
         const speeds = rain.speeds;
         const count = rain.count;
+        const matrixArray = rain.mesh.instanceMatrix.array as Float32Array;
         for (let i = 0; i < count; i++) {
-          pos[i * 3 + 1] -= speeds[i] * delta;
-          if (pos[i * 3 + 1] < -0.3) {
-            pos[i * 3 + 1] = 16 + Math.random() * 4;
+          let nextY = pos[i * 3 + 1] - speeds[i] * delta;
+          if (nextY < -0.3) {
+            nextY = 16 + ((i * 0.6180339) % 1) * 4;
           }
-          _dummy.position.set(pos[i * 3], pos[i * 3 + 1], pos[i * 3 + 2]);
-          _dummy.updateMatrix();
-          rain.mesh.setMatrixAt(i, _dummy.matrix);
+          pos[i * 3 + 1] = nextY;
+          // Directly update the Y translation element of the 4x4 instance matrix
+          matrixArray[i * 16 + 13] = nextY;
         }
         rain.mesh.instanceMatrix.needsUpdate = true;
 
@@ -311,9 +320,9 @@ export const OutdoorEnvironment: React.FC<OutdoorEnvironmentProps> = React.memo(
 
       // Adjust lantern light intensity & bulb emissive based on time-of-day + rain
       const normW = normalizeWeather(weather);
-      const isNight = normW === "malam" || theme.isNight;
-      const isSunset = normW === "senja";
-      const isMorning = normW === "pagi";
+      const isNight = introAtmo ? introAtmo.isNight : (normW === "malam" || theme.isNight);
+      const isSunset = introAtmo ? false : normW === "senja";
+      const isMorning = introAtmo ? false : normW === "pagi";
       const targetIntensity = isNight
         ? isRaining
           ? 3.2

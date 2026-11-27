@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useId, useState } from "react";
 import { type LucideIcon, X, AlertCircle, CheckCircle2 } from "lucide-react";
 import { soundEffects } from "../../engine/audio/soundEffects";
 import { NotchedSlot } from "./CartridgeFrame";
@@ -10,16 +10,19 @@ export interface PixelInputProps extends React.InputHTMLAttributes<HTMLInputElem
   hint?: string;
   isSuccess?: boolean;
   compact?: boolean;
+  hideCounter?: boolean;
   onClear?: () => void;
 }
 
 export const PixelInput: React.FC<PixelInputProps> = ({
+  id,
   label,
   icon: Icon,
   error,
   hint,
   isSuccess,
   compact = false,
+  hideCounter = false,
   onClear,
   value,
   maxLength,
@@ -30,6 +33,8 @@ export const PixelInput: React.FC<PixelInputProps> = ({
   onBlur,
   ...props
 }) => {
+  const generatedId = useId();
+  const inputId = id ?? generatedId;
   const [isFocused, setIsFocused] = useState(false);
   const currentLength = typeof value === "string" ? value.length : 0;
 
@@ -43,14 +48,17 @@ export const PixelInput: React.FC<PixelInputProps> = ({
   return (
     <div className="space-y-1.5 w-full select-none">
       {/* Label & Cartridge Character Counter */}
-      {(label || maxLength) && (
+      {(label || (maxLength && !hideCounter)) && (
         <div className="flex items-center justify-between gap-2">
           {label && (
-            <label className="font-pixel text-[11px] font-bold uppercase tracking-wide text-charcoal dark:text-neutral-200">
+            <label
+              htmlFor={inputId}
+              className="font-pixel text-[11px] font-bold uppercase tracking-wide text-charcoal dark:text-neutral-200 cursor-pointer"
+            >
               {label}
             </label>
           )}
-          {maxLength && (
+          {maxLength && !hideCounter && (
             <span className="font-mono-hud text-[11px] font-semibold px-1.5 py-0.5 rounded-[2px] bg-[#EFE9DC] dark:bg-[#101114] border border-charcoal/25 dark:border-[#3F424E] text-charcoal/75 dark:text-neutral-400">
               {String(currentLength).padStart(2, "0")}/{maxLength}
             </span>
@@ -62,30 +70,31 @@ export const PixelInput: React.FC<PixelInputProps> = ({
       <NotchedSlot
         state={slotState}
         disabled={disabled}
-        innerClassName={`${compact ? "px-2.5 py-1.5" : "px-3 py-2"} gap-2 relative`}
+        innerClassName={`${compact ? "px-2.5 py-1.5 min-h-[36px]" : "px-3 py-2 min-h-[42px]"} gap-2 relative`}
       >
-        {/* Prompt Glyph / Optional Icon + Custom Blinking Cursor Indicator */}
-        <div className="flex items-center gap-1 shrink-0 pointer-events-none">
+        {/* Prompt Glyph / Optional Icon (single native caret inside input tracks typing position) */}
+        <div className="flex items-center shrink-0 pointer-events-none">
           {Icon ? (
             <Icon
               size={compact ? 14 : 15}
               strokeWidth={2.2}
-              className="text-juro-orange"
+              className={`transition-colors ${
+                isFocused && !disabled ? "text-juro-orange" : "text-juro-orange/70"
+              }`}
             />
           ) : (
-            <span className="font-pixel text-xs font-bold text-juro-orange leading-none">
+            <span
+              className={`font-pixel text-xs font-bold leading-none transition-colors ${
+                isFocused && !disabled ? "text-juro-orange" : "text-juro-orange/70"
+              }`}
+            >
               &gt;
             </span>
-          )}
-          {isFocused && !disabled && (
-            <span
-              aria-hidden="true"
-              className="animate-console-cursor inline-block w-1.5 h-3.5 bg-juro-orange"
-            />
           )}
         </div>
 
         <input
+          id={inputId}
           value={value}
           maxLength={maxLength}
           disabled={disabled}
@@ -98,9 +107,9 @@ export const PixelInput: React.FC<PixelInputProps> = ({
             onBlur?.(e);
           }}
           className={`
-            flex-1 min-w-0 bg-transparent text-xs sm:text-sm font-mono-hud
+            flex-1 min-w-0 bg-transparent text-xs sm:text-sm font-mono-hud select-text
             text-charcoal dark:text-[#F4F4F5] caret-juro-orange
-            placeholder:text-neutral-500 dark:placeholder:text-neutral-500
+            placeholder:text-neutral-500/85 dark:placeholder:text-neutral-500
             focus:outline-none disabled:cursor-not-allowed
             ${className}
           `}

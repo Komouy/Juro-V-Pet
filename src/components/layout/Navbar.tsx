@@ -272,9 +272,6 @@ export const Navbar: React.FC = () => {
                     Tema
                   </span>
                 </div>
-                <span className="font-pixel text-[10px] font-bold uppercase text-charcoal/70 dark:text-neutral-300">
-                  {theme === "dark" ? "Gelap" : "Terang"}
-                </span>
               </button>
 
               <div className="border-t-2 border-dashed border-charcoal/20 dark:border-[#3F424E] my-1" />

@@ -238,7 +238,12 @@ export function buildPropsAndRain(ctx: WorldBuildContext, rainCount: number): Ra
   // 3. Rain Particles & Water Ripples
   const rainGeo = trackGeo(new THREE.BoxGeometry(0.035, 0.72, 0.035));
   const rainMat = trackMat(
-    new THREE.MeshBasicMaterial({ color: "#d4f0ff", transparent: true, opacity: 0.5 })
+    new THREE.MeshBasicMaterial({
+      color: "#d4f0ff",
+      transparent: true,
+      opacity: 0.5,
+      depthWrite: false,
+    })
   );
   const mesh = new THREE.InstancedMesh(rainGeo, rainMat, rainCount);
   mesh.frustumCulled = false;
@@ -248,20 +253,30 @@ export function buildPropsAndRain(ctx: WorldBuildContext, rainCount: number): Ra
   const randRain = mulberry32(88421);
   const positions = new Float32Array(rainCount * 3);
   const speeds = new Float32Array(rainCount);
+  const rainDummy = new THREE.Object3D();
   for (let i = 0; i < rainCount; i++) {
     const rAngle = randRain() * Math.PI * 2;
     const rDist = Math.sqrt(randRain()) * ISLAND_RADIUS;
-    positions[i * 3] = Math.cos(rAngle) * rDist;
-    positions[i * 3 + 1] = randRain() * 18 + 1;
-    positions[i * 3 + 2] = Math.sin(rAngle) * rDist;
+    const rx = Math.cos(rAngle) * rDist;
+    const ry = randRain() * 18 + 1;
+    const rz = Math.sin(rAngle) * rDist;
+    positions[i * 3] = rx;
+    positions[i * 3 + 1] = ry;
+    positions[i * 3 + 2] = rz;
     speeds[i] = 17 + randRain() * 8;
+
+    rainDummy.position.set(rx, ry, rz);
+    rainDummy.updateMatrix();
+    mesh.setMatrixAt(i, rainDummy.matrix);
   }
+  mesh.instanceMatrix.needsUpdate = true;
   rootGroup.add(mesh);
 
+  const rippleCount = 8;
   const ripples: THREE.Mesh[] = [];
-  const ripplePhases = new Float32Array(12);
-  const rippleGeo = trackGeo(new THREE.RingGeometry(0.3, 0.42, 16));
-  for (let r = 0; r < 12; r++) {
+  const ripplePhases = new Float32Array(rippleCount);
+  const rippleGeo = trackGeo(new THREE.RingGeometry(0.3, 0.42, 10));
+  for (let r = 0; r < rippleCount; r++) {
     const rMat = trackMat(
       new THREE.MeshBasicMaterial({
         color: "#e0f6ff",

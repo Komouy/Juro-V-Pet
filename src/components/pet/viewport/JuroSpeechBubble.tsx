@@ -40,24 +40,47 @@ export const JuroSpeechBubble: React.FC<JuroSpeechBubbleProps> = ({
   const tailRef = useRef<HTMLDivElement>(null);
   const [isPlacedAbove, setIsPlacedAbove] = useState<boolean>(true);
 
-  // Dynamic 60fps position tracking directly above Juro's head
+  // Dynamic 60fps position tracking directly above Juro's head without per-frame layout thrashing
   useEffect(() => {
     if (!open) return;
     let animId: number;
+    let lastX = -9999;
+    let lastY = -9999;
+    let lastTailX = -9999;
 
     const topSafe = 58;
     const bottomSafe = isDockMode ? 78 : 18;
 
-    const updatePosition = () => {
-      if (rootRef.current && targetPosRef?.current && containerRef?.current) {
-        const contRect = containerRef.current.getBoundingClientRect();
-        const pos = targetPosRef.current;
-        const contW = contRect.width || window.innerWidth;
-        const contH = contRect.height || window.innerHeight;
+    let cachedContW = containerRef?.current?.clientWidth || window.innerWidth;
+    let cachedContH = containerRef?.current?.clientHeight || window.innerHeight;
+    let cachedBubbleW = rootRef.current?.offsetWidth || 220;
+    let cachedBubbleH = rootRef.current?.offsetHeight || 60;
 
-        const bubbleEl = rootRef.current;
-        const bubbleW = bubbleEl.offsetWidth || 220;
-        const bubbleH = bubbleEl.offsetHeight || 60;
+    const measureDimensions = () => {
+      if (containerRef?.current) {
+        cachedContW = containerRef.current.clientWidth || window.innerWidth;
+        cachedContH = containerRef.current.clientHeight || window.innerHeight;
+      }
+      if (rootRef.current) {
+        cachedBubbleW = rootRef.current.offsetWidth || 220;
+        cachedBubbleH = rootRef.current.offsetHeight || 60;
+      }
+    };
+
+    const resizeObserver =
+      typeof ResizeObserver !== "undefined" ? new ResizeObserver(measureDimensions) : null;
+    if (resizeObserver) {
+      if (containerRef?.current) resizeObserver.observe(containerRef.current);
+      if (rootRef.current) resizeObserver.observe(rootRef.current);
+    }
+
+    const updatePosition = () => {
+      if (rootRef.current && targetPosRef?.current) {
+        const pos = targetPosRef.current;
+        const contW = cachedContW;
+        const contH = cachedContH;
+        const bubbleW = cachedBubbleW;
+        const bubbleH = cachedBubbleH;
 
         // Horizontally center bubble right over Juro's X coordinate
         const targetX = pos.x - bubbleW / 2;
@@ -79,20 +102,29 @@ export const JuroSpeechBubble: React.FC<JuroSpeechBubbleProps> = ({
           clampedY = Math.min(contH - bubbleH - bottomSafe, pos.y + pos.radiusPx * 0.75 + 14);
         }
 
-        // Apply smooth GPU-accelerated transform without CSS transition lag
-        bubbleEl.style.transform = `translate3d(${clampedX}px, ${clampedY}px, 0)`;
+        if (Math.abs(clampedX - lastX) >= 0.4 || Math.abs(clampedY - lastY) >= 0.4) {
+          lastX = clampedX;
+          lastY = clampedY;
+          rootRef.current.style.transform = `translate3d(${clampedX}px, ${clampedY}px, 0)`;
+        }
 
         // Position pointer tail to point directly towards Juro's center
         if (tailRef.current) {
           const tailX = Math.max(16, Math.min(bubbleW - 16, pos.x - clampedX));
-          tailRef.current.style.left = `${tailX}px`;
+          if (Math.abs(tailX - lastTailX) >= 0.4) {
+            lastTailX = tailX;
+            tailRef.current.style.left = `${tailX}px`;
+          }
         }
       }
       animId = requestAnimationFrame(updatePosition);
     };
 
     updatePosition();
-    return () => cancelAnimationFrame(animId);
+    return () => {
+      cancelAnimationFrame(animId);
+      resizeObserver?.disconnect();
+    };
   }, [open, targetPosRef, containerRef, isDockMode]);
 
   if (!open) return null;

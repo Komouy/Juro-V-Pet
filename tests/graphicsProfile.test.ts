@@ -28,7 +28,7 @@ describe("Adaptive Graphics Profile & Mobile Sharpness", () => {
     expect(profile.usePhysicalJuroBody).toBe(false);
     expect(profile.terrainSegments).toBe(72);
     expect(profile.maxPointLights).toBe(1);
-    expect(profile.rainCount).toBe(120);
+    expect(profile.rainCount).toBe(75);
   });
 
   it("selects balanced crisp profile on typical mid/high mobile devices", () => {

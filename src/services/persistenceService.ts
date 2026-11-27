@@ -2,6 +2,7 @@ import { db, type PetSaveRecord, type GameSaveRecord, type PreferencesSaveRecord
 import { usePetStore } from "../stores/petStore";
 import { useGameStore } from "../stores/gameStore";
 import { useUIStore } from "../stores/uiStore";
+import { useCaregiverStore } from "../stores/caregiverStore";
 import {
   CRYSTAL_CATALOG,
   DEFAULT_CRYSTALS,
@@ -21,6 +22,7 @@ import {
   isValidMineBoard,
 } from "../engine/mining/mineGenerator";
 import {
+  clearChatHistory,
   getPetMemories,
   setPetMemories,
   syncAndMergeMemories,
@@ -272,7 +274,11 @@ class PersistenceService {
     // Watch store changes
     usePetStore.subscribe(() => this.triggerDebouncedSave());
     useGameStore.subscribe(() => this.triggerDebouncedSave());
-    useUIStore.subscribe(() => this.triggerDebouncedSave());
+    useUIStore.subscribe((state, prev) => {
+      if (state.theme !== prev.theme || state.soundEnabled !== prev.soundEnabled) {
+        this.triggerDebouncedSave();
+      }
+    });
 
     // Flush immediately when browser tab hides or closes
     if (typeof window !== "undefined") {
@@ -314,6 +320,18 @@ class PersistenceService {
       if (!data || !data.pet) return false;
 
       if (data.pet) {
+        const rawPos = data.pet.lastPosition;
+        const safeLastPos =
+          rawPos &&
+          typeof rawPos === "object" &&
+          typeof rawPos.x === "number" &&
+          Number.isFinite(rawPos.x) &&
+          typeof rawPos.y === "number" &&
+          Number.isFinite(rawPos.y) &&
+          typeof rawPos.z === "number" &&
+          Number.isFinite(rawPos.z)
+            ? { x: rawPos.x, y: rawPos.y, z: rawPos.z }
+            : undefined;
         const sanitizedPet: PetSaveRecord = {
           id: "current",
           name: typeof data.pet.name === "string" && data.pet.name.trim() ? data.pet.name.trim() : "Juro",
@@ -325,6 +343,7 @@ class PersistenceService {
           happiness: safeNum(data.pet.happiness, 90, 0, 100),
           cleanliness: safeNum(data.pet.cleanliness, 85, 0, 100),
           affection: safeNum(data.pet.affection, 50, 0, 100),
+          lastPosition: safeLastPos,
           lastUpdated: Date.now(),
         };
         await db.pets.put(sanitizedPet);
@@ -338,6 +357,7 @@ class PersistenceService {
           happiness: sanitizedPet.happiness,
           cleanliness: sanitizedPet.cleanliness,
           affection: sanitizedPet.affection,
+          lastPosition: sanitizedPet.lastPosition,
           lastUpdated: sanitizedPet.lastUpdated,
         });
       }
@@ -455,6 +475,10 @@ class PersistenceService {
       happiness: 90,
       cleanliness: 85,
       affection: 50,
+      currentState: "idle",
+      currentFoodBeingEaten: null,
+      currentToyBeingPlayed: null,
+      lastPosition: undefined,
       lastUpdated: Date.now(),
       recentlyLeveledUp: false,
       pendingEvolutionAlert: null,
@@ -467,6 +491,8 @@ class PersistenceService {
       ownedToys: [...DEFAULT_OWNED_TOYS],
       unlockedSkins: [...DEFAULT_UNLOCKED_SKINS],
       activeSkin: "classic-orange",
+      unlockedHats: [...DEFAULT_UNLOCKED_HATS],
+      activeHat: "hat-none",
       pickaxeLevel: 1,
       deepestFloor: 1,
       miningStamina: MAX_MINING_STAMINA,
@@ -475,6 +501,10 @@ class PersistenceService {
       mineTiles: generateMineFloor(1),
       mineResetCooldownUntil: 0,
     });
+    setPetMemories([]);
+    clearChatHistory();
+    useUIStore.getState().resetIntro();
+    useCaregiverStore.getState().resetProfile();
     await this.saveNow();
   }
 }

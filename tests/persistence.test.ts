@@ -4,6 +4,11 @@ import { describe, it, expect, beforeEach } from "vitest";
 import { usePetStore } from "../src/stores/petStore";
 import { useGameStore } from "../src/stores/gameStore";
 import { persistenceService } from "../src/services/persistenceService";
+import { getPetMemories, addPetMemory } from "../src/services/petMemoryService";
+import {
+  DEFAULT_UNLOCKED_HATS,
+  DEFAULT_UNLOCKED_SKINS,
+} from "../src/data/economyCatalog";
 
 describe("PersistenceService", () => {
   beforeEach(() => {
@@ -192,5 +197,28 @@ describe("PersistenceService", () => {
     expect(game.activeHat).toBe("hat-chef");
     expect(game.unlockedSkins).toContain("mint-lime");
     expect(game.activeSkin).toBe("mint-lime");
+  });
+
+  it("resets purchased hats, equipped accessories, memories, and intro state on resetAll", async () => {
+    useGameStore.setState({
+      coins: 500,
+      unlockedHats: ["hat-none", "hat-chef", "hat-crown"],
+      activeHat: "hat-chef",
+      unlockedSkins: ["classic-orange", "berry-pink"],
+      activeSkin: "berry-pink",
+    });
+    addPetMemory("Topi koki adalah favorit Juro.", "preference");
+
+    await persistenceService.resetAll();
+
+    const game = useGameStore.getState();
+    const pet = usePetStore.getState();
+    expect(game.coins).toBe(50);
+    expect(game.unlockedHats).toEqual(DEFAULT_UNLOCKED_HATS);
+    expect(game.activeHat).toBe("hat-none");
+    expect(game.unlockedSkins).toEqual(DEFAULT_UNLOCKED_SKINS);
+    expect(game.activeSkin).toBe("classic-orange");
+    expect(pet.lastPosition).toBeUndefined();
+    expect(getPetMemories()).toEqual([]);
   });
 });

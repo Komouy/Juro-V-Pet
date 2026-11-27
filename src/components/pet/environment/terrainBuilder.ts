@@ -10,7 +10,6 @@ import type { AnimatedKoi, WorldBuildContext } from "./worldBuilderTypes";
 
 export interface TerrainAndWaterResult {
   terrainMesh: THREE.Mesh;
-  cobbleOverlay: THREE.Mesh;
   waterMesh: THREE.Mesh;
   kois: AnimatedKoi[];
 }
@@ -258,22 +257,7 @@ export function buildTerrainAndWater(
   cliffMesh.name = "island-cliff-skirt";
   rootGroup.add(cliffMesh);
 
-  // 2. Cobblestone Plaza
-  const plazaGeo = trackGeo(new THREE.CylinderGeometry(5.5, 5.8, 0.12, 20));
-  const plazaMat = trackMat(
-    new THREE.MeshStandardMaterial({
-      map: textures.cobble,
-      roughness: 0.88,
-      metalness: 0.02,
-    })
-  );
-  const cobbleOverlay = new THREE.Mesh(plazaGeo, plazaMat);
-  cobbleOverlay.position.set(14.8, 0.07, -1.6);
-  cobbleOverlay.scale.set(1.12, 1, 0.92);
-  cobbleOverlay.receiveShadow = shadowsEnabled;
-  rootGroup.add(cobbleOverlay);
-
-  // 3. Canal & Pond Water + Aquatic Flora & Fauna
+  // 2. Canal & Pond Water + Aquatic Flora & Fauna
   const waterGeo = trackGeo(new THREE.PlaneGeometry(36, 36, 12, 12));
   waterGeo.rotateX(-Math.PI / 2);
   const waterMat = trackMat(
@@ -650,5 +634,5 @@ export function buildTerrainAndWater(
     });
   }
 
-  return { terrainMesh, cobbleOverlay, waterMesh, kois };
+  return { terrainMesh, waterMesh, kois };
 }

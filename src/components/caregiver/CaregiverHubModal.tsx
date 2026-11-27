@@ -76,6 +76,7 @@ export const CaregiverHubPanel: React.FC<{ onClose?: () => void }> = ({ onClose 
     activeRoomCode,
     partnerProfile,
     pairingStatus,
+    connectionState,
     errorMessage,
     activityLogs,
     setProfile,
@@ -85,6 +86,30 @@ export const CaregiverHubPanel: React.FC<{ onClose?: () => void }> = ({ onClose 
   } = useCaregiverStore();
 
   const isPaired = activeRoomCode !== null;
+
+  const connectionMeta = (() => {
+    switch (connectionState) {
+      case "connected":
+        return {
+          dotClass: "bg-emerald-500",
+          textClass: "text-emerald-800 dark:text-emerald-300",
+          label: "Tersambung",
+        };
+      case "connecting":
+      case "reconnecting":
+        return {
+          dotClass: "bg-amber-400 animate-pulse",
+          textClass: "text-amber-700 dark:text-amber-300",
+          label: connectionState === "connecting" ? "Menyambungkan..." : "Menyambung kembali...",
+        };
+      default:
+        return {
+          dotClass: "bg-rose-500",
+          textClass: "text-rose-700 dark:text-rose-400",
+          label: "Terputus",
+        };
+    }
+  })();
 
   const handleCopyCode = () => {
     if (!activeRoomCode) return;
@@ -213,11 +238,15 @@ export const CaregiverHubPanel: React.FC<{ onClose?: () => void }> = ({ onClose 
           {/* Status Kemitraan */}
           {isPaired ? (
             <div className="p-3 rounded-[4px] bg-emerald-50/80 dark:bg-emerald-950/30 border-2 border-emerald-700 dark:border-emerald-700 space-y-2.5">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <span className="w-2 h-2 rounded-[1px] bg-emerald-500 border border-charcoal" />
-                  <span className="font-pixel text-[11px] font-bold uppercase text-emerald-800 dark:text-emerald-300">
-                    Kamar Pairing Terhubung
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2 min-w-0">
+                  <span
+                    className={`w-2 h-2 rounded-[1px] border border-charcoal shrink-0 ${connectionMeta.dotClass}`}
+                  />
+                  <span
+                    className={`font-pixel text-[11px] font-bold uppercase truncate ${connectionMeta.textClass}`}
+                  >
+                    Kamar Pairing ({connectionMeta.label})
                   </span>
                 </div>
                 <button

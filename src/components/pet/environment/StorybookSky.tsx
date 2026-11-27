@@ -3,12 +3,15 @@ import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
 
 import type { NormalizedWeather } from "../../../types/ui";
+import { evaluateTimeLapseAtmosphere } from "../../../features/intro/introTimeline";
 
 export interface StorybookSkyProps {
   weather: NormalizedWeather;
   isNight: boolean;
   isRaining?: boolean;
   cloudSegments?: [number, number];
+  introActive?: boolean;
+  introProgressRef?: React.RefObject<number>;
 }
 
 const CLOUD_TOP_PUFFS: Array<{ pos: [number, number, number]; scale: [number, number, number] }> = [
@@ -204,12 +207,27 @@ const HERO_NIGHT_STARS: Array<{ pos: [number, number, number]; size: number; col
 ];
 
 export const StorybookSky: React.FC<StorybookSkyProps> = React.memo(
-  ({ weather, isNight, isRaining = false, cloudSegments = [10, 8] }) => {
+  ({
+    weather,
+    isNight,
+    isRaining = false,
+    cloudSegments = [10, 8],
+    introActive = false,
+    introProgressRef,
+  }) => {
     const cloudTopInstancedRef = useRef<THREE.InstancedMesh>(null);
     const cloudBaseInstancedRef = useRef<THREE.InstancedMesh>(null);
+    const cloudTopMatRef = useRef<THREE.MeshBasicMaterial>(null);
+    const cloudBaseMatRef = useRef<THREE.MeshBasicMaterial>(null);
     const cloudXOffsetsRef = useRef<Float32Array>(
       Float32Array.from(CLOUD_CONFIGS, (c) => c.baseX)
     );
+    const sunGroupRef = useRef<THREE.Group>(null);
+    const moonGroupRef = useRef<THREE.Group>(null);
+    const starsGroupRef = useRef<THREE.Group>(null);
+    const sunGlowMatRef = useRef<THREE.SpriteMaterial>(null);
+    const sunRayMatRef = useRef<THREE.SpriteMaterial>(null);
+    const moonGlowMatRef = useRef<THREE.SpriteMaterial>(null);
     const starsLayerARef = useRef<THREE.Points>(null);
     const starsLayerBRef = useRef<THREE.Points>(null);
     const heroStarsRef = useRef<THREE.Group>(null);
@@ -366,18 +384,97 @@ export const StorybookSky: React.FC<StorybookSkyProps> = React.memo(
       syncCloudMatrices(raining ? 1.18 : 1);
     }, [raining]);
 
+    useEffect(() => {
+      if (introActive) return;
+      if (cloudTopMatRef.current) {
+        cloudTopMatRef.current.color.set(cloudTopColor);
+        cloudTopMatRef.current.opacity = cloudOpacity;
+      }
+      if (cloudBaseMatRef.current) {
+        cloudBaseMatRef.current.color.set(cloudBaseColor);
+        cloudBaseMatRef.current.opacity = cloudOpacity;
+      }
+      if (sunGroupRef.current) {
+        sunGroupRef.current.position.set(...sunConfig.position);
+        sunGroupRef.current.visible = true;
+      }
+      if (moonGroupRef.current) {
+        moonGroupRef.current.position.set(-16, 13.5, -27);
+        moonGroupRef.current.visible = true;
+      }
+      if (starsGroupRef.current) {
+        starsGroupRef.current.visible = true;
+      }
+    }, [introActive, cloudTopColor, cloudBaseColor, cloudOpacity, sunConfig.position]);
+
     useFrame((state, delta) => {
       const t = state.clock.elapsedTime;
+      const introAtmo =
+        introActive && introProgressRef
+          ? evaluateTimeLapseAtmosphere(introProgressRef.current)
+          : null;
+      const cloudMult = introAtmo ? introAtmo.cloudSpeedMultiplier : 1;
+      const activeRaining = introAtmo ? introAtmo.isRaining : raining;
 
       // 1. Drift instanced clouds smoothly across the sky perimeter (2 draw calls total)
       const xs = cloudXOffsetsRef.current;
       for (let i = 0; i < CLOUD_CONFIGS.length; i++) {
-        xs[i] += delta * CLOUD_CONFIGS[i].speed;
+        xs[i] += delta * CLOUD_CONFIGS[i].speed * cloudMult;
         if (xs[i] > 48) {
           xs[i] = -48;
         }
       }
-      syncCloudMatrices(raining ? 1.18 : 1);
+      syncCloudMatrices(activeRaining ? 1.18 : 1);
+
+      if (introAtmo) {
+        const { celestial } = introAtmo;
+        const clearFactor = Math.max(0, 1 - introAtmo.rainIntensity * 0.85);
+
+        if (sunGroupRef.current) {
+          sunGroupRef.current.position.set(...celestial.sunPos);
+          sunGroupRef.current.visible = celestial.sunOpacity > 0.01 && clearFactor > 0.05;
+        }
+        if (sunGlowMatRef.current) {
+          sunGlowMatRef.current.opacity = 0.65 * celestial.sunOpacity * clearFactor;
+        }
+        if (sunRayMatRef.current) {
+          sunRayMatRef.current.opacity = 0.42 * celestial.sunOpacity * clearFactor;
+          sunRayMatRef.current.rotation += delta * 0.9;
+        }
+        if (moonGroupRef.current) {
+          moonGroupRef.current.position.set(...celestial.moonPos);
+          moonGroupRef.current.visible = celestial.moonOpacity > 0.01 && clearFactor > 0.05;
+        }
+        if (moonGlowMatRef.current) {
+          moonGlowMatRef.current.opacity = 0.44 * celestial.moonOpacity * clearFactor;
+        }
+        if (starsGroupRef.current) {
+          starsGroupRef.current.visible = celestial.starOpacity > 0.02 && clearFactor > 0.1;
+        }
+        if (starsLayerARef.current) {
+          (starsLayerARef.current.material as THREE.PointsMaterial).opacity =
+            (0.72 + Math.sin(t * 2.4) * 0.2) * celestial.starOpacity;
+        }
+        if (starsLayerBRef.current) {
+          (starsLayerBRef.current.material as THREE.PointsMaterial).opacity =
+            (0.76 + Math.cos(t * 3.1) * 0.2) * celestial.starOpacity;
+        }
+        if (cloudTopMatRef.current && cloudBaseMatRef.current) {
+          const nightFade = celestial.starOpacity;
+          const rainFade = introAtmo.rainIntensity;
+          cloudTopMatRef.current.color
+            .set("#ffffff")
+            .lerp(new THREE.Color("#475569"), nightFade * 0.78)
+            .lerp(new THREE.Color("#64748b"), rainFade * 0.75);
+          cloudBaseMatRef.current.color
+            .set("#e2e8f0")
+            .lerp(new THREE.Color("#334155"), nightFade * 0.82)
+            .lerp(new THREE.Color("#475569"), rainFade * 0.8);
+          cloudTopMatRef.current.opacity = 0.94 - nightFade * 0.42;
+          cloudBaseMatRef.current.opacity = 0.94 - nightFade * 0.42;
+        }
+        return;
+      }
 
     // 2. Two-tier twinkling starlight at night (hidden under heavy rain overcast)
     if (isNight && !raining) {
@@ -424,8 +521,8 @@ export const StorybookSky: React.FC<StorybookSkyProps> = React.memo(
   return (
     <group name="StorybookSky">
       {/* --- 1. CELESTIAL SUN (Billboarded Corona + Soft Rays + Bright Sphere) --- */}
-      {!isNight && !raining && (
-        <group position={sunConfig.position}>
+      {(introActive || (!isNight && !raining)) && (
+        <group ref={sunGroupRef} position={sunConfig.position}>
           {/* Crisp 3D Luminous Core */}
           <mesh>
             <sphereGeometry args={[sunConfig.radius, 24, 24]} />
@@ -436,6 +533,7 @@ export const StorybookSky: React.FC<StorybookSkyProps> = React.memo(
           {sunGlowTex && (
             <sprite ref={sunGlowSpriteRef} scale={sunConfig.glowScale}>
               <spriteMaterial
+                ref={sunGlowMatRef}
                 map={sunGlowTex}
                 color={sunConfig.glowColor}
                 transparent
@@ -451,6 +549,7 @@ export const StorybookSky: React.FC<StorybookSkyProps> = React.memo(
           {sunRayTex && (
             <sprite ref={sunRaysSpriteRef} scale={sunConfig.rayScale}>
               <spriteMaterial
+                ref={sunRayMatRef}
                 map={sunRayTex}
                 color={sunConfig.rayColor}
                 transparent
@@ -465,8 +564,8 @@ export const StorybookSky: React.FC<StorybookSkyProps> = React.memo(
       )}
 
       {/* --- 2. CELESTIAL MOON (Malam) --- */}
-      {isNight && !raining && (
-        <group position={[-16, 13.5, -27]}>
+      {(introActive || (isNight && !raining)) && (
+        <group ref={moonGroupRef} position={[-16, 13.5, -27]}>
           {/* Luminous Ivory Moon Sphere */}
           <mesh>
             <sphereGeometry args={[2.0, 20, 20]} />
@@ -485,6 +584,7 @@ export const StorybookSky: React.FC<StorybookSkyProps> = React.memo(
           {sunGlowTex && (
             <sprite ref={moonGlowSpriteRef} scale={9.5}>
               <spriteMaterial
+                ref={moonGlowMatRef}
                 map={sunGlowTex}
                 color="#93c5fd"
                 transparent
@@ -499,8 +599,8 @@ export const StorybookSky: React.FC<StorybookSkyProps> = React.memo(
       )}
 
       {/* --- 3. TWINKLING STARFIELD (Malam) --- */}
-      {isNight && !raining && (
-        <group>
+      {(introActive || (isNight && !raining)) && (
+        <group ref={starsGroupRef}>
           <points ref={starsLayerARef} geometry={starGeoA}>
             <pointsMaterial
               map={starTex ?? undefined}
@@ -557,6 +657,7 @@ export const StorybookSky: React.FC<StorybookSkyProps> = React.memo(
           frustumCulled={false}
         >
           <meshBasicMaterial
+            ref={cloudTopMatRef}
             color={cloudTopColor}
             transparent
             opacity={cloudOpacity}
@@ -570,6 +671,7 @@ export const StorybookSky: React.FC<StorybookSkyProps> = React.memo(
           frustumCulled={false}
         >
           <meshBasicMaterial
+            ref={cloudBaseMatRef}
             color={cloudBaseColor}
             transparent
             opacity={cloudOpacity}

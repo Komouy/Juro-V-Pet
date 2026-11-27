@@ -3,6 +3,34 @@ export interface GeminiContentMessage {
   parts: Array<{ text: string }>;
 }
 
+const DEFAULT_NATIVE_API_BASE_URL = "https://jurovpet.vercel.app";
+
+/**
+ * Resolves the Gemini chat endpoint across web (same-origin /api/gemini/chat)
+ * and Capacitor Android builds (remote HTTPS API base URL).
+ */
+export function resolveGeminiEndpoint(): string {
+  const configuredBase =
+    typeof import.meta !== "undefined"
+      ? (import.meta.env?.VITE_API_BASE_URL as string | undefined)?.trim()
+      : undefined;
+
+  if (configuredBase) {
+    return `${configuredBase.replace(/\/+$/, "")}/api/gemini/chat`;
+  }
+
+  if (typeof window !== "undefined") {
+    const cap = (
+      window as unknown as { Capacitor?: { isNativePlatform?: () => boolean } }
+    ).Capacitor;
+    if (cap?.isNativePlatform?.() || window.location.protocol === "capacitor:") {
+      return `${DEFAULT_NATIVE_API_BASE_URL}/api/gemini/chat`;
+    }
+  }
+
+  return "/api/gemini/chat";
+}
+
 /**
  * HTTP client for the server-side Gemini AI chat proxy endpoint.
  */
@@ -15,7 +43,7 @@ export async function requestGeminiReply(
   const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
   try {
-    const response = await fetch("/api/gemini/chat", {
+    const response = await fetch(resolveGeminiEndpoint(), {
       method: "POST",
       headers: {
         "Content-Type": "application/json",

@@ -1,12 +1,17 @@
-import React, { useRef, useMemo, useEffect } from "react";
+import React, { useRef, useMemo, useEffect, useState } from "react";
 import { useFrame, useThree } from "@react-three/fiber";
 import * as THREE from "three";
 import { SpringOscillator3D } from "../../engine/physics/SpringOscillator";
 import { BehaviorStateMachine } from "../../engine/behavior/BehaviorStateMachine";
 import type { PetBehaviorState } from "../../types/pet";
 import { soundEffects } from "../../engine/audio/soundEffects";
+import { useShallow } from "zustand/react/shallow";
 import { usePetStore } from "../../stores/petStore";
 import { useGameStore } from "../../stores/gameStore";
+import { useCaregiverStore } from "../../stores/caregiverStore";
+import { juroSyncService } from "../../services/firebase/juroSyncService";
+import { PartnerInterpolationBuffer } from "../multiplayer/PartnerInterpolationBuffer";
+import { MovementSyncCoordinator } from "../multiplayer/SyncCoordinator";
 import { getSkinById } from "../../data/economyCatalog";
 import {
   createSleepZTexture,
@@ -74,6 +79,10 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
   partnerName: _partnerName,
   partnerState,
   isPartnerOnline = true,
+  partnerPosition,
+  partnerWalkTarget: _partnerWalkTarget,
+  partnerYaw,
+  partnerLastUpdated,
 }) => {
   const refs: JuroVisualRefs = {
     groupRef: useRef<THREE.Group>(null),
@@ -184,7 +193,15 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
     currentToyBeingPlayed,
     clearToyBeingPlayed,
     setBehaviorState,
-  } = usePetStore();
+  } = usePetStore(
+    useShallow((s) => ({
+      currentState: s.currentState,
+      currentFoodBeingEaten: s.currentFoodBeingEaten,
+      currentToyBeingPlayed: s.currentToyBeingPlayed,
+      clearToyBeingPlayed: s.clearToyBeingPlayed,
+      setBehaviorState: s.setBehaviorState,
+    }))
+  );
   const { activeSkin: storeSkin, activeHat: storeHat } = useGameStore();
   const activeSkin = customSkin ?? storeSkin;
   const activeHat = customHat !== undefined ? customHat : storeHat;
@@ -192,6 +209,24 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
 
   const myBedSlot = isPartner ? (initialPosition || JURO_BED_SLOT_2) : JURO_BED_SLOT_1;
   const fsm = useMemo(() => new BehaviorStateMachine("idle"), []);
+  const lastSyncedWanderTargetRef = useRef(new THREE.Vector3(Number.NaN, 0, Number.NaN));
+
+  const interpolationBuffer = useMemo(
+    () => (isPartner ? new PartnerInterpolationBuffer() : null),
+    [isPartner]
+  );
+
+  const syncCoordinator = useMemo(() => {
+    if (isPartner) return null;
+    return new MovementSyncCoordinator({
+      onDispatchMovement: (payload) => {
+        const { activeRoomCode, myProfile } = useCaregiverStore.getState();
+        if (activeRoomCode && myProfile?.id) {
+          void juroSyncService.syncMyPetMovement(activeRoomCode, myProfile.id, payload);
+        }
+      },
+    });
+  }, [isPartner]);
 
   const sleepZTexture = useMemo(() => createSleepZTexture(), []);
   const softShadowTexture = useMemo(() => createSoftShadowTexture(), []);
@@ -211,7 +246,7 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
     return () => mq.removeEventListener("change", onChange);
   }, []);
 
-  const spring = useMemo(() => {
+  const [spring] = useState(() => {
     const isNight = isBedtimeHour(new Date());
     const initialSleep = isPartner
       ? !isPartnerOnline || partnerState === "sleep"
@@ -220,14 +255,29 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
     const initialGrowth = 0.68 + (Math.min(10, Math.max(1, initialLevel)) - 1) * (0.52 / 9);
     const initBottom = BODY_BOTTOM_LOCAL * JURO_BASE_SCALE * initialGrowth;
 
+    const springOpts = { stiffness: 190, damping: 12.5, mass: 1 };
+
+    if (
+      isPartner &&
+      partnerPosition &&
+      Number.isFinite(partnerPosition.x) &&
+      Number.isFinite(partnerPosition.z)
+    ) {
+      const initY =
+        partnerPosition.y ?? getTerrainHeightAt(partnerPosition.x, partnerPosition.z) + initBottom;
+      return new SpringOscillator3D(
+        new THREE.Vector3(partnerPosition.x, initY, partnerPosition.z),
+        springOpts
+      );
+    }
+
     if (initialPosition) {
       const initY =
         initialPosition.y ?? getTerrainHeightAt(initialPosition.x, initialPosition.z) + initBottom;
-      return new SpringOscillator3D(new THREE.Vector3(initialPosition.x, initY, initialPosition.z), {
-        stiffness: 145,
-        damping: 10,
-        mass: 1,
-      });
+      return new SpringOscillator3D(
+        new THREE.Vector3(initialPosition.x, initY, initialPosition.z),
+        springOpts
+      );
     }
 
     if (initialSleep) {
@@ -235,26 +285,31 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
       const bedGroundY = getTerrainHeightAt(sleepBed.x, sleepBed.z);
       return new SpringOscillator3D(
         new THREE.Vector3(sleepBed.x, bedGroundY + 0.44 + initBottom * 0.88, sleepBed.z),
-        { stiffness: 145, damping: 10, mass: 1 }
+        springOpts
       );
     }
 
     const savedPos = usePetStore.getState().lastPosition;
     if (savedPos && Number.isFinite(savedPos.x) && Number.isFinite(savedPos.z)) {
       const groundY = getTerrainHeightAt(savedPos.x, savedPos.z);
-      return new SpringOscillator3D(new THREE.Vector3(savedPos.x, groundY + initBottom, savedPos.z), {
-        stiffness: 145,
-        damping: 10,
-        mass: 1,
-      });
+      return new SpringOscillator3D(
+        new THREE.Vector3(savedPos.x, groundY + initBottom, savedPos.z),
+        springOpts
+      );
     }
 
-    return new SpringOscillator3D(new THREE.Vector3(0, BASE_GROUND_Y + initBottom, 0.2), {
-      stiffness: 145,
-      damping: 10,
-      mass: 1,
-    });
-  }, [initialPosition, level, isPartner, isPartnerOnline, partnerState]);
+    return new SpringOscillator3D(new THREE.Vector3(0, BASE_GROUND_Y + initBottom, 0.2), springOpts);
+  });
+
+  useEffect(() => {
+    if (!isPartner || !interpolationBuffer || !partnerPosition) return;
+    interpolationBuffer.pushSample(
+      partnerPosition.x,
+      partnerPosition.z,
+      partnerYaw ?? 0,
+      Date.now()
+    );
+  }, [isPartner, interpolationBuffer, partnerPosition, partnerYaw, partnerLastUpdated]);
 
   useEffect(() => {
     return () => {
@@ -268,15 +323,16 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
   }, [spring, isPartner]);
 
   useEffect(() => {
-    if (storeState && storeState !== fsm.currentState && fsm.currentState !== "dragging") {
+    if (!isPartner && storeState && storeState !== fsm.currentState && fsm.currentState !== "dragging") {
       fsm.transitionTo(storeState, true);
     }
-  }, [storeState, fsm]);
+  }, [isPartner, storeState, fsm]);
 
   useEffect(() => {
-    if (!walkCommand) return;
+    if (!walkCommand || isPartner) return;
     enqueueWalkPath({
       walkCommand,
+      isPartner,
       spring,
       fsm,
       waypointQueueRef,
@@ -289,6 +345,7 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
     });
   }, [
     walkCommand,
+    isPartner,
     fsm,
     setBehaviorState,
     isHeadingToBedRef,
@@ -401,8 +458,10 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
 
     const currentState = fsm.currentState;
     const isSleepingNow = currentState === "sleep";
-    const isEatingNow = currentState === "eating";
-    const isPlayingToyNow = currentToyBeingPlayed !== null;
+    const isEatingNow = !isPartner && currentState === "eating";
+    const effectiveToy = isPartner ? null : currentToyBeingPlayed;
+    const effectiveEating = !isPartner && storeState === "eating";
+    const isPlayingToyNow = effectiveToy !== null;
     const motionScale = prefersReducedMotionRef.current ? 0.3 : 1;
     const isNightSleepy = isBedtimeHour();
     const isSleepy = isNightSleepy || liveAttributes.energy < 45;
@@ -429,11 +488,16 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
     currentPetScaleRef.current = currentPetScale;
     const currentBottomOffset = BODY_BOTTOM_LOCAL * currentPetScale;
 
+    const partnerPose =
+      isPartner && interpolationBuffer ? interpolationBuffer.sample(Date.now()) : null;
+
     stepJuroMovementAndPhysics({
       t,
       delta,
+      isPartner,
+      partnerPose,
       currentState,
-      storeState,
+      storeState: isPartner ? currentState : storeState,
       isSleepy,
       isSleepingNow,
       isEatingNow,
@@ -459,7 +523,7 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
       sleepyYawnTimer,
       dizzyRef,
       fetchBallRef,
-      currentToyBeingPlayed,
+      currentToyBeingPlayed: effectiveToy,
       myBedSlot,
       isHeadingToBedRef,
       onBedArrival,
@@ -469,8 +533,8 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
       isHeadingToTrampolineRef,
       onTrampolineArrival,
       isBouncingOnTrampoline,
-      isBlowingBubbles,
-      isDraggingFood,
+      isBlowingBubbles: !isPartner && isBlowingBubbles,
+      isDraggingFood: !isPartner && isDraggingFood,
       camera,
       size,
       juroScreenPosRef,
@@ -478,33 +542,65 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
       juroYawRef,
     });
 
+    if (!isPartner && syncCoordinator) {
+      const activeRoomCode = useCaregiverStore.getState().activeRoomCode;
+      if (activeRoomCode) {
+        const currentYaw = refs.groupRef.current?.rotation.y ?? 0;
+        const nowMs = Date.now();
+        if (currentState === "wander") {
+          const tx = fsm.wanderTarget.x;
+          const tz = fsm.wanderTarget.z;
+          if (
+            Math.hypot(
+              tx - lastSyncedWanderTargetRef.current.x,
+              tz - lastSyncedWanderTargetRef.current.z
+            ) > 0.15
+          ) {
+            lastSyncedWanderTargetRef.current.set(tx, 0, tz);
+            syncCoordinator.publishWalkIntent(
+              spring.position,
+              { x: tx, z: tz },
+              currentYaw,
+              nowMs
+            );
+          }
+        }
+        syncCoordinator.publishCheckpoint(spring.position, currentYaw, currentState, nowMs);
+      } else {
+        syncCoordinator.reset();
+        lastSyncedWanderTargetRef.current.set(Number.NaN, 0, Number.NaN);
+      }
+    }
+
     const restY = getTerrainHeightAt(spring.position.x, spring.position.z) + currentBottomOffset;
-    updateEatingAndToys({
-      t,
-      delta,
-      currentState,
-      isCurrentlyEating: storeState === "eating",
-      motionScale,
-      currentToyBeingPlayed,
-      spring,
-      fsm,
-      setBehaviorState,
-      clearToyBeingPlayed,
-      groupRef: refs.groupRef,
-      foodPropRef: refs.foodPropRef,
-      crumbsGroupRef: refs.crumbsGroupRef,
-      heartBubbleRef: refs.heartBubbleRef,
-      worldToyRef: refs.worldToyRef,
-      worldToyMeshRef: refs.worldToyMeshRef,
-      worldToyShadowRef: refs.worldToyShadowRef,
-      eatingTimer,
-      lastBiteSoundRef,
-      playTimer,
-      fetchBallRef,
-      bubbleStandRef,
-      radioStandRef,
-      restY,
-    });
+    if (!isPartner) {
+      updateEatingAndToys({
+        t,
+        delta,
+        currentState,
+        isCurrentlyEating: effectiveEating,
+        motionScale,
+        currentToyBeingPlayed: effectiveToy,
+        spring,
+        fsm,
+        setBehaviorState,
+        clearToyBeingPlayed,
+        groupRef: refs.groupRef,
+        foodPropRef: refs.foodPropRef,
+        crumbsGroupRef: refs.crumbsGroupRef,
+        heartBubbleRef: refs.heartBubbleRef,
+        worldToyRef: refs.worldToyRef,
+        worldToyMeshRef: refs.worldToyMeshRef,
+        worldToyShadowRef: refs.worldToyShadowRef,
+        eatingTimer,
+        lastBiteSoundRef,
+        playTimer,
+        fetchBallRef,
+        bubbleStandRef,
+        radioStandRef,
+        restY,
+      });
+    }
 
     updateJuroExpressionsAndParticles({
       t,
@@ -514,13 +610,13 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
       level,
       activeHat,
       isRaining,
-      isBlowingBubbles,
-      isDraggingFood,
-      isCurrentlyEating: storeState === "eating",
+      isBlowingBubbles: !isPartner && isBlowingBubbles,
+      isDraggingFood: !isPartner && isDraggingFood,
+      isCurrentlyEating: effectiveEating,
       motionScale,
       liveAttributes,
-      liveBath,
-      currentToyBeingPlayed,
+      liveBath: isPartner ? undefined : liveBath,
+      currentToyBeingPlayed: effectiveToy,
       fsm,
       spring,
       refs,
@@ -529,7 +625,7 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
       eatingTimer,
       fetchBallRef,
       dizzyRef,
-      isDizzyRef,
+      isDizzyRef: isPartner ? undefined : isDizzyRef,
       dirtyShakeTimer,
     });
   });
@@ -544,10 +640,10 @@ export const JuroModel: React.FC<JuroModelProps> = React.memo(({
       level={level}
       usePhysicalMaterial={usePhysicalMaterial}
       shadowsEnabled={shadowsEnabled}
-      isCurrentlyEating={storeState === "eating"}
-      currentFoodBeingEaten={currentFoodBeingEaten}
-      isPlayingToy={storeState === "play" && Boolean(currentToyBeingPlayed)}
-      currentToyBeingPlayed={currentToyBeingPlayed}
+      isCurrentlyEating={!isPartner && storeState === "eating"}
+      currentFoodBeingEaten={isPartner ? null : currentFoodBeingEaten}
+      isPlayingToy={!isPartner && storeState === "play" && Boolean(currentToyBeingPlayed)}
+      currentToyBeingPlayed={isPartner ? null : currentToyBeingPlayed}
       sleepZTexture={sleepZTexture}
       softShadowTexture={softShadowTexture}
       dizzyEyeTexture={dizzyEyeTexture}

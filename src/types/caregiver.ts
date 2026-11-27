@@ -84,6 +84,12 @@ export interface SharedJuroState {
   updatedByCaregiverId?: string;
 }
 
+export type SyncConnectionState =
+  | "disconnected"
+  | "connecting"
+  | "connected"
+  | "reconnecting";
+
 /**
  * Snapshot status Pet milik Pengasuh Pasangan yang berkunjung ke lembah bersama (Mode Dual-Pet)
  */
@@ -103,6 +109,8 @@ export interface PartnerPetState {
   activeHat?: string;
   isOnline: boolean;
   position?: { x: number; y: number; z: number };
+  walkTarget?: { x: number; z: number };
+  yaw?: number;
   lastUpdated: number;
 }
 

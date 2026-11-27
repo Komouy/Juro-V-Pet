@@ -114,6 +114,10 @@ export interface JuroModelProps {
   partnerName?: string;
   partnerState?: PetBehaviorState;
   isPartnerOnline?: boolean;
+  partnerPosition?: { x: number; y: number; z: number };
+  partnerWalkTarget?: { x: number; z: number } | null;
+  partnerYaw?: number;
+  partnerLastUpdated?: number;
 }
 
 export interface JumpState {

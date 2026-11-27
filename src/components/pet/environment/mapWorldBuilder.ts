@@ -29,14 +29,13 @@ export function buildRetroWorld(
   const terrainSegments = opts.terrainSegments ?? 96;
 
   const ctx = createWorldBuildContext(scene, textures, shadowsEnabled, maxPointLights);
-  const { terrainMesh, cobbleOverlay, waterMesh, kois } = buildTerrainAndWater(ctx, terrainSegments);
+  const { terrainMesh, waterMesh, kois } = buildTerrainAndWater(ctx, terrainSegments);
   const landmarkHitboxes = buildLandmarks(ctx);
   const rain = buildPropsAndRain(ctx, rainCount);
 
   return {
     rootGroup: ctx.rootGroup,
     terrainMesh,
-    cobbleOverlay,
     waterMesh,
     kois,
     lanternLights: ctx.lanternLights,

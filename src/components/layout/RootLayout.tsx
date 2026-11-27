@@ -22,6 +22,8 @@ export const RootLayout: React.FC = () => {
   const closeHubModal = useCaregiverStore((s) => s.closeHubModal);
   const weather = useUIStore((s) => s.weather);
   const scanlinesEnabled = useUIStore((s) => s.scanlinesEnabled);
+  const hasSeenIntro = useUIStore((s) => s.hasSeenIntro);
+  const isIntroActive = !isOverlayOpen && !hasSeenIntro;
 
   // Seamless BGM switching per view & day/night phase
   useEffect(() => {
@@ -60,12 +62,16 @@ export const RootLayout: React.FC = () => {
 
   return (
     <div className="h-dvh overflow-hidden flex flex-col bg-[#F4EFE6] text-charcoal dark:bg-[#141519] dark:text-[#F4F4F5] transition-colors duration-150">
-      <Navbar />
+      {!isIntroActive && <Navbar />}
       <PixelToast />
       <CaregiverHubModal isOpen={isHubModalOpen} onClose={closeHubModal} />
-      <DesktopPetGlance />
+      {!isIntroActive && <DesktopPetGlance />}
 
-      <div className="relative flex-1 min-h-0 w-full flex flex-col pb-14 md:pb-0">
+      <div
+        className={`relative flex-1 min-h-0 w-full flex flex-col ${
+          isIntroActive ? "" : "pb-14 md:pb-0"
+        }`}
+      >
         {/* Persistent Live 3D Juro Viewport (pauses WebGL loop while overlay or modal covers screen) */}
         <HomePage isPaused={isOverlayOpen || isHubModalOpen} />
 

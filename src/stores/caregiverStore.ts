@@ -6,6 +6,7 @@ import type {
   CareActionType,
   CaregiverRelationshipInfo,
   PartnerPetState,
+  SyncConnectionState,
 } from "../types/caregiver";
 import { juroSyncService } from "../services/firebase/juroSyncService";
 import { usePetStore } from "./petStore";
@@ -48,6 +49,7 @@ interface CaregiverState {
   activeRoomCode: string | null;
   partnerProfile: CaregiverProfile | null;
   pairingStatus: "idle" | "loading" | "paired" | "error";
+  connectionState: SyncConnectionState;
   errorMessage: string | null;
   activityLogs: CaregiverActionLog[];
   hasRegisteredName: boolean;
@@ -61,6 +63,7 @@ interface CaregiverState {
   openHubModal: () => void;
   closeHubModal: () => void;
   setProfile: (name: string, roleTitle?: string) => void;
+  resetProfile: () => void;
   createRoom: () => Promise<{ ok: boolean; roomCode?: string; error?: string }>;
   joinRoom: (roomCode: string) => Promise<{ ok: boolean; error?: string }>;
   disconnectRoom: () => void;
@@ -86,6 +89,7 @@ export const useCaregiverStore = create<CaregiverState>((set, get) => {
     activeRoomCode: initialRoom,
     partnerProfile: null,
     pairingStatus: initialRoom ? "paired" : "idle",
+    connectionState: "disconnected",
     errorMessage: null,
     activityLogs: [],
     hasRegisteredName: initialProfile !== null && initialProfile.name.trim().length > 0,
@@ -115,6 +119,31 @@ export const useCaregiverStore = create<CaregiverState>((set, get) => {
 
       localStorage.setItem(PROFILE_STORAGE_KEY, JSON.stringify(profile));
       set({ myProfile: profile, hasRegisteredName: true });
+    },
+
+    resetProfile: () => {
+      if (syncDebounceTimer) {
+        clearTimeout(syncDebounceTimer);
+        syncDebounceTimer = null;
+      }
+      juroSyncService.unsubscribe();
+      if (typeof localStorage !== "undefined") {
+        localStorage.removeItem(PROFILE_STORAGE_KEY);
+        localStorage.removeItem(ROOM_STORAGE_KEY);
+      }
+      usePartnerPetStore.getState().clearPartnerPet();
+      set({
+        myProfile: null,
+        activeRoomCode: null,
+        partnerProfile: null,
+        partnerPet: null,
+        isPartnerPetPresent: false,
+        pairingStatus: "idle",
+        connectionState: "disconnected",
+        errorMessage: null,
+        activityLogs: [],
+        hasRegisteredName: false,
+      });
     },
 
     createRoom: async () => {
@@ -251,6 +280,10 @@ export const useCaregiverStore = create<CaregiverState>((set, get) => {
     },
 
     disconnectRoom: () => {
+      if (syncDebounceTimer) {
+        clearTimeout(syncDebounceTimer);
+        syncDebounceTimer = null;
+      }
       juroSyncService.unsubscribe();
       localStorage.removeItem(ROOM_STORAGE_KEY);
       usePartnerPetStore.getState().clearPartnerPet();
@@ -260,6 +293,7 @@ export const useCaregiverStore = create<CaregiverState>((set, get) => {
         partnerPet: null,
         isPartnerPetPresent: false,
         pairingStatus: "idle",
+        connectionState: "disconnected",
         errorMessage: null,
       });
       soundEffects.playDismiss();
@@ -396,6 +430,21 @@ export const useCaregiverStore = create<CaregiverState>((set, get) => {
           if (incoming.memories && Array.isArray(incoming.memories)) {
             syncAndMergeMemories(incoming.memories);
           }
+          if (incoming.updatedByCaregiverId && incoming.updatedByCaregiverId !== myProfile.id) {
+            useGameStore.setState((prev) => ({
+              unlockedSkins: Array.from(
+                new Set([...(prev.unlockedSkins || []), ...(incoming.unlockedSkins || [])])
+              ),
+              unlockedHats: Array.from(
+                new Set([...(prev.unlockedHats || []), ...(incoming.unlockedHats || [])])
+              ),
+              ownedToys: Array.from(
+                new Set([...(prev.ownedToys || []), ...(incoming.ownedToys || [])])
+              ),
+              deepestFloor: Math.max(prev.deepestFloor ?? 1, incoming.deepestFloor ?? 1),
+              pickaxeLevel: Math.max(prev.pickaxeLevel ?? 1, incoming.pickaxeLevel ?? 1),
+            }));
+          }
         },
 
         onPartnerStatusChange: (partner) => {
@@ -407,6 +456,10 @@ export const useCaregiverStore = create<CaregiverState>((set, get) => {
               "profile"
             );
           }
+        },
+
+        onConnectionStateChange: (connectionState) => {
+          set({ connectionState });
         },
 
         onPartnerPetSync: (partnerPet) => {
@@ -443,6 +496,13 @@ export const useCaregiverStore = create<CaregiverState>((set, get) => {
           }
         },
 
+        onRoomClosed: () => {
+          get().disconnectRoom();
+          useUIStore
+            .getState()
+            .showToast("Kamar pairing telah ditutup atau tidak ditemukan.", "warn");
+        },
+
         onError: (err) => {
           console.warn("Koneksi kamar terputus:", err.message);
         },
@@ -477,6 +537,8 @@ usePetStore.subscribe((state, prevState) => {
     state.level !== prevState.level ||
     Math.abs(state.hunger - prevState.hunger) >= 2 ||
     Math.abs(state.energy - prevState.energy) >= 3 ||
+    Math.abs(state.happiness - prevState.happiness) >= 3 ||
+    Math.abs(state.cleanliness - prevState.cleanliness) >= 3 ||
     state.name !== prevState.name
   ) {
     triggerDebouncedPetSync();

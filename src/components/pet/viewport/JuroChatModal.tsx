@@ -39,7 +39,7 @@ function getDynamicQuickPrompts(props: JuroChatModalProps): string[] {
   }
 
   const defaults: string[] = [
-    ""
+    
   ];
 
   for (const d of defaults) {
@@ -128,44 +128,57 @@ export const JuroChatModal: React.FC<JuroChatModalProps> = (props) => {
         </div>
       </div>
 
-      {/* Live Scrollable Conversation Transcript */}
-      <div className="max-h-40 overflow-y-auto space-y-2 mb-3 pr-1">
+      {/* Live Scrollable Conversation Transcript (Grouped Bubble Mode) */}
+      <div className="max-h-48 overflow-y-auto rounded-[5px] bg-[#F5F0E4] dark:bg-[#14151B] border-2 border-charcoal/20 dark:border-[#3F424E] p-2.5 mb-2.5">
         {recentMessages.length === 0 && !isLoading ? (
-          <div className="p-2.5 rounded-[4px] bg-[#EFE9DC] dark:bg-[#101114] border border-charcoal/30 dark:border-[#3F424E] text-xs text-neutral-600 dark:text-neutral-400 text-center">
+          <div className="py-5 px-3 text-xs text-neutral-600 dark:text-neutral-400 text-center">
             Mulai percakapan dengan {petName} melalui sapaan cepat atau ketik pesan di bawah.
           </div>
         ) : (
-          recentMessages.map((msg) => {
-            const isUser = msg.sender === "user";
-            return (
-              <div
-                key={msg.id}
-                className={`flex ${isUser ? "justify-end" : "justify-start"}`}
-              >
+          <div className="flex flex-col">
+            {recentMessages.map((msg, idx) => {
+              const isUser = msg.sender === "user";
+              const prevMsg = idx > 0 ? recentMessages[idx - 1] : null;
+              const nextMsg = idx < recentMessages.length - 1 ? recentMessages[idx + 1] : null;
+              const isFirstInGroup = !prevMsg || prevMsg.sender !== msg.sender;
+              const isLastInGroup = !nextMsg || nextMsg.sender !== msg.sender;
+
+              const bubbleShape = isUser
+                ? `${isFirstInGroup ? "rounded-tr-[2px]" : ""} ${isLastInGroup ? "rounded-br-[8px]" : "rounded-br-[3px]"} rounded-tl-[8px] rounded-bl-[8px]`
+                : `${isFirstInGroup ? "rounded-tl-[2px]" : ""} ${isLastInGroup ? "rounded-bl-[8px]" : "rounded-bl-[3px]"} rounded-tr-[8px] rounded-br-[8px]`;
+
+              return (
                 <div
-                  className={`max-w-[85%] px-2.5 py-1.5 rounded-[4px] border-2 text-xs leading-relaxed ${
-                    isUser
-                      ? "bg-juro-orange text-white border-charcoal font-medium"
-                      : "bg-[#EFE9DC] dark:bg-[#101114] text-charcoal dark:text-neutral-100 border-charcoal/70 dark:border-[#3F424E]"
+                  key={msg.id}
+                  className={`flex flex-col ${isUser ? "items-end" : "items-start"} ${
+                    idx === 0 ? "" : isFirstInGroup ? "mt-2.5" : "mt-1"
                   }`}
                 >
-                  {!isUser && (
-                    <span className="block font-pixel text-[9px] font-bold uppercase text-juro-orange mb-0.5">
+                  {isFirstInGroup && !isUser && (
+                    <span className="font-pixel text-[9px] font-bold uppercase tracking-wide text-juro-orange ml-1 mb-0.5">
                       {petName}
                     </span>
                   )}
-                  <span className="select-text break-words">{msg.text}</span>
+                  <div
+                    className={`max-w-[82%] px-3 py-1.5 border-2 text-xs leading-relaxed ${bubbleShape} ${
+                      isUser
+                        ? "bg-juro-orange text-white border-charcoal shadow-[0_2px_0_#18181B] font-medium"
+                        : "bg-[#FDFBF7] dark:bg-[#1E2028] text-charcoal dark:text-neutral-100 border-charcoal/75 dark:border-[#4A4E5E] shadow-[0_2px_0_rgba(24,24,27,0.14)]"
+                    }`}
+                  >
+                    <span className="select-text break-words">{msg.text}</span>
+                  </div>
                 </div>
-              </div>
-            );
-          })
+              );
+            })}
+          </div>
         )}
 
         {isLoading && (
-          <div className="flex justify-start">
-            <div className="px-2.5 py-1.5 rounded-[4px] border-2 border-charcoal/70 dark:border-[#3F424E] bg-[#EFE9DC] dark:bg-[#101114] inline-flex items-center gap-2">
+          <div className="flex justify-start mt-2">
+            <div className="px-3 py-1.5 rounded-[8px] rounded-tl-[2px] border-2 border-charcoal/75 dark:border-[#4A4E5E] bg-[#FDFBF7] dark:bg-[#1E2028] inline-flex items-center gap-2">
               <span className="font-pixel text-[10px] font-bold text-neutral-600 dark:text-neutral-400">
-                {petName} berpikir
+                {petName} mengetik
               </span>
               <span className="inline-flex gap-1">
                 <span className="w-1.5 h-1.5 bg-juro-orange rounded-[1px] animate-bounce [animation-delay:-0.3s]" />
@@ -179,19 +192,21 @@ export const JuroChatModal: React.FC<JuroChatModalProps> = (props) => {
       </div>
 
       {/* Dynamic Contextual Quick Prompts */}
-      <div className="flex flex-wrap gap-1.5 mb-3">
-        {quickPrompts.map((prompt) => (
-          <button
-            key={prompt}
-            type="button"
-            disabled={isLoading}
-            onClick={() => handleQuickPrompt(prompt)}
-            className="console-btn-bevel px-2.5 py-1 rounded-[4px] bg-[#EFE9DC] dark:bg-[#101114] border-2 border-charcoal/75 dark:border-[#3F424E] text-xs font-medium text-charcoal dark:text-neutral-200 hover:border-juro-orange hover:text-juro-orange disabled:opacity-50 cursor-pointer"
-          >
-            {prompt}
-          </button>
-        ))}
-      </div>
+      {quickPrompts.length > 0 && (
+        <div className="flex flex-wrap gap-1.5 mb-2.5">
+          {quickPrompts.map((prompt) => (
+            <button
+              key={prompt}
+              type="button"
+              disabled={isLoading}
+              onClick={() => handleQuickPrompt(prompt)}
+              className="console-btn-bevel px-2.5 py-1 rounded-[4px] bg-[#EFE9DC] dark:bg-[#101114] border-2 border-charcoal/70 dark:border-[#3F424E] text-[11px] font-medium text-charcoal dark:text-neutral-200 hover:border-juro-orange hover:text-juro-orange disabled:opacity-50 cursor-pointer"
+            >
+              {prompt}
+            </button>
+          ))}
+        </div>
+      )}
 
       {/* Cartridge Input Form */}
       <form onSubmit={handleSubmit} className="flex items-center gap-2">
@@ -199,6 +214,7 @@ export const JuroChatModal: React.FC<JuroChatModalProps> = (props) => {
           <PixelInput
             type="text"
             compact
+            hideCounter
             autoFocus
             value={input}
             onChange={(e) => setInput(e.target.value)}
@@ -210,7 +226,7 @@ export const JuroChatModal: React.FC<JuroChatModalProps> = (props) => {
         <button
           type="submit"
           disabled={!input.trim() || isLoading}
-          className={`console-btn-bevel h-[38px] px-3 rounded-[4px] border-2 border-charcoal font-pixel text-xs font-bold uppercase flex items-center gap-1.5 shrink-0 ${
+          className={`console-btn-bevel h-[36px] px-3 rounded-[4px] border-2 border-charcoal font-pixel text-xs font-bold uppercase flex items-center gap-1.5 shrink-0 ${
             input.trim() && !isLoading
               ? "bg-juro-orange text-white shadow-[0_2px_0_#18181B] hover:bg-[#EA580C] cursor-pointer"
               : "bg-[#EFE9DC] dark:bg-[#101114] text-neutral-400 cursor-not-allowed opacity-60"

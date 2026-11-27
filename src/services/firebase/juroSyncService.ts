@@ -7,7 +7,11 @@ import {
   onValue,
   off,
   onDisconnect,
+  query,
+  limitToLast,
+  serverTimestamp,
   type DataSnapshot,
+  type Query,
 } from "firebase/database";
 import { getFirebaseDatabaseInstance, isFirebaseConfigured } from "./firebaseConfig";
 import type {
@@ -17,6 +21,14 @@ import type {
   JuroPairingRoomData,
   PartnerPetState,
 } from "../../types/caregiver";
+import type {
+  IRoomSyncPort,
+  PartnerMovementPayload,
+  RoomSyncCallbacks,
+} from "../../ports/roomSyncPort";
+import { ActivityLogDeduplicator } from "../../features/multiplayer/SyncCoordinator";
+
+export type SyncCallbacks = RoomSyncCallbacks;
 
 /**
  * Menghapus rekursif seluruh properti bernilai `undefined` agar aman dikirim ke Firebase Realtime Database
@@ -46,54 +58,60 @@ export function generatePairingCode(): string {
   return `JURO-${digits}`;
 }
 
-export interface SyncCallbacks {
-  onJuroStateSync: (juroState: SharedJuroState) => void;
-  onPartnerPetSync?: (partnerPet: PartnerPetState | null) => void;
-  onActivityLogAdded?: (log: CaregiverActionLog) => void;
-  onInitialLogsLoaded?: (logs: CaregiverActionLog[]) => void;
-  onPartnerStatusChange?: (partner: CaregiverProfile | null) => void;
-  onError?: (error: Error) => void;
+/**
+ * Membersihkan kode pairing agar hanya berisi karakter aman untuk path Firebase RTDB.
+ */
+export function sanitizeRoomCode(roomCodeInput: string): string {
+  return roomCodeInput.trim().toUpperCase().replace(/[^A-Z0-9-]/g, "");
+}
+
+const MAX_CREATE_RETRIES = 6;
+
+interface SubscribedQueryHandle {
+  target: Query;
+  callback: (snapshot: DataSnapshot) => void;
 }
 
 /**
- * Service sinkronisasi realtime 1 Juro 2 Perawat via Firebase Realtime Database
+ * Adapter Firebase Realtime Database untuk sinkronisasi 1-2 perawat & mode Mabar.
+ * Menggunakan listener sub-path terpisah, limitToLast log, deduplikasi berbasis ID,
+ * update parsial untuk posisi pet, serta pemulihan koneksi otomatis saat tab aktif kembali.
  */
-export class JuroRealtimeSyncService {
-  private activeRoomListener: { path: string; callback: (snapshot: DataSnapshot) => void } | null = null;
+export class JuroRealtimeSyncService implements IRoomSyncPort {
+  private subListeners: SubscribedQueryHandle[] = [];
   private activePresenceListener: {
     path: string;
     callback: (snapshot: DataSnapshot) => void;
     myPresencePath: string;
   } | null = null;
+  private lifecycleCleanup: (() => void) | null = null;
+  private onConnectionStateChangeCb: ((state: "disconnected") => void) | null = null;
+  private logDeduplicator = new ActivityLogDeduplicator(250);
 
-  /**
-   * Mengecek apakah layanan sinkronisasi cloud siap dipakai
-   */
   public isReady(): boolean {
     return isFirebaseConfigured();
   }
 
-  /**
-   * Membuat Kamar Pairing Baru (Perawat 1)
-   */
   public async createPairingRoom(
     caregiver: CaregiverProfile,
-    initialJuro: SharedJuroState
+    initialJuro: SharedJuroState,
+    attempt = 0
   ): Promise<{ ok: boolean; roomCode?: string; error?: string }> {
     const db = getFirebaseDatabaseInstance();
     if (!db) {
       return { ok: false, error: "Firebase Realtime Database belum terkonfigurasi." };
+    }
+    if (attempt >= MAX_CREATE_RETRIES) {
+      return { ok: false, error: "Gagal menghasilkan kode kamar unik. Silakan coba lagi." };
     }
 
     try {
       const roomCode = generatePairingCode();
       const roomRef = ref(db, `rooms/${roomCode}`);
 
-      // Cek apakah kode kebetulan sudah terpakai
       const existing = await get(roomRef);
       if (existing.exists()) {
-        // Coba ulang dengan kode baru jika tabrakan
-        return this.createPairingRoom(caregiver, initialJuro);
+        return this.createPairingRoom(caregiver, initialJuro, attempt + 1);
       }
 
       const initialLogId = `log_init_${Date.now()}`;
@@ -103,7 +121,7 @@ export class JuroRealtimeSyncService {
         caregiverId: caregiver.id,
         caregiverName: caregiver.name,
         caregiverRoleTitle: caregiver.roleTitle,
-        actionType: "interaction" as const,
+        actionType: "interaction",
         description: `${caregiver.name} (${caregiver.roleTitle}) membuat kamar Juro! Kode pairing: ${roomCode}`,
       };
 
@@ -153,9 +171,6 @@ export class JuroRealtimeSyncService {
     }
   }
 
-  /**
-   * Bergabung ke Kamar Pairing yang Sudah Ada (Perawat 2)
-   */
   public async joinPairingRoom(
     roomCodeInput: string,
     caregiver: CaregiverProfile
@@ -165,7 +180,7 @@ export class JuroRealtimeSyncService {
       return { ok: false, error: "Firebase Realtime Database belum terkonfigurasi." };
     }
 
-    const cleanCode = roomCodeInput.trim().toUpperCase();
+    const cleanCode = sanitizeRoomCode(roomCodeInput);
     if (!cleanCode) {
       return { ok: false, error: "Kode pairing tidak boleh kosong." };
     }
@@ -179,21 +194,17 @@ export class JuroRealtimeSyncService {
       }
 
       const room = snapshot.val() as JuroPairingRoomData;
+      const isAlreadyCaregiver1 = room.caregivers.caregiver1?.id === caregiver.id;
+      const isAlreadyCaregiver2 = room.caregivers.caregiver2?.id === caregiver.id;
 
-      // Cek apakah slot perawat 2 sudah terisi oleh orang lain
-      if (
-        room.caregivers.caregiver2 &&
-        room.caregivers.caregiver2.id !== caregiver.id &&
-        room.caregivers.caregiver1.id !== caregiver.id
-      ) {
+      if (room.caregivers.caregiver2 && !isAlreadyCaregiver1 && !isAlreadyCaregiver2) {
         return {
           ok: false,
           error: "Kamar ini sudah memiliki 2 perawat lengkap. 1 Juro hanya dapat dirawat oleh 2 orang.",
         };
       }
 
-      // Jika kita adalah perawat 2 yang baru bergabung
-      if (room.caregivers.caregiver1.id !== caregiver.id) {
+      if (!isAlreadyCaregiver1 && !isAlreadyCaregiver2) {
         const joinLogRef = push(ref(db, `rooms/${cleanCode}/activityLogs`));
         const joinLog: CaregiverActionLog = {
           id: joinLogRef.key || `log_${Date.now()}`,
@@ -223,12 +234,15 @@ export class JuroRealtimeSyncService {
           lastUpdated: Date.now(),
         };
 
-        await update(ref(db, `rooms/${cleanCode}`), sanitizeForFirebase({
-          "caregivers/caregiver2": caregiver,
-          [`pets/${caregiver.id}`]: myInitialPet,
-          lastUpdatedAt: Date.now(),
-          [`activityLogs/${joinLog.id}`]: joinLog,
-        }));
+        await update(
+          ref(db, `rooms/${cleanCode}`),
+          sanitizeForFirebase({
+            "caregivers/caregiver2": caregiver,
+            [`pets/${caregiver.id}`]: myInitialPet,
+            lastUpdatedAt: serverTimestamp(),
+            [`activityLogs/${joinLog.id}`]: joinLog,
+          })
+        );
 
         room.caregivers.caregiver2 = caregiver;
       }
@@ -241,34 +255,44 @@ export class JuroRealtimeSyncService {
   }
 
   /**
-   * Mendengarkan Perubahan State & Log Secara Realtime (onValue)
+   * Mendengarkan perubahan sub-path kamar secara ringan dan terpisah:
+   * juro, caregivers, pets, dan 60 activityLogs terbaru.
    */
   public subscribeToRoom(
     roomCode: string,
     myCaregiverId: string,
-    callbacks: SyncCallbacks
+    callbacks: RoomSyncCallbacks
   ): () => void {
     const db = getFirebaseDatabaseInstance();
     if (!db) return () => {};
 
-    const cleanCode = roomCode.trim().toUpperCase();
-    const roomRef = ref(db, `rooms/${cleanCode}`);
-
-    // Lepas listener sebelumnya jika ada
+    const cleanCode = sanitizeRoomCode(roomCode);
+    if (!cleanCode) return () => {};
     this.unsubscribe();
+    this.logDeduplicator.reset();
+    this.onConnectionStateChangeCb = (state) => callbacks.onConnectionStateChange?.(state);
+    callbacks.onConnectionStateChange?.("connecting");
 
-    // 0. Setup Presensi Realtime (Online/Offline) via .info/connected & onDisconnect
+    const presencePath = `rooms/${cleanCode}/pets/${myCaregiverId}/isOnline`;
+    const presenceRef = ref(db, presencePath);
+
+    const markPresenceOnline = () => {
+      try {
+        onDisconnect(presenceRef).set(false).catch(() => {});
+        set(presenceRef, true).catch(() => {});
+      } catch {
+        // Ignored in offline fallback
+      }
+    };
+
     try {
       const connectedRef = ref(db, ".info/connected");
-      const presencePath = `rooms/${cleanCode}/pets/${myCaregiverId}/isOnline`;
-      const presenceRef = ref(db, presencePath);
-      const disconnectRef = onDisconnect(presenceRef);
-      disconnectRef.set(false).catch(() => {});
-
       const presenceListener = (snap: DataSnapshot) => {
         if (snap.val() === true) {
-          disconnectRef.set(false).catch(() => {});
-          set(presenceRef, true).catch(() => {});
+          markPresenceOnline();
+          callbacks.onConnectionStateChange?.("connected");
+        } else {
+          callbacks.onConnectionStateChange?.("reconnecting");
         }
       };
 
@@ -279,113 +303,110 @@ export class JuroRealtimeSyncService {
         myPresencePath: presencePath,
       };
     } catch {
-      // Mock mode / offline fallback
+      // Offline / mock fallback
     }
 
-    let lastKnownLogsCount = 0;
+    if (typeof window !== "undefined" && typeof document !== "undefined") {
+      const onVisibilityOrOnline = () => {
+        if (document.visibilityState === "visible" && navigator.onLine !== false) {
+          markPresenceOnline();
+        }
+      };
+      document.addEventListener("visibilitychange", onVisibilityOrOnline);
+      window.addEventListener("online", onVisibilityOrOnline);
+      this.lifecycleCleanup = () => {
+        document.removeEventListener("visibilitychange", onVisibilityOrOnline);
+        window.removeEventListener("online", onVisibilityOrOnline);
+      };
+    }
 
-    const listener = (snapshot: DataSnapshot) => {
-      if (!snapshot.exists()) {
+    const onError = (err: Error) => {
+      console.warn("Realtime sub-listener error:", err);
+      callbacks.onConnectionStateChange?.("reconnecting");
+      callbacks.onError?.(err);
+    };
+
+    // 1. Sub-listener: Shared Juro State
+    const juroRef = ref(db, `rooms/${cleanCode}/juro`);
+    const juroCb = (snap: DataSnapshot) => {
+      if (!snap.exists()) return;
+      const juroVal = snap.val() as SharedJuroState;
+      callbacks.onJuroStateSync(juroVal);
+    };
+    onValue(juroRef, juroCb, onError);
+    this.subListeners.push({ target: juroRef, callback: juroCb });
+
+    // 2. Sub-listener: Caregivers Roster
+    const caregiversRef = ref(db, `rooms/${cleanCode}/caregivers`);
+    const caregiversCb = (snap: DataSnapshot) => {
+      if (!snap.exists()) {
+        callbacks.onRoomClosed?.();
         callbacks.onError?.(new Error("Kamar pairing telah ditutup atau dihapus."));
         return;
       }
-
-      const data = snapshot.val() as JuroPairingRoomData;
-
-      // 1. Sync Juro State (memori atau snapshot umum)
-      if (data.juro) {
-        callbacks.onJuroStateSync(data.juro);
-      }
-
-      // 1b. Deteksi status Pet Pasangan di mode Dual-Pet
-      if (data.pets) {
-        const partnerEntry = Object.entries(data.pets).find(
-          ([cgId]) => cgId !== myCaregiverId
-        );
-        if (partnerEntry) {
-          callbacks.onPartnerPetSync?.(partnerEntry[1]);
-        } else {
-          callbacks.onPartnerPetSync?.(null);
-        }
-      } else if (data.juro && data.caregivers) {
-        // Fallback backward-compatible: jika perawat pasangan ada tapi kamar masih format single pet
-        const partner =
-          data.caregivers.caregiver1.id === myCaregiverId
-            ? data.caregivers.caregiver2 ?? null
-            : data.caregivers.caregiver1 ?? null;
-        if (partner) {
-          callbacks.onPartnerPetSync?.({
-            ownerCaregiverId: partner.id,
-            ownerName: partner.name,
-            ownerRoleTitle: partner.roleTitle,
-            name: `${data.juro.name} (${partner.name})`,
-            level: data.juro.level,
-            hunger: data.juro.hunger,
-            energy: data.juro.energy,
-            cleanliness: data.juro.cleanliness,
-            happiness: data.juro.happiness,
-            affection: data.juro.affection,
-            currentState: data.juro.currentState,
-            activeSkin: data.juro.activeSkin,
-            activeHat: data.juro.activeHat,
-            isOnline: true,
-            lastUpdated: data.juro.lastUpdated,
-          });
-        }
-      }
-
-      // 2. Deteksi status perawat pasangan
+      const cg = snap.val() as JuroPairingRoomData["caregivers"];
       const partner =
-        data.caregivers.caregiver1.id === myCaregiverId
-          ? data.caregivers.caregiver2 ?? null
-          : data.caregivers.caregiver1 ?? null;
+        cg.caregiver1?.id === myCaregiverId ? cg.caregiver2 ?? null : cg.caregiver1 ?? null;
       callbacks.onPartnerStatusChange?.(partner);
+    };
+    onValue(caregiversRef, caregiversCb, onError);
+    this.subListeners.push({ target: caregiversRef, callback: caregiversCb });
 
-      // 3. Deteksi log aksi baru dan pulihkan seluruh riwayat saat baru terhubung
-      if (data.activityLogs) {
-        const logsDesc = Object.values(data.activityLogs).sort(
-          (a, b) => b.timestamp - a.timestamp
-        );
-        if (lastKnownLogsCount === 0) {
-          // Pertama kali terhubung / setelah refresh browser: muat seluruh log
-          callbacks.onInitialLogsLoaded?.(logsDesc.slice(0, 80));
-          lastKnownLogsCount = logsDesc.length;
-        } else if (logsDesc.length > lastKnownLogsCount) {
-          const newLogsCount = logsDesc.length - lastKnownLogsCount;
-          const newLogs = logsDesc.slice(0, newLogsCount);
-          for (let i = newLogs.length - 1; i >= 0; i--) {
-            const log = newLogs[i];
-            if (log && log.caregiverId !== myCaregiverId) {
-              callbacks.onActivityLogAdded?.(log);
-            }
-          }
-          lastKnownLogsCount = logsDesc.length;
-        } else {
-          lastKnownLogsCount = logsDesc.length;
+    // 3. Sub-listener: Dual-Pet Realtime States & Coordinates
+    const petsRef = ref(db, `rooms/${cleanCode}/pets`);
+    const petsCb = (snap: DataSnapshot) => {
+      if (!snap.exists()) {
+        callbacks.onPartnerPetSync?.(null);
+        return;
+      }
+      const petsMap = snap.val() as Record<string, PartnerPetState>;
+      const partnerEntry = Object.entries(petsMap).find(([cgId]) => cgId !== myCaregiverId);
+      callbacks.onPartnerPetSync?.(partnerEntry ? partnerEntry[1] : null);
+    };
+    onValue(petsRef, petsCb, onError);
+    this.subListeners.push({ target: petsRef, callback: petsCb });
+
+    // 4. Sub-listener: Recent Activity Logs (capped at last 60 + ID deduplication)
+    const logsQuery = query(ref(db, `rooms/${cleanCode}/activityLogs`), limitToLast(60));
+    let initialBatchDone = false;
+    const logsCb = (snap: DataSnapshot) => {
+      if (!snap.exists()) {
+        if (!initialBatchDone) {
+          callbacks.onInitialLogsLoaded?.([]);
+          initialBatchDone = true;
+        }
+        return;
+      }
+
+      const rawMap = snap.val() as Record<string, CaregiverActionLog>;
+      const logsAsc = Object.values(rawMap).sort((a, b) => a.timestamp - b.timestamp);
+
+      if (!initialBatchDone) {
+        this.logDeduplicator.seed(logsAsc.map((l) => l.id));
+        callbacks.onInitialLogsLoaded?.([...logsAsc].reverse());
+        initialBatchDone = true;
+        return;
+      }
+
+      for (const log of logsAsc) {
+        if (log && this.logDeduplicator.isNewAndTrack(log.id) && log.caregiverId !== myCaregiverId) {
+          callbacks.onActivityLogAdded?.(log);
         }
       }
     };
-
-    onValue(roomRef, listener, (err) => {
-      console.warn("Realtime listener error:", err);
-      callbacks.onError?.(err);
-    });
-
-    this.activeRoomListener = {
-      path: `rooms/${cleanCode}`,
-      callback: listener,
-    };
+    onValue(logsQuery, logsCb, onError);
+    this.subListeners.push({ target: logsQuery, callback: logsCb });
 
     return () => this.unsubscribe();
   }
 
-  /**
-   * Mendorong aksi pengasuhan dan stat pet terbaru secara atomik ke Firebase
-   */
   public async pushCareAction(
     roomCode: string,
     caregiver: CaregiverProfile,
-    action: Omit<CaregiverActionLog, "id" | "timestamp" | "caregiverId" | "caregiverName" | "caregiverRoleTitle">,
+    action: Omit<
+      CaregiverActionLog,
+      "id" | "timestamp" | "caregiverId" | "caregiverName" | "caregiverRoleTitle"
+    >,
     updatedJuro: Partial<SharedJuroState>
   ): Promise<boolean> {
     const db = getFirebaseDatabaseInstance();
@@ -406,40 +427,63 @@ export class JuroRealtimeSyncService {
         caregiverName: caregiver.name,
         caregiverRoleTitle: caregiver.roleTitle,
       };
+      this.logDeduplicator.isNewAndTrack(logId);
 
       const updates: Record<string, unknown> = {
         [`rooms/${cleanCode}/activityLogs/${logId}`]: fullLog,
-        [`rooms/${cleanCode}/lastUpdatedAt`]: Date.now(),
+        [`rooms/${cleanCode}/lastUpdatedAt`]: serverTimestamp(),
       };
 
-      // Di mode Dual-Pet, sinkronkan status pet pemilik aksi ke rooms/{roomCode}/pets/{caregiverId}
-      const myPetUpdate: Record<string, unknown> = {
-        ownerCaregiverId: caregiver.id,
-        ownerName: caregiver.name,
-        ownerRoleTitle: caregiver.roleTitle,
-        lastUpdated: Date.now(),
-        isOnline: true,
-      };
+      const myPetPrefix = `rooms/${cleanCode}/pets/${caregiver.id}`;
+      updates[`${myPetPrefix}/ownerCaregiverId`] = caregiver.id;
+      updates[`${myPetPrefix}/ownerName`] = caregiver.name;
+      updates[`${myPetPrefix}/ownerRoleTitle`] = caregiver.roleTitle;
+      updates[`${myPetPrefix}/lastUpdated`] = serverTimestamp();
+      updates[`${myPetPrefix}/isOnline`] = true;
 
-      if (updatedJuro.name !== undefined) myPetUpdate.name = updatedJuro.name;
-      if (updatedJuro.level !== undefined) myPetUpdate.level = updatedJuro.level;
-      if (updatedJuro.hunger !== undefined) myPetUpdate.hunger = updatedJuro.hunger;
-      if (updatedJuro.energy !== undefined) myPetUpdate.energy = updatedJuro.energy;
-      if (updatedJuro.cleanliness !== undefined) myPetUpdate.cleanliness = updatedJuro.cleanliness;
-      if (updatedJuro.happiness !== undefined) myPetUpdate.happiness = updatedJuro.happiness;
-      if (updatedJuro.affection !== undefined) myPetUpdate.affection = updatedJuro.affection;
-      if (updatedJuro.currentState !== undefined) myPetUpdate.currentState = updatedJuro.currentState;
-      if (updatedJuro.activeSkin !== undefined) myPetUpdate.activeSkin = updatedJuro.activeSkin;
-      if (updatedJuro.activeHat !== undefined) myPetUpdate.activeHat = updatedJuro.activeHat;
-
-      for (const [key, val] of Object.entries(myPetUpdate)) {
-        updates[`rooms/${cleanCode}/pets/${caregiver.id}/${key}`] = val;
+      const syncedPetFields: Array<keyof PartnerPetState> = [
+        "name",
+        "level",
+        "hunger",
+        "energy",
+        "cleanliness",
+        "happiness",
+        "affection",
+        "currentState",
+        "activeSkin",
+        "activeHat",
+      ];
+      for (const field of syncedPetFields) {
+        const val = updatedJuro[field as keyof SharedJuroState];
+        if (val !== undefined) {
+          updates[`${myPetPrefix}/${field}`] = val;
+        }
       }
 
-      // Simpan memori bersama jika ada
       if (updatedJuro.memories) {
         updates[`rooms/${cleanCode}/juro/memories`] = updatedJuro.memories;
       }
+
+      const sharedJuroFields: Array<keyof SharedJuroState> = [
+        "name",
+        "level",
+        "xp",
+        "xpToNextLevel",
+        "hunger",
+        "energy",
+        "cleanliness",
+        "happiness",
+        "affection",
+        "currentState",
+      ];
+      for (const field of sharedJuroFields) {
+        const val = updatedJuro[field];
+        if (val !== undefined) {
+          updates[`rooms/${cleanCode}/juro/${field}`] = val;
+        }
+      }
+      updates[`rooms/${cleanCode}/juro/updatedByCaregiverId`] = caregiver.id;
+      updates[`rooms/${cleanCode}/juro/lastUpdated`] = serverTimestamp();
 
       await update(ref(db), sanitizeForFirebase(updates));
       return true;
@@ -449,9 +493,6 @@ export class JuroRealtimeSyncService {
     }
   }
 
-  /**
-   * Menyinkronkan perubahan status Juro secara langsung ke Firebase tanpa menambah log baru
-   */
   public async syncJuroState(
     roomCode: string,
     caregiverId: string,
@@ -464,7 +505,7 @@ export class JuroRealtimeSyncService {
 
     try {
       const updates: Record<string, unknown> = {
-        [`rooms/${cleanCode}/lastUpdatedAt`]: Date.now(),
+        [`rooms/${cleanCode}/lastUpdatedAt`]: serverTimestamp(),
       };
 
       for (const [key, val] of Object.entries(updatedJuro)) {
@@ -473,7 +514,7 @@ export class JuroRealtimeSyncService {
         }
       }
       updates[`rooms/${cleanCode}/juro/updatedByCaregiverId`] = caregiverId;
-      updates[`rooms/${cleanCode}/juro/lastUpdated`] = Date.now();
+      updates[`rooms/${cleanCode}/juro/lastUpdated`] = serverTimestamp();
 
       await update(ref(db), sanitizeForFirebase(updates));
       return true;
@@ -484,12 +525,12 @@ export class JuroRealtimeSyncService {
   }
 
   /**
-   * Menyinkronkan status Pet Pribadi ke kamar Firebase (Mode Dual-Pet)
+   * Memperbarui field pet milik saya secara parsial agar tidak menimpa posisi atau isOnline.
    */
   public async syncMyPet(
     roomCode: string,
     caregiverId: string,
-    petState: PartnerPetState
+    petState: Partial<PartnerPetState>
   ): Promise<boolean> {
     const db = getFirebaseDatabaseInstance();
     if (!db) return false;
@@ -497,9 +538,14 @@ export class JuroRealtimeSyncService {
 
     try {
       const updates: Record<string, unknown> = {
-        [`rooms/${cleanCode}/lastUpdatedAt`]: Date.now(),
-        [`rooms/${cleanCode}/pets/${caregiverId}`]: petState,
+        [`rooms/${cleanCode}/lastUpdatedAt`]: serverTimestamp(),
+        [`rooms/${cleanCode}/pets/${caregiverId}/lastUpdated`]: serverTimestamp(),
       };
+      for (const [key, val] of Object.entries(petState)) {
+        if (val !== undefined && key !== "lastUpdated") {
+          updates[`rooms/${cleanCode}/pets/${caregiverId}/${key}`] = val;
+        }
+      }
       await update(ref(db), sanitizeForFirebase(updates));
       return true;
     } catch (err) {
@@ -509,10 +555,47 @@ export class JuroRealtimeSyncService {
   }
 
   /**
-   * Melepas listener realtime yang sedang aktif dan memperbarui status offline
+   * Mengirim pembaruan koordinat & target gerak mabar secara parsial dan hemat bandwidth.
    */
+  public async syncMyPetMovement(
+    roomCode: string,
+    caregiverId: string,
+    movement: PartnerMovementPayload
+  ): Promise<boolean> {
+    const db = getFirebaseDatabaseInstance();
+    if (!db) return false;
+    const cleanCode = roomCode.trim().toUpperCase();
+
+    try {
+      const prefix = `rooms/${cleanCode}/pets/${caregiverId}`;
+      const updates: Record<string, unknown> = {
+        [`${prefix}/position`]: movement.position,
+        [`${prefix}/lastUpdated`]: serverTimestamp(),
+        [`${prefix}/isOnline`]: true,
+      };
+      if (movement.yaw !== undefined) {
+        updates[`${prefix}/yaw`] = movement.yaw;
+      }
+      if (movement.currentState !== undefined) {
+        updates[`${prefix}/currentState`] = movement.currentState;
+      }
+      if (movement.walkTarget !== undefined) {
+        updates[`${prefix}/walkTarget`] = movement.walkTarget;
+      }
+      await update(ref(db), sanitizeForFirebase(updates));
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
   public unsubscribe(): void {
     const db = getFirebaseDatabaseInstance();
+
+    if (this.lifecycleCleanup) {
+      this.lifecycleCleanup();
+      this.lifecycleCleanup = null;
+    }
 
     if (this.activePresenceListener && db) {
       try {
@@ -521,20 +604,22 @@ export class JuroRealtimeSyncService {
         const presenceRef = ref(db, this.activePresenceListener.myPresencePath);
         set(presenceRef, false).catch(() => {});
       } catch {
-        // Abaikan
+        // Ignored
       }
       this.activePresenceListener = null;
     }
 
-    if (this.activeRoomListener && db) {
+    for (const entry of this.subListeners) {
       try {
-        const roomRef = ref(db, this.activeRoomListener.path);
-        off(roomRef, "value", this.activeRoomListener.callback);
+        off(entry.target, "value", entry.callback);
       } catch {
-        // Abaikan
+        // Ignored
       }
-      this.activeRoomListener = null;
     }
+    this.subListeners = [];
+    this.logDeduplicator.reset();
+    this.onConnectionStateChangeCb?.("disconnected");
+    this.onConnectionStateChangeCb = null;
   }
 }
 

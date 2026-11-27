@@ -611,11 +611,15 @@ export async function chatWithJuro(
 
   if (result.ok && result.text) {
     const sanitized = sanitizeJuroReply(result.text);
-    addChatMessage("juro", sanitized);
+    if (!isSpontaneousPrompt) {
+      addChatMessage("juro", sanitized);
+    }
     return sanitized;
   }
 
   const fallback = getContextualFallbackReply(context, promptText);
-  addChatMessage("juro", fallback);
+  if (!isSpontaneousPrompt) {
+    addChatMessage("juro", fallback);
+  }
   return fallback;
 }

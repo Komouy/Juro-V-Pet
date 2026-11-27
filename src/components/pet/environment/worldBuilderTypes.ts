@@ -34,7 +34,6 @@ export interface RainSystem {
 export interface BuiltWorld {
   rootGroup: THREE.Group;
   terrainMesh: THREE.Mesh;
-  cobbleOverlay: THREE.Mesh;
   waterMesh: THREE.Mesh;
   kois: AnimatedKoi[];
   lanternLights: THREE.PointLight[];

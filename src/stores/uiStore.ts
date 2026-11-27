@@ -88,6 +88,7 @@ interface UIState {
   autoWeatherNextChangeAt: number;
   soundEnabled: boolean;
   scanlinesEnabled: boolean;
+  hasSeenIntro: boolean;
   isMobileNavOpen: boolean;
   actionMenuStyle: ActionMenuStyle;
   graphicsQuality: GraphicsQualitySetting;
@@ -100,6 +101,8 @@ interface UIState {
   syncAutoWeather: (nowMs?: number, rng?: () => number) => void;
   toggleSound: () => void;
   toggleScanlines: () => void;
+  markIntroSeen: () => void;
+  resetIntro: () => void;
   setMobileNav: (open: boolean) => void;
   setActionMenuStyle: (style: ActionMenuStyle) => void;
   setGraphicsQuality: (quality: GraphicsQualitySetting) => void;
@@ -137,6 +140,15 @@ const getInitialScanlinesEnabled = (): boolean => {
   return true;
 };
 
+const INTRO_SEEN_STORAGE_KEY = "juro_has_seen_intro";
+
+const getInitialHasSeenIntro = (): boolean => {
+  if (typeof window !== "undefined" && window.localStorage) {
+    return window.localStorage.getItem(INTRO_SEEN_STORAGE_KEY) === "true";
+  }
+  return false;
+};
+
 const initialAutoWeather = loadOrCreateAutoWeather();
 
 export const useUIStore = create<UIState>((set, get) => ({
@@ -146,6 +158,7 @@ export const useUIStore = create<UIState>((set, get) => ({
   autoWeatherNextChangeAt: initialAutoWeather.nextChangeAt,
   soundEnabled: true,
   scanlinesEnabled: getInitialScanlinesEnabled(),
+  hasSeenIntro: getInitialHasSeenIntro(),
   isMobileNavOpen: false,
   actionMenuStyle: getInitialActionMenuStyle(),
   graphicsQuality: getInitialGraphicsQuality(),
@@ -202,6 +215,18 @@ export const useUIStore = create<UIState>((set, get) => ({
       }
       return { scanlinesEnabled: next };
     }),
+  markIntroSeen: () => {
+    if (typeof window !== "undefined" && window.localStorage) {
+      window.localStorage.setItem(INTRO_SEEN_STORAGE_KEY, "true");
+    }
+    set({ hasSeenIntro: true });
+  },
+  resetIntro: () => {
+    if (typeof window !== "undefined" && window.localStorage) {
+      window.localStorage.removeItem(INTRO_SEEN_STORAGE_KEY);
+    }
+    set({ hasSeenIntro: false });
+  },
   setMobileNav: (open) => set({ isMobileNavOpen: open }),
   setActionMenuStyle: (style) => {
     if (typeof window !== "undefined" && window.localStorage) {

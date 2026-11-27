@@ -145,10 +145,17 @@ export function getFirebaseDatabaseInstance(): Database | null {
   try {
     if (!cachedApp) {
       const existingApps = getApps();
-      if (existingApps.length > 0) {
-        cachedApp = existingApps[0];
-      } else {
+      const matchingApp = existingApps.find(
+        (app) =>
+          app.options.databaseURL === config.databaseURL &&
+          app.options.projectId === config.projectId
+      );
+      if (matchingApp) {
+        cachedApp = matchingApp;
+      } else if (existingApps.length === 0) {
         cachedApp = initializeApp(config);
+      } else {
+        cachedApp = initializeApp(config, `juro_${config.projectId}_${Date.now()}`);
       }
     }
 

@@ -414,7 +414,7 @@ export function buildLandmarks(ctx: WorldBuildContext): THREE.Mesh[] {
     registerPointLight(2, cafe, "#ffc06e", 1.1, 15, 1.5, 0, 2.4, 3.4);
 
     rootGroup.add(cafe);
-    createLantern(14.2, plazaY, 2.6, true, 6);
+    createLantern(15.3, groundHeightAt(15.3, -0.5), -0.5, true, 6);
   }
 
   // --- E. POS PANDANG SELATAN (BENCH) ---

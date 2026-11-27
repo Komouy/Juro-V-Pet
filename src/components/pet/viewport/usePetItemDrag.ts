@@ -319,7 +319,7 @@ export function usePetItemDrag({
           const wandTipY = relY - 22;
 
           setDragBubbles((prev) => [
-            ...prev.slice(-20),
+            ...prev.slice(-9),
             { id: bubbleId, x: wandTipX, y: wandTipY, size, dx },
           ]);
 
