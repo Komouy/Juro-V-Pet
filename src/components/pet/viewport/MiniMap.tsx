@@ -2,6 +2,7 @@ import React, { useEffect, useRef } from "react";
 import type * as THREE from "three";
 import {
   HALF_WORLD,
+  ISLAND_RADIUS,
   JURO_TRAMPOLINE_POS,
   LANDMARKS,
   WORLD_SIZE,
@@ -44,8 +45,15 @@ export const MiniMap: React.FC<MiniMapProps> = ({
 
     for (let gz = 0; gz < BASE_RES; gz++) {
       for (let gx = 0; gx < BASE_RES; gx++) {
-        const wx = (gx / BASE_RES) * WORLD_SIZE - HALF_WORLD;
-        const wz = (gz / BASE_RES) * WORLD_SIZE - HALF_WORLD;
+        const wx = ((gx + 0.5) / BASE_RES) * WORLD_SIZE - HALF_WORLD;
+        const wz = ((gz + 0.5) / BASE_RES) * WORLD_SIZE - HALF_WORLD;
+        const radialDist = Math.hypot(wx, wz);
+
+        if (radialDist > ISLAND_RADIUS) {
+          ctx.fillStyle = "#b8d6ea";
+          ctx.fillRect(gx, gz, 1, 1);
+          continue;
+        }
 
         if (isBridgeDeck(wx, wz)) {
           ctx.fillStyle = "#cf924a";
@@ -55,6 +63,8 @@ export const MiniMap: React.FC<MiniMapProps> = ({
           ctx.fillStyle = "#f2cb77";
         } else if (isOnCobblePath(wx, wz)) {
           ctx.fillStyle = "#dfd3bd";
+        } else if (radialDist > ISLAND_RADIUS - 2.6) {
+          ctx.fillStyle = "#589f39";
         } else {
           const patch = grassPatchFactor(wx, wz);
           const h = groundHeightAt(wx, wz);
@@ -83,6 +93,13 @@ export const MiniMap: React.FC<MiniMapProps> = ({
       ctx.imageSmoothingEnabled = false;
       ctx.clearRect(0, 0, MAP_PX, MAP_PX);
       ctx.drawImage(base, 0, 0, MAP_PX, MAP_PX);
+
+      // Circular island outline ring
+      ctx.strokeStyle = "#3a4c38";
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(MAP_PX / 2, MAP_PX / 2, (ISLAND_RADIUS / WORLD_SIZE) * MAP_PX, 0, Math.PI * 2);
+      ctx.stroke();
 
       // Subtle soft grid lines (3x3 grid)
       ctx.strokeStyle = "rgba(58, 76, 56, 0.1)";
@@ -191,15 +208,22 @@ export const MiniMap: React.FC<MiniMapProps> = ({
   }, [playerX, playerZ, yaw, juroWorldPosRef, juroYawRef]);
 
   return (
-    <div className="relative rounded-2xl border border-neutral-200/80 dark:border-neutral-800 bg-white/95 dark:bg-neutral-900/95 p-1 shadow-sm select-none pointer-events-auto">
-      <canvas
-        ref={canvasRef}
-        width={MAP_PX}
-        height={MAP_PX}
-        className="w-[76px] h-[76px] sm:w-[88px] sm:h-[88px] block cursor-default rounded-xl"
-        title="Peta lembah"
-      />
-      <span className="pointer-events-none absolute top-1.5 left-1/2 -translate-x-1/2 text-[9px] font-bold text-neutral-800 bg-white/85 px-1 rounded leading-tight">
+    <div className="relative rounded-[6px] border-2 border-charcoal dark:border-[#4A4E5E] bg-[#FDFBF7] dark:bg-[#1E2028] p-1 shadow-[0_3px_0_#18181B] dark:shadow-[0_3px_0_#09090B] select-none pointer-events-auto">
+      <div className="relative border border-charcoal/40 dark:border-[#3F424E] rounded-[3px] overflow-hidden">
+        <canvas
+          ref={canvasRef}
+          width={MAP_PX}
+          height={MAP_PX}
+          className="w-[76px] h-[76px] sm:w-[88px] sm:h-[88px] block cursor-default"
+          title="Peta lembah"
+        />
+        {/* Corner Radar Brackets */}
+        <span aria-hidden="true" className="pointer-events-none absolute top-0.5 left-0.5 w-1.5 h-1.5 border-t-2 border-l-2 border-charcoal/60" />
+        <span aria-hidden="true" className="pointer-events-none absolute top-0.5 right-0.5 w-1.5 h-1.5 border-t-2 border-r-2 border-charcoal/60" />
+        <span aria-hidden="true" className="pointer-events-none absolute bottom-0.5 left-0.5 w-1.5 h-1.5 border-b-2 border-l-2 border-charcoal/60" />
+        <span aria-hidden="true" className="pointer-events-none absolute bottom-0.5 right-0.5 w-1.5 h-1.5 border-b-2 border-r-2 border-charcoal/60" />
+      </div>
+      <span className="pointer-events-none absolute -top-2 left-1/2 -translate-x-1/2 font-pixel text-[9px] font-bold text-charcoal bg-[#FDFBF7] border-2 border-charcoal px-1 rounded-[2px] leading-tight">
         U
       </span>
     </div>

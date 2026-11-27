@@ -401,15 +401,15 @@ export const MiningPage: React.FC = () => {
 
   return (
     <section className="w-full px-4 sm:px-6 py-4 sm:py-5 space-y-4">
-      {/* Compact Overlay Header */}
-      <div className="border-b border-neutral-200/80 dark:border-neutral-800 pb-3.5 flex items-center justify-between gap-3">
-        <h1 className="text-base sm:text-lg font-bold text-neutral-900 dark:text-white tracking-tight flex items-center gap-2 shrink-0">
+      {/* Compact Console Header */}
+      <div className="border-b-2 border-dashed border-charcoal/20 dark:border-[#3F424E] pb-3.5 flex items-center justify-between gap-3">
+        <h1 className="font-pixel text-base sm:text-lg font-bold uppercase text-charcoal dark:text-white tracking-wide flex items-center gap-2 shrink-0">
           <Pickaxe size={18} strokeWidth={2.2} className="text-juro-orange" />
           <span>Tambang</span>
         </h1>
 
         <div className="flex items-center gap-2 sm:gap-2.5">
-          <span className="inline-flex items-center gap-1.5 text-xs sm:text-sm font-semibold tabular-nums text-neutral-900 dark:text-white">
+          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-[4px] bg-[#EFE9DC] dark:bg-[#101114] border-2 border-charcoal dark:border-[#3F424E] font-mono-hud text-xs sm:text-sm font-bold text-charcoal dark:text-white">
             <Coins size={14} strokeWidth={2.2} className="text-amber-500" />
             <span>{coins}</span>
           </span>
@@ -422,11 +422,11 @@ export const MiningPage: React.FC = () => {
               soundEffects.playDismiss();
               navigate("/");
             }}
-            className="w-8 h-8 rounded-xl inline-flex items-center justify-center text-neutral-500 hover:text-neutral-900 hover:bg-neutral-100 dark:text-neutral-400 dark:hover:text-white dark:hover:bg-neutral-800 transition-colors cursor-pointer"
+            className="console-btn-bevel w-8 h-8 rounded-[4px] border-2 border-charcoal dark:border-[#3F424E] bg-[#FDFBF7] dark:bg-[#101114] shadow-[0_2px_0_#18181B] inline-flex items-center justify-center text-charcoal hover:text-juro-orange dark:text-neutral-200 transition-colors cursor-pointer"
             aria-label="Tutup dan kembali ke Home"
             title="Kembali ke Home"
           >
-            <X size={17} strokeWidth={2} />
+            <X size={16} strokeWidth={2.4} />
           </button>
         </div>
       </div>
@@ -436,21 +436,21 @@ export const MiningPage: React.FC = () => {
         {/* Left: Interactive 5x5 Mine Grid */}
         <div className="lg:col-span-7 space-y-3.5">
           {/* Floor & Persisted Stamina HUD */}
-          <Card shadowOffset="sm" className="p-4 shadow-none">
-            <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
-              <span className="text-xs sm:text-sm font-semibold text-juro-orange tabular-nums">
+          <Card shadowOffset="sm" className="p-4">
+            <div className="flex flex-wrap items-center justify-between gap-2 mb-2.5">
+              <span className="font-pixel text-xs sm:text-sm font-bold uppercase text-juro-orange">
                 Lantai {mineFloor}
               </span>
 
-              <div className="flex flex-wrap items-center gap-2 text-xs tabular-nums">
-                <span className="font-medium text-neutral-700 dark:text-neutral-200 flex items-center gap-1.5">
+              <div className="flex flex-wrap items-center gap-2 font-mono-hud text-xs">
+                <span className="font-bold text-charcoal dark:text-neutral-200 flex items-center gap-1.5">
                   <Zap size={13} strokeWidth={2.2} className="text-amber-500" />
                   <span>
                     Stamina {miningStamina}/{MAX_MINING_STAMINA}
                   </span>
                 </span>
                 {miningStamina < MAX_MINING_STAMINA && (
-                  <span className="inline-flex items-center gap-1 text-[11px] font-medium text-amber-600 dark:text-amber-300">
+                  <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-amber-700 dark:text-amber-300">
                     <span>·</span>
                     <Clock size={11} strokeWidth={2.2} />
                     <span>+1 ({formatCountdownSeconds(nextStaminaMs)})</span>
@@ -459,21 +459,31 @@ export const MiningPage: React.FC = () => {
               </div>
             </div>
 
-            {/* Smooth Rounded Stamina Progress Bar */}
-            <div className="w-full h-2 rounded-full bg-neutral-200 dark:bg-neutral-800 overflow-hidden">
-              <div
-                className={`h-full rounded-full transition-all duration-300 ${
-                  miningStamina <= 4 ? "bg-rose-500" : "bg-amber-400"
-                }`}
-                style={{ width: `${staminaPercent}%` }}
-              />
+            {/* Segmented 10-Cell Stamina Matrix */}
+            <div className="w-full h-3.5 rounded-[4px] border-2 border-charcoal dark:border-[#3F424E] bg-[#EFE9DC] dark:bg-[#101114] p-[2px] grid grid-cols-10 gap-[2px]">
+              {Array.from({ length: 10 }, (_, idx) => {
+                const filledCount = Math.round((staminaPercent / 100) * 10);
+                const isFilled = idx < filledCount;
+                return (
+                  <span
+                    key={idx}
+                    className={`h-full rounded-[1px] transition-colors duration-200 ${
+                      isFilled
+                        ? miningStamina <= 4
+                          ? "bg-rose-500"
+                          : "bg-amber-400"
+                        : "bg-charcoal/12 dark:bg-white/10"
+                    }`}
+                  />
+                );
+              })}
             </div>
           </Card>
 
           {/* 5x5 Digging Shaft with Micro Screen-Shake & Floor Descent Animation */}
           <Card
             shadowOffset="md"
-            className="p-4 bg-[#1C1917] dark:bg-neutral-950 border-neutral-800 overflow-visible"
+            className="p-4 bg-[#1C1917] dark:bg-[#101114] border-charcoal dark:border-[#4A4E5E] overflow-visible"
           >
             <div
               className={
@@ -502,7 +512,7 @@ export const MiningPage: React.FC = () => {
                         type="button"
                         onClick={() => handleDigTile(tile.id)}
                         className={`
-                          relative w-full h-full rounded-xl border transition-colors duration-75 select-none
+                          relative w-full h-full rounded-[4px] border-2 transition-colors duration-75 select-none
                           flex flex-col items-center justify-center overflow-hidden
                           ${getTileStyle(tile)}
                           ${isShaking ? "animate-mine-tile-shake" : "active:scale-95"}
@@ -599,7 +609,7 @@ export const MiningPage: React.FC = () => {
                         {tile.dug && tile.reward.kind === "ladder" && (
                           <div className="flex flex-col items-center justify-center">
                             <ItemIllustration id="mine-ladder" size={32} />
-                            <span className="rounded-full text-[10px] font-semibold text-amber-200 bg-neutral-900/90 px-2 py-0.5 border border-amber-400/70 -mt-1 shadow-xs">
+                            <span className="rounded-[2px] font-pixel text-[9px] font-bold uppercase text-amber-200 bg-neutral-900/95 px-1.5 py-0.5 border border-amber-400 -mt-1">
                               Turun
                             </span>
                           </div>
@@ -614,7 +624,7 @@ export const MiningPage: React.FC = () => {
                                 size={26}
                               />
                             </div>
-                            <span className="absolute inline-flex items-center justify-center w-5 h-5 rounded-full bg-emerald-500 text-white shadow-xs">
+                            <span className="absolute inline-flex items-center justify-center w-5 h-5 rounded-[3px] bg-emerald-500 text-white border border-charcoal">
                               <Check size={11} strokeWidth={2.8} />
                             </span>
                           </div>
@@ -736,13 +746,13 @@ export const MiningPage: React.FC = () => {
         {/* Right: Crystal Pouch & Mining Equipment Summary */}
         <div className="lg:col-span-5 space-y-3.5">
           {/* Crystal Pouch Card */}
-          <Card shadowOffset="sm" className="p-4 shadow-none space-y-3">
-            <div className="flex items-center justify-between pb-2.5 border-b border-neutral-100 dark:border-neutral-800">
-              <h2 className="text-sm font-semibold text-neutral-900 dark:text-white flex items-center gap-2">
+          <Card shadowOffset="sm" className="p-4 space-y-3">
+            <div className="flex items-center justify-between pb-2.5 border-b-2 border-dashed border-charcoal/15 dark:border-[#3F424E]">
+              <h2 className="font-pixel text-xs sm:text-sm font-bold uppercase text-charcoal dark:text-white flex items-center gap-2">
                 <Gem size={15} strokeWidth={2.2} className="text-sky-500" />
                 <span>Kantong Kristal ({totalCrystals})</span>
               </h2>
-              <span className="text-xs font-semibold text-emerald-600 dark:text-emerald-400 tabular-nums">
+              <span className="font-mono-hud text-xs font-bold text-emerald-600 dark:text-emerald-400">
                 ~{estimatedValue} Koin
               </span>
             </div>
@@ -755,23 +765,23 @@ export const MiningPage: React.FC = () => {
                 return (
                   <div
                     key={c.id}
-                    className={`p-3 rounded-xl border bg-neutral-50/80 dark:bg-neutral-800/60 flex items-center gap-2.5 transition-all ${
+                    className={`p-2.5 rounded-[4px] border-2 bg-[#EFE9DC] dark:bg-[#101114] flex items-center gap-2.5 transition-all ${
                       isPopping
-                        ? "animate-mine-pouch border-juro-orange ring-1 ring-juro-orange/25"
-                        : "border-neutral-200/80 dark:border-neutral-700/70"
+                        ? "animate-mine-pouch border-juro-orange"
+                        : "border-charcoal/75 dark:border-[#3F424E]"
                     } ${locked ? "opacity-55" : ""}`}
                   >
-                    <div className="w-10 h-10 rounded-lg bg-white dark:bg-neutral-900 border border-neutral-200/80 dark:border-neutral-700/70 flex items-center justify-center shrink-0">
+                    <div className="w-10 h-10 rounded-[3px] bg-[#FDFBF7] dark:bg-[#1E2028] border border-charcoal/40 dark:border-[#3F424E] flex items-center justify-center shrink-0">
                       <ItemIllustration id={c.illustrationId} size={28} />
                     </div>
                     <div className="min-w-0">
-                      <p className="text-xs font-medium text-neutral-800 dark:text-white truncate">
+                      <p className="text-xs font-semibold text-charcoal dark:text-white truncate">
                         {c.name.replace("Kristal ", "")}
                       </p>
-                      <p className="text-sm font-bold text-juro-orange tabular-nums leading-tight mt-0.5">
+                      <p className="font-mono-hud text-sm font-bold text-juro-orange leading-tight mt-0.5">
                         ×{count}
                       </p>
-                      <p className="text-[11px] text-neutral-500 dark:text-neutral-400 tabular-nums">
+                      <p className="font-mono-hud text-[11px] text-neutral-600 dark:text-neutral-400">
                         {c.sellPrice} koin · Lt.{c.minFloor}+
                       </p>
                     </div>
@@ -780,7 +790,7 @@ export const MiningPage: React.FC = () => {
               })}
             </div>
 
-            <div className="pt-3 border-t border-neutral-100 dark:border-neutral-800">
+            <div className="pt-3 border-t-2 border-dashed border-charcoal/15 dark:border-[#3F424E]">
               <Link to="/shop?tab=sell" className="block">
                 <Button
                   label={
@@ -798,22 +808,22 @@ export const MiningPage: React.FC = () => {
           </Card>
 
           {/* Compact Active Pickaxe Row */}
-          <Card variant="warm" shadowOffset="sm" className="p-4 shadow-none">
+          <Card variant="warm" shadowOffset="sm" className="p-4">
             <div className="flex items-center justify-between gap-3">
               <div className="flex items-center gap-3 min-w-0">
-                <div className="w-12 h-12 rounded-xl bg-white dark:bg-neutral-900 border border-neutral-200/80 dark:border-neutral-700 flex items-center justify-center shrink-0">
+                <div className="w-12 h-12 rounded-[4px] bg-[#FDFBF7] dark:bg-[#101114] border-2 border-charcoal dark:border-[#3F424E] flex items-center justify-center shrink-0">
                   <ItemIllustration id={activePickaxe.illustrationId} size={32} />
                 </div>
                 <div className="min-w-0">
                   <div className="flex items-center gap-1.5">
-                    <h3 className="text-sm font-semibold text-neutral-900 dark:text-white truncate">
+                    <h3 className="text-sm font-bold text-charcoal dark:text-white truncate">
                       {activePickaxe.name}
                     </h3>
-                    <span className="text-[11px] font-semibold text-juro-orange tabular-nums shrink-0">
+                    <span className="font-mono-hud text-[11px] font-bold text-juro-orange shrink-0">
                       · Lv.{activePickaxe.level}
                     </span>
                   </div>
-                  <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-0.5 tabular-nums">
+                  <p className="font-mono-hud text-xs text-neutral-600 dark:text-neutral-400 mt-0.5">
                     Daya {activePickaxe.power} · +{Math.round(activePickaxe.bonusChance * 100)}% Bonus
                   </p>
                 </div>
@@ -821,7 +831,7 @@ export const MiningPage: React.FC = () => {
 
               <Link
                 to="/shop?tab=tools"
-                className="shrink-0 inline-flex items-center gap-0.5 text-xs font-semibold text-juro-orange hover:underline"
+                className="shrink-0 inline-flex items-center gap-0.5 font-pixel text-xs font-bold uppercase text-juro-orange hover:underline"
               >
                 <span>Upgrade</span>
                 <ChevronRight size={14} strokeWidth={2.2} />

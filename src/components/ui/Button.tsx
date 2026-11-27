@@ -35,22 +35,22 @@ export const Button: React.FC<ButtonProps> = ({
   };
 
   const sizeStyles = {
-    sm: "px-3.5 py-2 text-xs gap-1.5 min-h-[38px]",
-    md: "px-4 py-2 text-xs sm:text-sm gap-2 min-h-[42px]",
-    lg: "px-5 py-2.5 text-sm sm:text-base gap-2.5 min-h-[46px]",
+    sm: "px-3 py-1.5 text-[11px] gap-1.5 min-h-[38px]",
+    md: "px-4 py-2 text-xs gap-2 min-h-[42px]",
+    lg: "px-5 py-2.5 text-xs sm:text-sm gap-2.5 min-h-[46px]",
   };
 
   const variantStyles = {
     primary:
-      "bg-neutral-900 text-white border border-neutral-900 shadow-xs hover:bg-neutral-800 dark:bg-neutral-100 dark:text-neutral-900 dark:border-neutral-100 dark:hover:bg-neutral-200",
+      "bg-charcoal text-[#FDFBF7] border-charcoal shadow-[inset_0_2px_0_rgba(255,255,255,0.16),0_3px_0_#09090B] hover:bg-[#27272A] active:shadow-[0_1px_0_#09090B] dark:bg-[#FDFBF7] dark:text-charcoal dark:border-[#3F424E] dark:shadow-[inset_0_2px_0_#FFFFFF,0_3px_0_#09090B] dark:hover:bg-[#EFE9DC]",
     secondary:
-      "bg-white text-neutral-800 border border-neutral-200 shadow-xs hover:bg-neutral-50 hover:border-neutral-300 dark:bg-neutral-800 dark:text-neutral-100 dark:border-neutral-700 dark:hover:bg-neutral-750",
+      "bg-[#FDFBF7] text-charcoal border-charcoal shadow-[inset_0_2px_0_#FFFFFF,0_3px_0_#18181B] hover:bg-[#F4EFE6] active:shadow-[0_1px_0_#18181B] dark:bg-[#1E2028] dark:text-[#F4F4F5] dark:border-[#3F424E] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.08),0_3px_0_#09090B] dark:hover:bg-[#272A35]",
     accent:
-      "bg-juro-orange text-white border border-juro-orange shadow-xs hover:bg-orange-600 hover:border-orange-600",
+      "bg-juro-orange text-white border-charcoal shadow-[inset_0_2px_0_rgba(255,255,255,0.28),0_3px_0_#18181B] hover:bg-[#EA580C] active:shadow-[0_1px_0_#18181B] dark:border-[#3F424E] dark:shadow-[inset_0_2px_0_rgba(255,255,255,0.28),0_3px_0_#09090B]",
     ghost:
-      "bg-transparent text-neutral-700 border border-transparent hover:bg-neutral-100 dark:text-neutral-200 dark:hover:bg-neutral-800 shadow-none",
+      "bg-transparent text-charcoal border-transparent shadow-none hover:bg-[#EFE9DC]/80 hover:border-charcoal/25 dark:text-neutral-200 dark:hover:bg-[#1E2028] dark:hover:border-[#3F424E]",
     danger:
-      "bg-rose-600 text-white border border-rose-600 shadow-xs hover:bg-rose-700 hover:border-rose-700",
+      "bg-rose-600 text-white border-charcoal shadow-[inset_0_2px_0_rgba(255,255,255,0.22),0_3px_0_#18181B] hover:bg-rose-700 active:shadow-[0_1px_0_#18181B] dark:border-[#3F424E] dark:shadow-[inset_0_2px_0_rgba(255,255,255,0.22),0_3px_0_#09090B]",
   };
 
   return (
@@ -58,12 +58,11 @@ export const Button: React.FC<ButtonProps> = ({
       onClick={handleClick}
       disabled={disabled || loading}
       className={`
-        relative inline-flex items-center justify-center rounded-xl font-semibold
+        console-btn-bevel relative inline-flex items-center justify-center rounded-[4px] border-2
+        font-pixel font-bold uppercase tracking-wide
         cursor-pointer select-none
-        transition-all duration-150
-        active:scale-[0.98]
         focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-juro-orange focus-visible:ring-offset-1
-        disabled:opacity-45 disabled:cursor-not-allowed disabled:active:scale-100
+        disabled:opacity-45 disabled:cursor-not-allowed disabled:translate-y-0
         ${sizeStyles[size]}
         ${variantStyles[variant]}
         ${className}
@@ -71,11 +70,11 @@ export const Button: React.FC<ButtonProps> = ({
       {...props}
     >
       {loading ? (
-        <span className="inline-block w-3.5 h-3.5 rounded-full border-2 border-current border-t-transparent animate-spin" />
+        <span className="inline-block w-3.5 h-3.5 border-2 border-current border-t-transparent animate-spin" />
       ) : (
-        Icon && <Icon size={size === "sm" ? 14 : size === "lg" ? 18 : 16} strokeWidth={2} />
+        Icon && <Icon size={size === "sm" ? 14 : size === "lg" ? 17 : 15} strokeWidth={2.2} />
       )}
-      <span>{label}</span>
+      <span className="leading-none">{label}</span>
     </button>
   );
 };

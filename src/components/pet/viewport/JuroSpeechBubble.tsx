@@ -12,15 +12,15 @@ export interface JuroSpeechBubbleProps {
   headY?: number;
   containerWidth?: number;
   containerHeight?: number;
+  isDockMode?: boolean;
   onClose: () => void;
   petName?: string;
 }
 
 /**
  * Juro's Floating Retro Speech Bubble
- * Perfectly centered directly above Juro's head with a downward pointing tail that tracks Juro's horizontal position.
- * Automatically flips below Juro if Juro walks too close to the top edge of the screen.
- * Tracks Juro smoothly at 60fps via requestAnimationFrame without CSS transition lag.
+ * Centered directly above Juro's head with a downward pointing tail that tracks Juro's horizontal position.
+ * Keeps clear of top StatBars / MiniMap and bottom ActionDock while tracking smoothly at 60fps.
  */
 export const JuroSpeechBubble: React.FC<JuroSpeechBubbleProps> = ({
   open,
@@ -32,6 +32,7 @@ export const JuroSpeechBubble: React.FC<JuroSpeechBubbleProps> = ({
   headY,
   containerWidth,
   containerHeight,
+  isDockMode = false,
   onClose,
   petName = "JURO",
 }) => {
@@ -43,6 +44,9 @@ export const JuroSpeechBubble: React.FC<JuroSpeechBubbleProps> = ({
   useEffect(() => {
     if (!open) return;
     let animId: number;
+
+    const topSafe = 58;
+    const bottomSafe = isDockMode ? 78 : 18;
 
     const updatePosition = () => {
       if (rootRef.current && targetPosRef?.current && containerRef?.current) {
@@ -57,22 +61,22 @@ export const JuroSpeechBubble: React.FC<JuroSpeechBubbleProps> = ({
 
         // Horizontally center bubble right over Juro's X coordinate
         const targetX = pos.x - bubbleW / 2;
-        const clampedX = Math.max(16, Math.min(contW - bubbleW - 16, targetX));
+        const clampedX = Math.max(12, Math.min(contW - bubbleW - 12, targetX));
 
         // Crown/head Y position
         const crownY = pos.headY ?? (pos.y - pos.radiusPx);
 
-        // Check vertical clearance: if there is enough space above, position above; otherwise flip below
-        const spaceAbove = crownY - 14;
-        const placeAbove = spaceAbove >= bubbleH + 12;
+        // Check vertical clearance below StatBars
+        const spaceAbove = crownY - topSafe;
+        const placeAbove = spaceAbove >= bubbleH + 10;
 
         setIsPlacedAbove((prev) => (prev !== placeAbove ? placeAbove : prev));
 
         let clampedY: number;
         if (placeAbove) {
-          clampedY = Math.max(14, crownY - bubbleH - 12);
+          clampedY = Math.max(topSafe, Math.min(contH - bubbleH - bottomSafe, crownY - bubbleH - 12));
         } else {
-          clampedY = Math.min(contH - bubbleH - 16, pos.y + (pos.radiusPx * 0.75) + 14);
+          clampedY = Math.min(contH - bubbleH - bottomSafe, pos.y + pos.radiusPx * 0.75 + 14);
         }
 
         // Apply smooth GPU-accelerated transform without CSS transition lag
@@ -89,7 +93,7 @@ export const JuroSpeechBubble: React.FC<JuroSpeechBubbleProps> = ({
 
     updatePosition();
     return () => cancelAnimationFrame(animId);
-  }, [open, targetPosRef, containerRef]);
+  }, [open, targetPosRef, containerRef, isDockMode]);
 
   if (!open) return null;
 
@@ -119,29 +123,29 @@ export const JuroSpeechBubble: React.FC<JuroSpeechBubbleProps> = ({
       }}
       className="absolute top-0 left-0 z-35 pointer-events-auto will-change-transform select-none"
     >
-      <div className="relative animate-tray-enter p-3 rounded-2xl bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-700 shadow-lg">
+      <div className="relative animate-tray-enter p-3 rounded-[6px] bg-[#FDFBF7] dark:bg-[#1E2028] border-2 border-charcoal dark:border-[#4A4E5E] shadow-[0_4px_0_#18181B] dark:shadow-[0_4px_0_#09090B]">
         {/* Dynamic Pointer Tail */}
         {isPlacedAbove ? (
           <div
             ref={tailRef}
             style={{ left: `${initialTailLeft}px` }}
-            className="absolute -bottom-1.5 -translate-x-1/2 w-3 h-3 bg-white dark:bg-neutral-900 rotate-45 border-r border-b border-neutral-200 dark:border-neutral-700 pointer-events-none"
+            className="absolute -bottom-2 -translate-x-1/2 w-3 h-3 bg-[#FDFBF7] dark:bg-[#1E2028] rotate-45 border-r-2 border-b-2 border-charcoal dark:border-[#4A4E5E] pointer-events-none"
             aria-hidden="true"
           />
         ) : (
           <div
             ref={tailRef}
             style={{ left: `${initialTailLeft}px` }}
-            className="absolute -top-1.5 -translate-x-1/2 w-3 h-3 bg-white dark:bg-neutral-900 rotate-45 border-l border-t border-neutral-200 dark:border-neutral-700 pointer-events-none"
+            className="absolute -top-2 -translate-x-1/2 w-3 h-3 bg-[#FDFBF7] dark:bg-[#1E2028] rotate-45 border-l-2 border-t-2 border-charcoal dark:border-[#4A4E5E] pointer-events-none"
             aria-hidden="true"
           />
         )}
 
         {/* Header Bar */}
-        <div className="flex items-center justify-between gap-3 pb-1.5 border-b border-neutral-200 dark:border-neutral-800 mb-2">
+        <div className="flex items-center justify-between gap-3 pb-1.5 border-b-2 border-dashed border-charcoal/20 dark:border-[#3F424E] mb-2">
           <div className="flex items-center gap-1.5">
-            <span className="w-2 h-2 rounded-full bg-juro-orange inline-block" />
-            <span className="text-xs font-semibold text-juro-orange">
+            <span className="w-2 h-2 rounded-[1px] bg-juro-orange border border-charcoal inline-block" />
+            <span className="font-pixel text-xs font-bold uppercase text-juro-orange">
               {petName}
             </span>
           </div>
@@ -149,28 +153,28 @@ export const JuroSpeechBubble: React.FC<JuroSpeechBubbleProps> = ({
           <button
             type="button"
             onClick={onClose}
-            className="text-neutral-400 hover:text-neutral-700 dark:hover:text-white p-0.5 rounded-md transition-colors cursor-pointer"
+            className="text-neutral-500 hover:text-charcoal dark:hover:text-white p-0.5 rounded-[3px] transition-colors cursor-pointer"
             aria-label="Tutup pesan"
           >
-            <X size={14} strokeWidth={2} />
+            <X size={14} strokeWidth={2.2} />
           </button>
         </div>
 
-        {/* Content: Loading Dots or Juro's Reply */}
+        {/* Content: Loading Blocks or Juro's Reply */}
         {isLoading ? (
-          <div className="flex items-center gap-1.5 py-0.5 text-neutral-700 dark:text-neutral-200">
-            <span className="text-xs text-neutral-500 dark:text-neutral-400">
+          <div className="flex items-center gap-2 py-0.5 text-charcoal dark:text-neutral-200">
+            <span className="font-pixel text-[11px] text-neutral-600 dark:text-neutral-400">
               Juro berpikir
             </span>
-            <span className="inline-flex gap-0.5">
-              <span className="w-1 h-1 bg-juro-orange rounded-full animate-bounce [animation-delay:-0.3s]" />
-              <span className="w-1 h-1 bg-juro-orange rounded-full animate-bounce [animation-delay:-0.15s]" />
-              <span className="w-1 h-1 bg-juro-orange rounded-full animate-bounce" />
+            <span className="inline-flex gap-1">
+              <span className="w-1.5 h-1.5 bg-juro-orange rounded-[1px] animate-bounce [animation-delay:-0.3s]" />
+              <span className="w-1.5 h-1.5 bg-juro-orange rounded-[1px] animate-bounce [animation-delay:-0.15s]" />
+              <span className="w-1.5 h-1.5 bg-juro-orange rounded-[1px] animate-bounce" />
             </span>
           </div>
         ) : (
           <div className="relative">
-            <p className="text-xs sm:text-sm leading-relaxed text-neutral-800 dark:text-neutral-100">
+            <p className="text-xs sm:text-sm leading-relaxed text-charcoal dark:text-neutral-100">
               {text}
             </p>
           </div>

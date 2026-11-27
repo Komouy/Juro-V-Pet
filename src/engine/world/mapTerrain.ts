@@ -68,12 +68,15 @@ export const WORLD_SIZE = 72;
 export const HALF_WORLD = WORLD_SIZE / 2;
 export const GRID_RES = 72;
 export const BASE_GROUND_Y = 0.0;
+export const ISLAND_RADIUS = 31.5;
+export const TREE_RING_MAX_RADIUS = 29.9;
+export const WALKABLE_RADIUS = 26.0;
 
 // Landmarks definition matching the Storybook world map
 export const LANDMARKS: Landmark[] = [
   {
     id: "tunnel",
-    name: "Gerbang Terowongan",
+    name: "Gerbang Tambang",
     subtitle: "Hulu Kanal Utara (Tambang)",
     category: "portal",
     position: { x: -14.2, z: -14.2 },
@@ -103,7 +106,7 @@ export const LANDMARKS: Landmark[] = [
   },
   {
     id: "cafe",
-    name: "Kafe Senja & Kios Jamur",
+    name: "WARUNG & Kios Jamur",
     subtitle: "Alun-Alun Timur (Toko)",
     category: "cafe",
     position: { x: 16.5, z: -2.2 },
@@ -133,14 +136,7 @@ export const LANDMARKS: Landmark[] = [
   },
 ];
 
-export const STEPPING_STONES: SteppingStone[] = [
-  { x: -10.5, z: 8.5, radius: 0.95, rotation: 0.2 },
-  { x: -7.5, z: 9.8, radius: 0.85, rotation: -0.3 },
-  { x: -4.4, z: 10.6, radius: 0.95, rotation: 0.5 },
-  { x: -1.3, z: 11.4, radius: 0.85, rotation: -0.1 },
-  { x: 1.7, z: 12.0, radius: 0.95, rotation: 0.4 },
-  { x: 4.4, z: 13.6, radius: 0.9, rotation: -0.2 },
-];
+export const STEPPING_STONES: SteppingStone[] = [];
 
 export const STUMP_SPECS: StumpSpec[] = [
   { x: 0.8, z: 22.8, scale: 0.95, rotation: 0.4 },
@@ -152,15 +148,14 @@ export const STUMP_SPECS: StumpSpec[] = [
 
 export const FENCE_SPECS: FenceSpec[] = [
   { x: -2.5, z: 16.2, rotation: -0.35, panels: 2 },
-  { x: 9.8, z: 4.2, rotation: 0.85, panels: 2 },
   { x: 4.2, z: -16.8, rotation: -0.55, panels: 2 },
 ];
 
-// Winding S-curve storybook sandy trail waypoints
+// Winding S-curve storybook sandy trail waypoints (ending neatly inside the circular woodland)
 export const TRAIL_POINTS: Array<[number, number]> = [
-  [12.0, 29.0],
-  [3.0, 25.5],
-  [-3.5, 21.0],
+  [8.6, 25.2],
+  [3.0, 23.8],
+  [-3.2, 20.6],
   [5.2, 16.8],
   [2.5, 11.5],
   [-6.8, 8.2],
@@ -178,9 +173,9 @@ export const TRAIL_POINTS: Array<[number, number]> = [
 
 export const TRAIL_EXTRA: Array<[number, number]> = [
   [2.0, -13.5],
-  [-1.5, -19.5],
-  [6.5, -24.5],
-  [14.0, -30.0],
+  [-1.2, -18.5],
+  [5.2, -22.8],
+  [10.2, -25.4],
 ];
 
 export function mulberry32(seed: number): () => number {
@@ -309,9 +304,11 @@ export function groundHeightAt(x: number, z: number): number {
   const { dist: canalDist } = distanceToCanalAxis(x, z);
   const mouthCarve = canalDist < 3.4 && x > -14.8 && z > -14.8 ? 0 : 1;
 
-  // Gentle outer rim
-  const edgeDist = Math.max(Math.abs(x), Math.abs(z));
-  const rimLift = smoothstep(28.5, 36.5, edgeDist) * 1.6;
+  // Gentle circular forest bowl rim that softens near the island cliff lip
+  const radialDist = Math.hypot(x, z);
+  const rimRise = smoothstep(23.5, 29.2, radialDist) * 1.15;
+  const rimBevel = smoothstep(29.8, ISLAND_RADIUS, radialDist) * 0.45;
+  const rimLift = rimRise - rimBevel;
 
   h += gentleNoise + hillLounge + hillOverlook + hillEastLedge + tunnelMound * mouthCarve + rimLift;
 
@@ -322,7 +319,7 @@ export function groundHeightAt(x: number, z: number): number {
     h = h * (1 - trailFlatten * 0.35);
   }
 
-  // Flatten plaza around Kafe Senja & Kios Jamur
+  // Flatten plaza around WARUNG & Kios Jamur
   const dCafePlaza = Math.hypot(x - 15.0, z + 1.5);
   const cafeFlatten = smoothstep(5.8, 9.2, dCafePlaza);
   h = h * cafeFlatten + 0.06 * (1 - cafeFlatten);
@@ -384,8 +381,8 @@ export function generateWorldProps(): { trees: TreeSpec[]; rocks: RockSpec[] } {
   const trees: TreeSpec[] = [];
   const rocks: RockSpec[] = [];
 
-  const isReserved = (x: number, z: number, pad = 2.4): boolean => {
-    if (Math.abs(x) > 33.5 || Math.abs(z) > 33.5) return true;
+  const isReserved = (x: number, z: number, pad = 2.4, maxRadius = TREE_RING_MAX_RADIUS): boolean => {
+    if (Math.hypot(x, z) > maxRadius) return true;
     const { dist } = distanceToCanalAxis(x, z);
     if (dist < 3.5 + pad * 0.35) return true;
     if (Math.hypot(x - 9.5, z - 9.5) < 6.7 + pad * 0.35) return true;
@@ -412,9 +409,20 @@ export function generateWorldProps(): { trees: TreeSpec[]; rocks: RockSpec[] } {
     }
 
     if (Math.hypot(x + 16.5, z + 16.5) < 5.6) return true;
+    if (Math.hypot(x - JURO_TRAMPOLINE_POS.x, z - JURO_TRAMPOLINE_POS.z) < 3.4) return true;
     return false;
   };
 
+  const canPlaceTree = (x: number, z: number): boolean => {
+    for (const t of trees) {
+      if (Math.hypot(x - t.x, z - t.z) < 2.65) {
+        return false;
+      }
+    }
+    return true;
+  };
+
+  // Iconic North-East scenic cliff pine
   trees.push({
     x: 19.5,
     z: -15.8,
@@ -424,38 +432,62 @@ export function generateWorldProps(): { trees: TreeSpec[]; rocks: RockSpec[] } {
     tintIndex: 0,
   });
 
-  for (let attempt = 0; attempt < 900 && trees.length < 155; attempt++) {
-    const x = (rand() * 2 - 1) * 32.5;
-    const z = (rand() * 2 - 1) * 32.5;
+  // Pass 1: Continuous circular perimeter tree ring framing the island rim without empty edges
+  const perimeterRings: Array<{ count: number; minR: number; maxR: number; pineChance: number }> = [
+    { count: 58, minR: 28.0, maxR: 29.8, pineChance: 0.78 },
+    { count: 44, minR: 25.0, maxR: 27.6, pineChance: 0.65 },
+  ];
+
+  for (const ring of perimeterRings) {
+    for (let i = 0; i < ring.count; i++) {
+      const angle = (i / ring.count) * Math.PI * 2 + (rand() - 0.5) * 0.08;
+      const radius = ring.minR + rand() * (ring.maxR - ring.minR);
+      const x = Math.cos(angle) * radius;
+      const z = Math.sin(angle) * radius;
+      if (isReserved(x, z)) continue;
+      if (!canPlaceTree(x, z)) continue;
+
+      trees.push({
+        x,
+        z,
+        kind: rand() < ring.pineChance ? "pine" : "round",
+        scale: 0.9 + rand() * 0.3,
+        rotation: rand() * Math.PI * 2,
+        tintIndex: Math.floor(rand() * 4),
+      });
+    }
+  }
+
+  // Pass 2: Natural polar interior woodland accents inside the outer ring
+  for (let attempt = 0; attempt < 650 && trees.length < 168; attempt++) {
+    const angle = rand() * Math.PI * 2;
+    const radius = Math.sqrt(rand()) * 27.4;
+    const x = Math.cos(angle) * radius;
+    const z = Math.sin(angle) * radius;
     if (isReserved(x, z)) continue;
 
-    const edgeBias = Math.max(Math.abs(x), Math.abs(z)) / 32.5;
-    const keepChance = edgeBias > 0.65 ? 0.85 : 0.3;
+    const edgeBias = radius / 27.4;
+    const keepChance = edgeBias > 0.72 ? 0.85 : edgeBias > 0.45 ? 0.34 : 0.18;
     if (rand() > keepChance) continue;
-
-    let tooClose = false;
-    for (const t of trees) {
-      if (Math.hypot(x - t.x, z - t.z) < 2.65) {
-        tooClose = true;
-        break;
-      }
-    }
-    if (tooClose) continue;
+    if (!canPlaceTree(x, z)) continue;
 
     trees.push({
       x,
       z,
-      kind: rand() > 0.35 ? "pine" : "round",
-      scale: 0.86 + rand() * 0.32,
+      kind: rand() > 0.38 ? "pine" : "round",
+      scale: 0.86 + rand() * 0.3,
       rotation: rand() * Math.PI * 2,
       tintIndex: Math.floor(rand() * 4),
     });
   }
 
-  for (let attempt = 0; attempt < 220 && rocks.length < 32; attempt++) {
-    const x = (rand() * 2 - 1) * 30.5;
-    const z = (rand() * 2 - 1) * 30.5;
-    if (isReserved(x, z, 1.5)) continue;
+  // Pass 3: Polar rock scatter inside playable woodland radius
+  for (let attempt = 0; attempt < 220 && rocks.length < 30; attempt++) {
+    const angle = rand() * Math.PI * 2;
+    const radius = Math.sqrt(rand()) * (TREE_RING_MAX_RADIUS - 1.5);
+    const x = Math.cos(angle) * radius;
+    const z = Math.sin(angle) * radius;
+    if (isReserved(x, z, 1.5, TREE_RING_MAX_RADIUS - 1.5)) continue;
 
     let tooClose = false;
     for (const t of trees) {
@@ -477,13 +509,26 @@ export function generateWorldProps(): { trees: TreeSpec[]; rocks: RockSpec[] } {
   return { trees, rocks };
 }
 
-// Wide explorable map bounds
+// Wide explorable circular map bounds
 export const MAP_BOUNDS = {
-  minX: -26.0,
-  maxX: 26.0,
-  minZ: -26.0,
-  maxZ: 26.0,
+  minX: -WALKABLE_RADIUS,
+  maxX: WALKABLE_RADIUS,
+  minZ: -WALKABLE_RADIUS,
+  maxZ: WALKABLE_RADIUS,
 } as const;
+
+export function clampToCircularWorld(
+  x: number,
+  z: number,
+  maxRadius = WALKABLE_RADIUS
+): { x: number; z: number } {
+  const r = Math.hypot(x, z);
+  if (r <= maxRadius || r < 0.0001) {
+    return { x, z };
+  }
+  const scale = maxRadius / r;
+  return { x: x * scale, z: z * scale };
+}
 
 // Cozy sleep bed location atop the Bukit Santai terrace
 export const JURO_BED_POS = {
@@ -519,26 +564,27 @@ export const JURO_BENCH_POS = {
   platformId: "pos-pandang",
 } as const;
 
-// Interactive bouncy mushroom trampoline in meadow clearing (front of mine, left of trail)
+// Interactive bouncy mushroom trampoline in north-west meadow clearing (between tunnel/canal and sandy trail)
 export const JURO_TRAMPOLINE_POS = {
-  x: 4.2,
-  z: -9.8,
-  surfaceY: 0.72,
+  x: -6.2,
+  z: -15.5,
+  scale: 1.24,
+  surfaceY: 1.12,
   label: "Trampolin Jamur",
 } as const;
 
-// Interactive shop counter at Kafe Senja & Kios Jamur
+// Interactive shop counter at WARUNG & Kios Jamur
 export const JURO_SHOP_POS = {
   x: 13.4,
   z: -0.6,
-  label: "Kafe Senja & Kios Jamur",
+  label: "WARUNG & Kios Jamur",
 } as const;
 
-// Interactive mine entrance at Gerbang Terowongan
+// Interactive mine entrance at Gerbang Tambang
 export const JURO_MINE_POS = {
   x: -10.5,
   z: -10.5,
-  label: "Gerbang Terowongan (Tambang)",
+  label: "Gerbang Tambang",
 } as const;
 
 // Elevated platforms Juro can climb / rest on
@@ -566,8 +612,8 @@ export const MAP_PLATFORMS: ElevatedPlatform[] = [
     kind: "terrace",
     x: JURO_TRAMPOLINE_POS.x,
     z: JURO_TRAMPOLINE_POS.z,
-    radius: 1.05,
-    height: 0.72,
+    radius: 1.28,
+    height: JURO_TRAMPOLINE_POS.surfaceY,
     label: "Trampolin Jamur",
   },
   {
@@ -586,16 +632,21 @@ export const MAP_PLATFORMS: ElevatedPlatform[] = [
     z: -1.6,
     radius: 3.5,
     height: 0.12,
-    label: "Kafe Senja & Kios Jamur",
+    label: "WARUNG & Kios Jamur",
   },
 ];
 
 // Solid world obstacles so Juro never clips through props
 export const MAP_OBSTACLES: SolidObstacle[] = [
-  // Kafe Senja Main Building
-  { x: 18.8, z: -3.2, radius: 2.8, topY: 4.2 },
+  // WARUNG Main Building + Plinth Corners + Front Service Counter
+  { x: 18.8, z: -3.2, radius: 3.05, topY: 4.5 },
+  { x: 17.56, z: -1.05, radius: 1.35, topY: 2.2 },
+  { x: 17.89, z: -6.03, radius: 1.15, topY: 4.2 },
+  { x: 21.71, z: -3.83, radius: 1.15, topY: 4.2 },
+  { x: 19.71, z: -0.37, radius: 1.15, topY: 4.2 },
+  { x: 15.89, z: -2.57, radius: 1.15, topY: 4.2 },
 
-  // Gerbang Terowongan Stone Arch & Mountain Rocks
+  // Gerbang Tambang Stone Arch & Mountain Rocks
   { x: -14.2, z: -14.2, radius: 2.6, topY: 4.5 },
   { x: -16.5, z: -12.5, radius: 1.8, topY: 3.5 },
   { x: -12.5, z: -16.5, radius: 1.8, topY: 3.5 },
@@ -611,22 +662,25 @@ export const MAP_OBSTACLES: SolidObstacle[] = [
   { x: 4.15, z: 19.6, radius: 0.38, topY: 2.5 },
   { x: 8.0, z: 19.7, radius: 0.3, topY: 2.5 },
 
-  // Bouncy Mushroom Trampoline (Front of mine, left of trail)
-  { x: 4.2, z: -9.8, radius: 0.85, topY: 1.2, tag: "trampoline" },
+  // Bouncy Mushroom Trampoline (North-West grassy clearing)
+  { x: JURO_TRAMPOLINE_POS.x, z: JURO_TRAMPOLINE_POS.z, radius: 1.12, topY: 1.65, tag: "trampoline" },
 
-  // Footbridge Railings (Left and Right)
-  { x: -4.8, z: -1.6, radius: 0.38, topY: 1.8 },
-  { x: -1.6, z: -4.8, radius: 0.38, topY: 1.8 },
+  // Footbridge Side Railings (South-East & North-West rails keeping center walkway clear)
+  { x: -3.59, z: -0.62, radius: 0.32, topY: 1.8 },
+  { x: -2.10, z: -2.10, radius: 0.32, topY: 1.8 },
+  { x: -0.62, z: -3.59, radius: 0.32, topY: 1.8 },
+  { x: -5.78, z: -2.81, radius: 0.32, topY: 1.8 },
+  { x: -4.30, z: -4.30, radius: 0.32, topY: 1.8 },
+  { x: -2.81, z: -5.78, radius: 0.32, topY: 1.8 },
 
   // Lantern posts
-  { x: -6.0, z: -0.4, radius: 0.22, topY: 2.2 },
-  { x: -0.4, z: -6.0, radius: 0.22, topY: 2.2 },
+  { x: -7.1, z: -1.7, radius: 0.22, topY: 2.2 },
+  { x: 0.7, z: -4.7, radius: 0.22, topY: 2.2 },
   { x: 14.2, z: 2.6, radius: 0.22, topY: 2.2 },
   { x: 8.1, z: 18.8, radius: 0.22, topY: 2.2 },
 
   // Rustic Fences
   { x: -2.5, z: 16.2, radius: 1.25, topY: 1.8 },
-  { x: 9.8, z: 4.2, radius: 1.25, topY: 1.8 },
   { x: 4.2, z: -16.8, radius: 1.25, topY: 1.8 },
 
   // Tree Stumps
@@ -636,6 +690,69 @@ export const MAP_OBSTACLES: SolidObstacle[] = [
   { x: -5.4, z: -17.5, radius: 0.55, topY: 1.2 },
   { x: 10.6, z: -21.2, radius: 0.58, topY: 1.2 },
 ];
+
+const PROP_CELL_SIZE = 4.0;
+let cachedPropGrid: Map<number, SolidObstacle[]> | null = null;
+
+function propCellKey(cx: number, cz: number): number {
+  return ((cx + 32) << 8) ^ (cz + 32);
+}
+
+function getPropSpatialGrid(): Map<number, SolidObstacle[]> {
+  if (cachedPropGrid) return cachedPropGrid;
+  const grid = new Map<number, SolidObstacle[]>();
+  const { trees, rocks } = generateWorldProps();
+
+  const insert = (obs: SolidObstacle) => {
+    const cx = Math.floor(obs.x / PROP_CELL_SIZE);
+    const cz = Math.floor(obs.z / PROP_CELL_SIZE);
+    const key = propCellKey(cx, cz);
+    let bucket = grid.get(key);
+    if (!bucket) {
+      bucket = [];
+      grid.set(key, bucket);
+    }
+    bucket.push(obs);
+  };
+
+  for (const t of trees) {
+    insert({
+      x: t.x,
+      z: t.z,
+      radius: 0.48 * t.scale,
+      topY: groundHeightAt(t.x, t.z) + 4.5 * t.scale,
+    });
+  }
+  for (const r of rocks) {
+    insert({
+      x: r.x,
+      z: r.z,
+      radius: 0.68 * r.scale,
+      topY: groundHeightAt(r.x, r.z) + 0.95 * r.scale,
+    });
+  }
+
+  cachedPropGrid = grid;
+  return grid;
+}
+
+function getNearbyPropObstacles(x: number, z: number): SolidObstacle[] {
+  const grid = getPropSpatialGrid();
+  const cx = Math.floor(x / PROP_CELL_SIZE);
+  const cz = Math.floor(z / PROP_CELL_SIZE);
+  const results: SolidObstacle[] = [];
+  for (let dz = -1; dz <= 1; dz++) {
+    for (let dx = -1; dx <= 1; dx++) {
+      const bucket = grid.get(propCellKey(cx + dx, cz + dz));
+      if (bucket) {
+        for (let i = 0; i < bucket.length; i++) {
+          results.push(bucket[i]);
+        }
+      }
+    }
+  }
+  return results;
+}
 
 export function isInsideObstacle(
   x: number,
@@ -670,6 +787,14 @@ export function isInsideObstacle(
     }
   }
 
+  const nearbyProps = getNearbyPropObstacles(x, z);
+  for (let i = 0; i < nearbyProps.length; i++) {
+    const prop = nearbyProps[i];
+    if (Math.hypot(x - prop.x, z - prop.z) < prop.radius + pad) {
+      return true;
+    }
+  }
+
   // Check bed mattress while awake
   if (!isSleepingOrHeading && Math.hypot(x - JURO_BED_POS.x, z - JURO_BED_POS.z) < 0.55 + pad) {
     return true;
@@ -687,11 +812,13 @@ export function resolveHorizontalCollisions(
   isSittingOrHeadingToBench = false,
   isBouncingOrHeadingToTrampoline = false
 ): { x: number; z: number; hitObstacle: boolean } {
-  let rx = Math.max(MAP_BOUNDS.minX, Math.min(MAP_BOUNDS.maxX, x));
-  let rz = Math.max(MAP_BOUNDS.minZ, Math.min(MAP_BOUNDS.maxZ, z));
+  const initialClamped = clampToCircularWorld(x, z);
+  let rx = initialClamped.x;
+  let rz = initialClamped.z;
   let hitObstacle = false;
+  const nearbyProps = getNearbyPropObstacles(rx, rz);
 
-  for (let pass = 0; pass < 2; pass++) {
+  for (let pass = 0; pass < 3; pass++) {
     for (let i = 0; i < MAP_OBSTACLES.length; i++) {
       const obs = MAP_OBSTACLES[i];
       if (
@@ -723,6 +850,23 @@ export function resolveHorizontalCollisions(
         const nz = dist > 0.0001 ? dz / dist : 0;
         rx = obs.x + nx * minDist;
         rz = obs.z + nz * minDist;
+        hitObstacle = true;
+      }
+    }
+
+    for (let i = 0; i < nearbyProps.length; i++) {
+      const prop = nearbyProps[i];
+      if (bottomY >= prop.topY) continue;
+
+      const dx = rx - prop.x;
+      const dz = rz - prop.z;
+      const dist = Math.hypot(dx, dz);
+      const minDist = prop.radius + petRadius;
+      if (dist < minDist) {
+        const nx = dist > 0.0001 ? dx / dist : 1;
+        const nz = dist > 0.0001 ? dz / dist : 0;
+        rx = prop.x + nx * minDist;
+        rz = prop.z + nz * minDist;
         hitObstacle = true;
       }
     }
@@ -768,9 +912,10 @@ export function resolveHorizontalCollisions(
     }
   }
 
+  const finalClamped = clampToCircularWorld(rx, rz);
   return {
-    x: Math.max(MAP_BOUNDS.minX, Math.min(MAP_BOUNDS.maxX, rx)),
-    z: Math.max(MAP_BOUNDS.minZ, Math.min(MAP_BOUNDS.maxZ, rz)),
+    x: finalClamped.x,
+    z: finalClamped.z,
     hitObstacle,
   };
 }
@@ -791,10 +936,13 @@ export function pickScenicWaypoint(bias?: "water" | "bed" | "food" | "bench" | "
       // Pos Pandang overlook terrace in front of bench
       candidate = { x: 6.0 + (Math.random() - 0.5) * 0.8, z: 18.5 + (Math.random() - 0.5) * 0.8 };
     } else if (bias === "trampoline") {
-      // Clear meadow in front of trampoline
-      candidate = { x: 4.2 + (Math.random() - 0.5) * 0.4, z: -8.8 + (Math.random() - 0.5) * 0.4 };
+      // Clear meadow beside the enlarged mushroom trampoline
+      candidate = {
+        x: JURO_TRAMPOLINE_POS.x + 1.45 + (Math.random() - 0.5) * 0.4,
+        z: JURO_TRAMPOLINE_POS.z + 0.45 + (Math.random() - 0.5) * 0.4,
+      };
     } else if (bias === "food") {
-      // Kafe Senja plaza
+      // WARUNG plaza
       candidate = { x: 13.4 + (Math.random() - 0.5) * 1.5, z: -0.6 + (Math.random() - 0.5) * 1.5 };
     } else if (Math.random() < 0.4) {
       // Pick a point along the scenic sandy trail
@@ -803,14 +951,20 @@ export function pickScenicWaypoint(bias?: "water" | "bed" | "food" | "bench" | "
       const offset = (Math.random() - 0.5) * 0.8;
       candidate = { x: tx + offset, z: tz + offset };
     } else {
-      // Clear spot across the meadow
+      // Clear spot across the circular meadow
+      const angle = Math.random() * Math.PI * 2;
+      const radius = Math.sqrt(Math.random()) * 21.0;
       candidate = {
-        x: -20.0 + Math.random() * 40.0,
-        z: -20.0 + Math.random() * 40.0,
+        x: Math.cos(angle) * radius,
+        z: Math.sin(angle) * radius,
       };
     }
 
-    if (!isInsideObstacle(candidate.x, candidate.z, 0.35) && !isWaterAt(candidate.x, candidate.z)) {
+    if (
+      Math.hypot(candidate.x, candidate.z) <= WALKABLE_RADIUS &&
+      !isInsideObstacle(candidate.x, candidate.z, 0.35) &&
+      !isWaterAt(candidate.x, candidate.z)
+    ) {
       return candidate;
     }
   }

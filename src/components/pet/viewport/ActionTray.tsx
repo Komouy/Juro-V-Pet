@@ -49,17 +49,17 @@ export const ActionTray: React.FC<ActionTrayProps> = ({
       {activeTray === "food" && (() => {
         const availableFoods = SHOP_FOODS.filter((f) => (foodInventory[f.id] ?? 0) > 0);
         return (
-          <div className="animate-tray-enter w-full rounded-2xl bg-white dark:bg-neutral-900 border border-neutral-200/90 dark:border-neutral-800 shadow-xl p-3">
-            <div className="flex items-center justify-between gap-3 pb-2 mb-2.5 border-b border-neutral-100 dark:border-neutral-800">
-              <span className="text-xs sm:text-sm font-semibold text-neutral-900 dark:text-white">
+          <div className="animate-tray-enter w-full rounded-[6px] bg-[#FDFBF7] dark:bg-[#1E2028] border-2 border-charcoal dark:border-[#4A4E5E] shadow-[0_4px_0_#18181B] dark:shadow-[0_4px_0_#09090B] p-3">
+            <div className="flex items-center justify-between gap-3 pb-2 mb-2.5 border-b-2 border-dashed border-charcoal/20 dark:border-[#3F424E]">
+              <span className="font-pixel text-xs font-bold uppercase text-charcoal dark:text-white">
                 Stok Makanan
               </span>
               <div className="flex items-center gap-2">
                 <Link
                   to="/shop?tab=food"
-                  className="inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-lg bg-juro-orange text-white hover:bg-orange-600 transition-colors"
+                  className="console-btn-bevel inline-flex items-center gap-1 font-pixel text-[11px] font-bold uppercase px-2.5 py-1 rounded-[4px] bg-juro-orange text-white border-2 border-charcoal shadow-[0_2px_0_#18181B] hover:bg-[#EA580C]"
                 >
-                  <Store size={12} strokeWidth={2} />
+                  <Store size={12} strokeWidth={2.2} />
                   <span>Toko</span>
                 </Link>
                 <button
@@ -67,29 +67,29 @@ export const ActionTray: React.FC<ActionTrayProps> = ({
                     soundEffects.playDismiss();
                     onClose();
                   }}
-                  className="p-1 rounded-lg text-neutral-500 hover:bg-neutral-100 dark:text-neutral-300 dark:hover:bg-neutral-800 cursor-pointer"
+                  className="p-1 rounded-[4px] border-2 border-transparent hover:border-charcoal text-charcoal/70 hover:text-charcoal hover:bg-[#EFE9DC] dark:text-neutral-300 dark:hover:bg-[#101114] cursor-pointer"
                   aria-label="Tutup menu makanan"
                 >
-                  <X size={16} strokeWidth={2} />
+                  <X size={15} strokeWidth={2.2} />
                 </button>
               </div>
             </div>
 
             {availableFoods.length === 0 ? (
               <div className="py-3 px-2 text-center space-y-2.5">
-                <p className="text-xs text-neutral-500 dark:text-neutral-400">
+                <p className="text-xs text-neutral-600 dark:text-neutral-400">
                   Stok makanan habis.
                 </p>
                 <Link
                   to="/shop?tab=food"
-                  className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-juro-orange text-white text-xs font-semibold hover:bg-orange-600 transition-colors"
+                  className="console-btn-bevel inline-flex items-center gap-1.5 px-3.5 py-2 rounded-[4px] bg-juro-orange text-white border-2 border-charcoal shadow-[0_2px_0_#18181B] font-pixel text-xs font-bold uppercase hover:bg-[#EA580C]"
                 >
-                  <Store size={14} strokeWidth={2} />
+                  <Store size={13} strokeWidth={2.2} />
                   <span>Beli Makanan di Toko</span>
                 </Link>
               </div>
             ) : (
-              <div className="flex items-stretch gap-2 overflow-x-auto max-w-[92vw] pb-0.5">
+              <div className="flex items-stretch gap-2 overflow-x-auto max-w-[92vw] pb-1">
                 {availableFoods.map((food) => {
                   const stock = foodInventory[food.id] ?? 0;
                   return (
@@ -98,20 +98,20 @@ export const ActionTray: React.FC<ActionTrayProps> = ({
                       type="button"
                       onPointerDown={(e) => onStartItemDrag({ kind: "food", food }, e)}
                       onClick={() => onDirectUse?.({ kind: "food", food })}
-                      className="relative group shrink-0 w-24 p-2.5 rounded-xl bg-neutral-50/80 dark:bg-neutral-800/80 border border-neutral-200/80 dark:border-neutral-700 hover:border-juro-orange hover:bg-orange-50/40 dark:hover:bg-neutral-800 active:scale-95 transition-all cursor-grab active:cursor-grabbing flex flex-col items-center text-center gap-1.5 touch-none"
+                      className="console-btn-bevel relative group shrink-0 w-24 p-2.5 rounded-[4px] bg-[#EFE9DC] dark:bg-[#101114] border-2 border-charcoal dark:border-[#3F424E] shadow-[0_2px_0_#18181B] hover:border-juro-orange hover:bg-[#FFF6EB] dark:hover:bg-[#191B22] cursor-grab active:cursor-grabbing flex flex-col items-center text-center gap-1.5 touch-none"
                     >
-                      <span className="absolute top-1.5 right-2 text-[11px] font-semibold tabular-nums text-neutral-500 dark:text-neutral-400 leading-none">
+                      <span className="font-mono-hud absolute top-1 right-1.5 text-[10px] font-bold text-charcoal/80 dark:text-neutral-300 leading-none">
                         ×{stock}
                       </span>
                       <ItemIllustration id={food.id} size={34} />
-                      <span className="text-xs text-neutral-800 dark:text-white font-semibold leading-tight line-clamp-2">
+                      <span className="text-xs text-charcoal dark:text-white font-semibold leading-tight line-clamp-2">
                         {food.name}
                       </span>
-                      <div className="flex items-center gap-1 text-[11px] tabular-nums">
-                        <span className="text-juro-orange font-semibold">+{food.hungerRestore}</span>
+                      <div className="font-mono-hud flex items-center gap-1 text-[10px] font-bold">
+                        <span className="text-juro-orange">+{food.hungerRestore}</span>
                         <span className="text-neutral-400">·</span>
-                        <span className="text-emerald-600 dark:text-emerald-400 font-semibold">
-                          +{food.xpReward} XP
+                        <span className="text-emerald-600 dark:text-emerald-400">
+                          +{food.xpReward}XP
                         </span>
                       </div>
                     </button>
@@ -127,18 +127,18 @@ export const ActionTray: React.FC<ActionTrayProps> = ({
       {activeTray === "toy" && (() => {
         const myToys = SHOP_TOYS.filter((t) => ownedToys.includes(t.id));
         return (
-          <div className="animate-tray-enter w-full rounded-2xl bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-700 shadow-xl p-3">
-            <div className="flex items-center justify-between gap-3 pb-2 mb-2.5 border-b border-neutral-200 dark:border-neutral-800">
-              <span className="text-xs sm:text-sm font-semibold text-neutral-900 dark:text-white">
+          <div className="animate-tray-enter w-full rounded-[6px] bg-[#FDFBF7] dark:bg-[#1E2028] border-2 border-charcoal dark:border-[#4A4E5E] shadow-[0_4px_0_#18181B] dark:shadow-[0_4px_0_#09090B] p-3">
+            <div className="flex items-center justify-between gap-3 pb-2 mb-2.5 border-b-2 border-dashed border-charcoal/20 dark:border-[#3F424E]">
+              <span className="font-pixel text-xs font-bold uppercase text-charcoal dark:text-white">
                 Koleksi Mainan
               </span>
               <div className="flex items-center gap-2">
                 {myToys.length < SHOP_TOYS.length && (
                   <Link
                     to="/shop?tab=toy"
-                    className="inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-lg bg-juro-orange text-white hover:bg-orange-600 transition-colors"
+                    className="console-btn-bevel inline-flex items-center gap-1 font-pixel text-[11px] font-bold uppercase px-2.5 py-1 rounded-[4px] bg-juro-orange text-white border-2 border-charcoal shadow-[0_2px_0_#18181B] hover:bg-[#EA580C]"
                   >
-                    <Store size={12} strokeWidth={2} />
+                    <Store size={12} strokeWidth={2.2} />
                     <span>Toko</span>
                   </Link>
                 )}
@@ -147,10 +147,10 @@ export const ActionTray: React.FC<ActionTrayProps> = ({
                     soundEffects.playDismiss();
                     onClose();
                   }}
-                  className="p-1 rounded-lg text-neutral-500 hover:bg-neutral-100 dark:text-neutral-300 dark:hover:bg-neutral-800 cursor-pointer"
+                  className="p-1 rounded-[4px] border-2 border-transparent hover:border-charcoal text-charcoal/70 hover:text-charcoal hover:bg-[#EFE9DC] dark:text-neutral-300 dark:hover:bg-[#101114] cursor-pointer"
                   aria-label="Tutup menu mainan"
                 >
-                  <X size={16} strokeWidth={2} />
+                  <X size={15} strokeWidth={2.2} />
                 </button>
               </div>
             </div>
@@ -169,17 +169,17 @@ export const ActionTray: React.FC<ActionTrayProps> = ({
                   type="button"
                   onPointerDown={(e) => onStartItemDrag({ kind: "toy", toy }, e)}
                   onClick={() => onDirectUse?.({ kind: "toy", toy })}
-                  className="group min-w-0 p-2.5 rounded-xl bg-neutral-50 dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 hover:border-juro-orange hover:bg-orange-50/40 dark:hover:bg-neutral-750 active:scale-95 transition-all cursor-grab active:cursor-grabbing flex flex-col items-center text-center gap-1.5 touch-none"
+                  className="console-btn-bevel group min-w-0 p-2.5 rounded-[4px] bg-[#EFE9DC] dark:bg-[#101114] border-2 border-charcoal dark:border-[#3F424E] shadow-[0_2px_0_#18181B] hover:border-juro-orange hover:bg-[#FFF6EB] dark:hover:bg-[#191B22] cursor-grab active:cursor-grabbing flex flex-col items-center text-center gap-1.5 touch-none"
                 >
                   <ItemIllustration id={toy.id} size={36} />
-                  <span className="text-xs text-neutral-800 dark:text-white font-semibold leading-tight">
+                  <span className="text-xs text-charcoal dark:text-white font-semibold leading-tight">
                     {toy.name}
                   </span>
-                  <div className="flex items-center gap-1 text-[11px] tabular-nums">
-                    <span className="text-rose-500 font-semibold">+{toy.happinessGain}</span>
+                  <div className="font-mono-hud flex items-center gap-1 text-[10px] font-bold">
+                    <span className="text-rose-600">+{toy.happinessGain}</span>
                     <span className="text-neutral-400">·</span>
-                    <span className="text-emerald-600 dark:text-emerald-400 font-semibold">
-                      +{toy.xpReward} XP
+                    <span className="text-emerald-600 dark:text-emerald-400">
+                      +{toy.xpReward}XP
                     </span>
                   </div>
                 </button>
@@ -191,9 +191,9 @@ export const ActionTray: React.FC<ActionTrayProps> = ({
 
       {/* Interactive Bath Kit Strip */}
       {activeTray === "bath" && (
-        <div className="animate-tray-enter w-full rounded-2xl bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-700 shadow-xl p-3">
-          <div className="flex items-center justify-between gap-4 pb-2 mb-2.5 border-b border-neutral-200 dark:border-neutral-800">
-            <span className="text-xs sm:text-sm font-semibold text-neutral-900 dark:text-white">
+        <div className="animate-tray-enter w-full rounded-[6px] bg-[#FDFBF7] dark:bg-[#1E2028] border-2 border-charcoal dark:border-[#4A4E5E] shadow-[0_4px_0_#18181B] dark:shadow-[0_4px_0_#09090B] p-3">
+          <div className="flex items-center justify-between gap-4 pb-2 mb-2.5 border-b-2 border-dashed border-charcoal/20 dark:border-[#3F424E]">
+            <span className="font-pixel text-xs font-bold uppercase text-charcoal dark:text-white">
               Peralatan Mandi
             </span>
             <button
@@ -201,10 +201,10 @@ export const ActionTray: React.FC<ActionTrayProps> = ({
                 soundEffects.playDismiss();
                 onClose();
               }}
-              className="p-1 rounded-lg text-neutral-500 hover:bg-neutral-100 dark:text-neutral-300 dark:hover:bg-neutral-800 cursor-pointer"
+              className="p-1 rounded-[4px] border-2 border-transparent hover:border-charcoal text-charcoal/70 hover:text-charcoal hover:bg-[#EFE9DC] dark:text-neutral-300 dark:hover:bg-[#101114] cursor-pointer"
               aria-label="Tutup alat mandi"
             >
-              <X size={16} strokeWidth={2} />
+              <X size={15} strokeWidth={2.2} />
             </button>
           </div>
 
@@ -214,14 +214,14 @@ export const ActionTray: React.FC<ActionTrayProps> = ({
               type="button"
               onPointerDown={(e) => onStartItemDrag({ kind: "soap" }, e)}
               onClick={() => onDirectUse?.({ kind: "soap" })}
-              className="group min-w-0 p-2.5 rounded-xl bg-neutral-50 dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 hover:border-sky-400 hover:bg-sky-50/40 dark:hover:bg-neutral-750 active:scale-95 transition-all cursor-grab active:cursor-grabbing flex flex-col items-center text-center gap-1.5 touch-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400"
+              className="console-btn-bevel group min-w-0 p-2.5 rounded-[4px] bg-[#EFE9DC] dark:bg-[#101114] border-2 border-charcoal dark:border-[#3F424E] shadow-[0_2px_0_#18181B] hover:border-sky-500 hover:bg-sky-50 dark:hover:bg-[#191B22] cursor-grab active:cursor-grabbing flex flex-col items-center text-center gap-1.5 touch-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400"
             >
               <ItemIllustration id="soap-bar" size={38} />
               <div className="flex flex-col items-center">
-                <span className="text-xs text-neutral-800 dark:text-white font-semibold">
+                <span className="text-xs text-charcoal dark:text-white font-semibold">
                   Sabun Busa
                 </span>
-                <span className="text-[11px] text-neutral-500 dark:text-neutral-400">
+                <span className="text-[11px] text-neutral-600 dark:text-neutral-400">
                   1. Gosokkan sabun
                 </span>
               </div>
@@ -232,18 +232,18 @@ export const ActionTray: React.FC<ActionTrayProps> = ({
               type="button"
               onPointerDown={(e) => onStartItemDrag({ kind: "bucket" }, e)}
               onClick={() => onDirectUse?.({ kind: "bucket" })}
-              className={`group min-w-0 p-2.5 rounded-xl bg-neutral-50 dark:bg-neutral-800 border active:scale-95 transition-all cursor-grab active:cursor-grabbing flex flex-col items-center text-center gap-1.5 touch-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400 ${
+              className={`console-btn-bevel group min-w-0 p-2.5 rounded-[4px] bg-[#EFE9DC] dark:bg-[#101114] border-2 shadow-[0_2px_0_#18181B] cursor-grab active:cursor-grabbing flex flex-col items-center text-center gap-1.5 touch-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400 ${
                 soapBadgePercent >= 40
-                  ? "border-sky-400 ring-2 ring-sky-400/30"
-                  : "border-neutral-200 dark:border-neutral-700 hover:border-sky-400 hover:bg-sky-50/40"
+                  ? "border-sky-500 bg-sky-50 dark:bg-sky-950/30"
+                  : "border-charcoal dark:border-[#3F424E] hover:border-sky-500 hover:bg-sky-50"
               }`}
             >
               <ItemIllustration id="water-bucket" size={38} />
               <div className="flex flex-col items-center">
-                <span className="text-xs text-neutral-800 dark:text-white font-semibold">
+                <span className="text-xs text-charcoal dark:text-white font-semibold">
                   Ember Air
                 </span>
-                <span className="text-[11px] text-neutral-500 dark:text-neutral-400">
+                <span className="text-[11px] text-neutral-600 dark:text-neutral-400">
                   2. Siram bersih
                 </span>
               </div>

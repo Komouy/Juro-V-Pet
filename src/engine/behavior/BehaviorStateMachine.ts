@@ -2,7 +2,12 @@ import * as THREE from "three";
 import { BEHAVIOR_CONFIGS } from "./types";
 import type { PetBehaviorState } from "./types";
 import type { PetAttributes, PetMood } from "../../types/pet";
-import { MAP_BOUNDS, pickScenicWaypoint, getTerrainHeightAt } from "../world/mapTerrain";
+import {
+  MAP_BOUNDS,
+  clampToCircularWorld,
+  pickScenicWaypoint,
+  getTerrainHeightAt,
+} from "../world/mapTerrain";
 
 export class BehaviorStateMachine {
   currentState: PetBehaviorState = "idle";
@@ -84,8 +89,7 @@ export class BehaviorStateMachine {
         }
       }
     }
-    const clampedX = Math.max(this.minX, Math.min(this.maxX, pt.x));
-    const clampedZ = Math.max(this.minZ, Math.min(this.maxZ, pt.z));
+    const { x: clampedX, z: clampedZ } = clampToCircularWorld(pt.x, pt.z);
     const surfaceY = getTerrainHeightAt(clampedX, clampedZ);
     this.wanderTarget.set(clampedX, surfaceY, clampedZ);
     this.timeInState = 0;

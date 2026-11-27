@@ -8,4 +8,17 @@ export default defineConfig({
     react(),
     tailwindcss(),
   ],
+  build: {
+    rolldownOptions: {
+      output: {
+        manualChunks(id) {
+          if (!id.includes('node_modules')) return undefined;
+          if (id.includes('three') || id.includes('@react-three')) return 'vendor-three';
+          if (id.includes('firebase')) return 'vendor-firebase';
+          if (id.includes('lucide-react') || id.includes('motion')) return 'vendor-ui';
+          return undefined;
+        },
+      },
+    },
+  },
 })

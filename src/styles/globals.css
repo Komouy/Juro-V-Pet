@@ -3,17 +3,25 @@
 @custom-variant dark (&:where(.dark, .dark *));
 
 @theme {
+  --color-console-bg: #F4EFE6;
+  --color-cream-paper: #FDFBF7;
+  --color-lcd-well: #EFE9DC;
   --color-juro-orange: #F97316;
-  --color-charcoal: #171717;
+  --color-juro-orange-deep: #C2410C;
+  --color-charcoal: #18181B;
   --color-warm-white: #FFF7ED;
   --color-soft-orange: #FED7AA;
-  --color-muted: #737373;
+  --color-led-green: #22C55E;
+  --color-muted: #71717A;
 
-  --color-dark-bg: #171717;
-  --color-dark-surface: #262626;
+  --color-dark-bg: #141519;
+  --color-dark-surface: #1E2028;
+  --color-dark-well: #101114;
+  --color-dark-border: #3F424E;
   --color-dark-accent: #F97316;
 
-  --font-pixel: "Plus Jakarta Sans", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-pixel: "Silkscreen", "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
   --font-sans: "Plus Jakarta Sans", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
 
@@ -31,64 +39,180 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
-/* Legacy class fallback mapped to clean sans-serif */
+/* Display pixel font utility for console labels, titles & keycaps */
+.font-pixel,
 .pixel-text {
-  font-family: var(--font-sans);
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
+  font-family: var(--font-pixel);
+  letter-spacing: 0.01em;
 }
 
-/* Smooth tactile button press effect */
+/* Tabular monospace readout for stats, counters & codes */
+.font-mono-hud {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Handheld Cartridge Surface & Hard Offset Bevel */
+.console-surface {
+  border: 2px solid #18181B;
+  box-shadow: 0 3px 0 #18181B;
+}
+
+.dark .console-surface {
+  border-color: #3F424E;
+  box-shadow: 0 3px 0 #09090B;
+}
+
+/* Tactile Console Keycap Press */
+.console-btn-bevel,
 .pixel-btn-press {
-  transition: transform 0.12s ease, background-color 0.15s ease, box-shadow 0.15s ease;
+  transition: transform 0.1s ease, box-shadow 0.1s ease, background-color 0.14s ease, border-color 0.14s ease;
 }
 
-.pixel-btn-press:active {
-  transform: scale(0.97);
+.console-btn-bevel:active:not(:disabled),
+.pixel-btn-press:active:not(:disabled) {
+  transform: translateY(2px);
 }
 
-/* Clean rounded scrollbar */
+/* Notched / Chamfered Cartridge Corners */
+.cartridge-chamfer {
+  clip-path: polygon(
+    6px 0,
+    calc(100% - 6px) 0,
+    100% 6px,
+    100% calc(100% - 6px),
+    calc(100% - 6px) 100%,
+    6px 100%,
+    0 calc(100% - 6px),
+    0 6px
+  );
+}
+
+.cartridge-chamfer-sm {
+  clip-path: polygon(
+    4px 0,
+    calc(100% - 4px) 0,
+    100% 4px,
+    100% calc(100% - 4px),
+    calc(100% - 4px) 100%,
+    4px 100%,
+    0 calc(100% - 4px),
+    0 4px
+  );
+}
+
+/* Optional subtle CRT Console Scanlines overlay */
+.console-scanlines {
+  background-image: repeating-linear-gradient(
+    to bottom,
+    rgba(24, 24, 27, 0.04) 0px,
+    rgba(24, 24, 27, 0.04) 1px,
+    transparent 1px,
+    transparent 3px
+  );
+}
+
+.dark .console-scanlines {
+  background-image: repeating-linear-gradient(
+    to bottom,
+    rgba(0, 0, 0, 0.18) 0px,
+    rgba(0, 0, 0, 0.18) 1px,
+    transparent 1px,
+    transparent 3px
+  );
+}
+
+@keyframes console-blink {
+  0%, 49% {
+    opacity: 1;
+  }
+  50%, 100% {
+    opacity: 0;
+  }
+}
+
+.animate-console-cursor {
+  animation: console-blink 1s steps(2, start) infinite;
+}
+
+/* Mechanical Handheld Console Scrollbar */
 * {
   scrollbar-width: thin;
-  scrollbar-color: rgba(115, 115, 115, 0.45) transparent;
+  scrollbar-color: #d6cec0 #eae3d5;
 }
 
 .dark * {
-  scrollbar-color: rgba(163, 163, 163, 0.35) transparent;
+  scrollbar-color: #3f424e #101114;
 }
 
 ::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+  width: 10px;
+  height: 10px;
 }
 
 ::-webkit-scrollbar-track {
-  background: transparent;
+  background: #eae3d5;
+  border-left: 2px solid #18181B;
+}
+
+::-webkit-scrollbar-track:horizontal {
+  border-left: none;
+  border-top: 2px solid #18181B;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: rgba(115, 115, 115, 0.35);
-  border-radius: 9999px;
-  border: 2px solid transparent;
-  background-clip: padding-box;
+  background:
+    linear-gradient(
+      to bottom,
+      transparent 34%,
+      rgba(24, 24, 27, 0.28) 34%,
+      rgba(24, 24, 27, 0.28) 42%,
+      transparent 42%,
+      transparent 58%,
+      rgba(24, 24, 27, 0.28) 58%,
+      rgba(24, 24, 27, 0.28) 66%,
+      transparent 66%
+    ),
+    #d6cec0;
+  border: 2px solid #18181B;
+  border-radius: 2px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(115, 115, 115, 0.55);
-  border: 2px solid transparent;
-  background-clip: padding-box;
+  background-color: #F97316;
+}
+
+.dark ::-webkit-scrollbar-track {
+  background: #101114;
+  border-left: 2px solid #3F424E;
+}
+
+.dark ::-webkit-scrollbar-track:horizontal {
+  border-left: none;
+  border-top: 2px solid #3F424E;
 }
 
 .dark ::-webkit-scrollbar-thumb {
-  background: rgba(163, 163, 163, 0.3);
-  border: 2px solid transparent;
-  background-clip: padding-box;
+  background:
+    linear-gradient(
+      to bottom,
+      transparent 34%,
+      rgba(255, 255, 255, 0.22) 34%,
+      rgba(255, 255, 255, 0.22) 42%,
+      transparent 42%,
+      transparent 58%,
+      rgba(255, 255, 255, 0.22) 58%,
+      rgba(255, 255, 255, 0.22) 66%,
+      transparent 66%
+    ),
+    #2C2F3A;
+  border: 2px solid #3F424E;
+  border-radius: 2px;
 }
 
 .dark ::-webkit-scrollbar-thumb:hover {
-  background: rgba(163, 163, 163, 0.5);
-  border: 2px solid transparent;
-  background-clip: padding-box;
+  background-color: #F97316;
+  border-color: #FDBA74;
 }
 
 /* Mining Mini-Game Juicy Pixel Animations (GPU-composited) */

@@ -364,10 +364,10 @@ export function createPixelTextureSet(): PixelTextureSet {
         ctx.lineWidth = 5;
         ctx.strokeRect(4, 4, 248, 56);
         ctx.fillStyle = "#ffe599";
-        ctx.font = "bold 26px sans-serif";
+        ctx.font = "bold 30px sans-serif";
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";
-        ctx.fillText("TEROWONGAN", 128, 34);
+        ctx.fillText("TAMBANG", 128, 34);
       },
       1,
       1,
@@ -390,7 +390,7 @@ export function createPixelTextureSet(): PixelTextureSet {
         ctx.font = "bold 28px sans-serif";
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";
-        ctx.fillText("KAFE SENJA", 128, 34);
+        ctx.fillText("WARUNG", 128, 34);
       },
       1,
       1,

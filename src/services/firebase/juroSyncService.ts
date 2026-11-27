@@ -104,7 +104,7 @@ export class JuroRealtimeSyncService {
         caregiverName: caregiver.name,
         caregiverRoleTitle: caregiver.roleTitle,
         actionType: "interaction" as const,
-        description: `${caregiver.name} (${caregiver.roleTitle}) membuat kamar asuh Juro! Kode pairing: ${roomCode}`,
+        description: `${caregiver.name} (${caregiver.roleTitle}) membuat kamar Juro! Kode pairing: ${roomCode}`,
       };
 
       const myInitialPet: PartnerPetState = {

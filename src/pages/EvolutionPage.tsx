@@ -14,7 +14,7 @@ const StageEmblem: React.FC<{ stage: 1 | 2 | 3; unlocked: boolean }> = ({
   const fillLight = unlocked ? "#FDBA74" : "#D1D5DB";
 
   return (
-    <div className="w-12 h-12 rounded-xl bg-orange-50/70 dark:bg-neutral-800 border border-orange-200/70 dark:border-neutral-700 flex items-center justify-center shrink-0">
+    <div className="w-12 h-12 rounded-[4px] bg-[#EFE9DC] dark:bg-[#101114] border-2 border-charcoal dark:border-[#3F424E] flex items-center justify-center shrink-0">
       <svg
         width="28"
         height="28"
@@ -119,14 +119,14 @@ export const EvolutionPage: React.FC = () => {
 
   return (
     <section className="w-full px-4 sm:px-6 py-4 sm:py-5 space-y-4">
-      {/* Compact Overlay Header */}
-      <div className="border-b border-neutral-200/80 dark:border-neutral-800 pb-3.5 flex items-center justify-between gap-3">
-        <h1 className="text-base sm:text-lg font-bold text-neutral-900 dark:text-white tracking-tight flex items-center gap-2 shrink-0">
+      {/* Compact Console Header */}
+      <div className="border-b-2 border-dashed border-charcoal/20 dark:border-[#3F424E] pb-3.5 flex items-center justify-between gap-3">
+        <h1 className="font-pixel text-base sm:text-lg font-bold uppercase text-charcoal dark:text-white tracking-wide flex items-center gap-2 shrink-0">
           <TrendingUp size={18} strokeWidth={2.2} className="text-juro-orange" />
           <span>Evolusi</span>
         </h1>
         <div className="flex items-center gap-2.5">
-          <span className="text-xs text-neutral-500 dark:text-neutral-400 hidden sm:inline">
+          <span className="text-xs text-neutral-600 dark:text-neutral-400 hidden sm:inline">
             Tahapan pertumbuhan Juro
           </span>
           <button
@@ -135,22 +135,22 @@ export const EvolutionPage: React.FC = () => {
               soundEffects.playDismiss();
               navigate("/");
             }}
-            className="w-8 h-8 rounded-xl inline-flex items-center justify-center text-neutral-500 hover:text-neutral-900 hover:bg-neutral-100 dark:text-neutral-400 dark:hover:text-white dark:hover:bg-neutral-800 transition-colors cursor-pointer"
+            className="console-btn-bevel w-8 h-8 rounded-[4px] border-2 border-charcoal dark:border-[#3F424E] bg-[#FDFBF7] dark:bg-[#101114] shadow-[0_2px_0_#18181B] inline-flex items-center justify-center text-charcoal hover:text-juro-orange dark:text-neutral-200 transition-colors cursor-pointer"
             aria-label="Tutup dan kembali ke Home"
             title="Kembali ke Home"
           >
-            <X size={17} strokeWidth={2} />
+            <X size={16} strokeWidth={2.4} />
           </button>
         </div>
       </div>
 
       {/* Progress Level Card */}
-      <Card shadowOffset="sm" variant="warm" className="p-4 shadow-none">
+      <Card shadowOffset="sm" variant="warm" className="p-4">
         <div className="flex items-center justify-between gap-3 mb-2.5">
-          <h2 className="text-sm sm:text-base font-semibold text-neutral-900 dark:text-white">
+          <h2 className="font-pixel text-sm sm:text-base font-bold uppercase text-charcoal dark:text-white">
             {name} · Level {level}
           </h2>
-          <span className="text-xs font-medium text-neutral-500 dark:text-neutral-400 tabular-nums">
+          <span className="font-mono-hud text-xs font-bold text-charcoal/75 dark:text-neutral-300">
             {xp}/{xpToNextLevel} XP
           </span>
         </div>
@@ -165,11 +165,11 @@ export const EvolutionPage: React.FC = () => {
 
       {/* Section: Wujud Fisik */}
       <div className="space-y-3.5">
-        <div className="flex items-center justify-between border-b border-neutral-200/80 dark:border-neutral-800 pb-2.5">
-          <h2 className="text-sm font-semibold text-neutral-900 dark:text-white">
+        <div className="flex items-center justify-between border-b-2 border-dashed border-charcoal/20 dark:border-[#3F424E] pb-2.5">
+          <h2 className="font-pixel text-xs sm:text-sm font-bold uppercase text-charcoal dark:text-white">
             Wujud Fisik
           </h2>
-          <span className="text-xs text-neutral-500 dark:text-neutral-400">
+          <span className="font-mono-hud text-xs text-neutral-600 dark:text-neutral-400">
             3 tahap pertumbuhan
           </span>
         </div>
@@ -181,10 +181,11 @@ export const EvolutionPage: React.FC = () => {
               <Card
                 key={stage.stageName}
                 shadowOffset="sm"
+                variant={stage.current ? "warm" : "default"}
                 onClick={() => soundEffects.playClick()}
-                className={`p-4 shadow-none flex flex-col justify-between gap-3 transition-all cursor-pointer ${
+                className={`p-4 flex flex-col justify-between gap-3 transition-all cursor-pointer ${
                   stage.current
-                    ? "border-juro-orange ring-1 ring-juro-orange/25"
+                    ? "border-juro-orange"
                     : !isUnlocked
                     ? "opacity-75"
                     : ""
@@ -194,28 +195,28 @@ export const EvolutionPage: React.FC = () => {
                   <div className="flex items-center gap-3 min-w-0">
                     <StageEmblem stage={stage.num} unlocked={isUnlocked} />
                     <div className="min-w-0">
-                      <span className="text-xs text-neutral-500 dark:text-neutral-400 block tabular-nums">
+                      <span className="font-mono-hud text-xs text-neutral-600 dark:text-neutral-400 block">
                         {stage.levelRange}
                       </span>
-                      <h3 className="text-sm font-semibold text-neutral-900 dark:text-white mt-0.5 truncate">
+                      <h3 className="text-sm font-bold text-charcoal dark:text-white mt-0.5 truncate">
                         {stage.stageName}
                       </h3>
                     </div>
                   </div>
                   <span
-                    className={`text-xs font-semibold shrink-0 ${
+                    className={`font-pixel text-[10px] font-bold uppercase px-1.5 py-0.5 rounded-[2px] border shrink-0 ${
                       stage.completed
-                        ? "text-emerald-600 dark:text-emerald-400"
+                        ? "bg-emerald-50 text-emerald-700 border-emerald-600 dark:bg-emerald-500/20 dark:text-emerald-300"
                         : stage.current
-                        ? "text-juro-orange"
-                        : "text-neutral-400"
+                        ? "bg-[#FFF1DF] text-juro-orange-deep border-juro-orange"
+                        : "bg-[#EFE9DC] text-neutral-500 border-charcoal/30 dark:bg-[#101114] dark:text-neutral-400"
                     }`}
                   >
                     {stage.completed ? "Selesai" : stage.current ? "Aktif" : "Terkunci"}
                   </span>
                 </div>
 
-                <div className="pt-3 border-t border-neutral-100 dark:border-neutral-800 space-y-1.5">
+                <div className="pt-3 border-t-2 border-dashed border-charcoal/15 dark:border-[#3F424E] space-y-1.5">
                   {stage.perks.map((perk) => (
                     <div
                       key={perk}

@@ -18,11 +18,13 @@ export interface GraphicsProfile {
   dpr: number;
   terrainSegments: number;
   juroSphereSegs: [number, number];
+  cloudSegments: [number, number];
   shadowsEnabled: boolean;
   shadowMapSize: number;
   maxPointLights: number;
   rainCount: number;
   anisotropy: number;
+  antialias: boolean;
   usePhysicalJuroBody: boolean;
 }
 
@@ -104,6 +106,16 @@ export function resolveGraphicsTier(
 
   const isMobile = env.isTouchDevice || env.viewportWidth < 768;
   if (isMobile) {
+    if (typeof env.deviceMemoryGb === "number" && env.deviceMemoryGb <= 4) {
+      return "low";
+    }
+    if (
+      env.deviceMemoryGb == null &&
+      typeof env.hardwareConcurrency === "number" &&
+      env.hardwareConcurrency <= 6
+    ) {
+      return "low";
+    }
     return "balanced";
   }
 
@@ -150,11 +162,13 @@ export function resolveGraphicsProfile(
       dpr,
       terrainSegments: 72,
       juroSphereSegs: [32, 24],
+      cloudSegments: [8, 6],
       shadowsEnabled,
       shadowMapSize: 0,
       maxPointLights: 1,
       rainCount: 120,
       anisotropy: 2,
+      antialias: false,
       usePhysicalJuroBody: false,
     };
   }
@@ -166,11 +180,13 @@ export function resolveGraphicsProfile(
       dpr,
       terrainSegments: 96,
       juroSphereSegs: [44, 32],
+      cloudSegments: [10, 8],
       shadowsEnabled,
       shadowMapSize: shadowsEnabled ? 512 : 0,
       maxPointLights: 3,
       rainCount: 200,
       anisotropy: 4,
+      antialias: true,
       usePhysicalJuroBody: !env.isSoftwareRenderer,
     };
   }
@@ -181,11 +197,13 @@ export function resolveGraphicsProfile(
     dpr,
     terrainSegments: 112,
     juroSphereSegs: [56, 40],
+    cloudSegments: [12, 10],
     shadowsEnabled,
     shadowMapSize: shadowsEnabled ? 1024 : 0,
     maxPointLights: 5,
     rainCount: 260,
     anisotropy: 4,
+    antialias: true,
     usePhysicalJuroBody: !env.isSoftwareRenderer,
   };
 }

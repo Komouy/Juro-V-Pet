@@ -45,42 +45,62 @@ export const PixelSwitch: React.FC<PixelSwitchProps> = ({
       {(label || description) && (
         <div className="flex-1 min-w-0">
           {label && (
-            <p className="text-sm font-medium text-neutral-900 dark:text-neutral-100 group-hover:text-juro-orange transition-colors">
+            <p className="text-sm font-semibold text-charcoal dark:text-neutral-100 group-hover:text-juro-orange transition-colors">
               {label}
             </p>
           )}
           {description && (
-            <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-0.5 leading-relaxed">
+            <p className="text-xs text-neutral-600 dark:text-neutral-400 mt-0.5 leading-relaxed">
               {description}
             </p>
           )}
         </div>
       )}
 
-      {/* Smooth Modern Pill Switch */}
+      {/* Mechanical Console Slide Rocker Switch */}
       <div
         role="switch"
         aria-checked={checked}
         tabIndex={disabled ? -1 : 0}
         onKeyDown={handleKeyDown}
         className={`
-          relative w-11 h-6 rounded-full shrink-0
-          transition-colors duration-200 flex items-center p-0.5
+          relative w-12 h-6 rounded-[4px] border-2 border-charcoal dark:border-[#3F424E] shrink-0
+          transition-colors duration-150 flex items-center px-0.5
+          shadow-[inset_0_2px_0_rgba(24,24,27,0.18)]
           focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-juro-orange focus-visible:ring-offset-1
           ${
             checked
               ? "bg-juro-orange"
-              : "bg-neutral-300 dark:bg-neutral-700"
+              : "bg-[#D6CEC0] dark:bg-[#101114]"
           }
         `}
       >
+        <span
+          aria-hidden="true"
+          className={`font-pixel text-[8px] font-bold leading-none select-none transition-opacity ${
+            checked ? "text-white ml-1 opacity-100" : "opacity-0"
+          }`}
+        >
+          I
+        </span>
+        <span
+          aria-hidden="true"
+          className={`font-pixel text-[8px] font-bold leading-none select-none ml-auto mr-1 transition-opacity ${
+            !checked ? "text-charcoal/70 dark:text-neutral-400 opacity-100" : "opacity-0"
+          }`}
+        >
+          O
+        </span>
         <div
           className={`
-            w-5 h-5 rounded-full bg-white shadow-sm
-            transition-transform duration-200
-            ${checked ? "translate-x-5" : "translate-x-0"}
+            absolute top-0.5 left-0.5 w-5 h-4 rounded-[2px] bg-[#FDFBF7] border-2 border-charcoal
+            shadow-[0_1px_0_#18181B] flex items-center justify-center
+            transition-transform duration-150
+            ${checked ? "translate-x-[22px]" : "translate-x-0"}
           `}
-        />
+        >
+          <span className="w-[2px] h-2 bg-charcoal/40" aria-hidden="true" />
+        </div>
       </div>
     </div>
   );

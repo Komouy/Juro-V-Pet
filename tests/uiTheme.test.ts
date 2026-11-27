@@ -44,6 +44,16 @@ describe("UI Store & Theme Mode", () => {
     expect(useUIStore.getState().soundEnabled).toBe(true);
   });
 
+  it("toggles CRT scanlines and persists preference", () => {
+    useUIStore.setState({ scanlinesEnabled: true });
+    useUIStore.getState().toggleScanlines();
+    expect(useUIStore.getState().scanlinesEnabled).toBe(false);
+    expect(window.localStorage.getItem("juro_scanlines_enabled")).toBe("false");
+    useUIStore.getState().toggleScanlines();
+    expect(useUIStore.getState().scanlinesEnabled).toBe(true);
+    expect(window.localStorage.getItem("juro_scanlines_enabled")).toBe("true");
+  });
+
   it("shows and clears unified UI toast notifications with unique incrementing ids", () => {
     useUIStore.getState().showToast("Berhasil dibeli", "success");
     const first = useUIStore.getState().toast;

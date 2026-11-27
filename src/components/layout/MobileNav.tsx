@@ -23,7 +23,7 @@ export const MobileNav: React.FC = () => {
   );
 
   return (
-    <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-white/95 dark:bg-neutral-900/95 border-t border-neutral-200/80 dark:border-neutral-800 pb-[env(safe-area-inset-bottom)]">
+    <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-[#FDFBF7] dark:bg-[#1E2028] border-t-2 border-charcoal dark:border-[#3F424E] pb-[env(safe-area-inset-bottom)]">
       <div className="flex items-center justify-around h-14 px-2 max-w-lg mx-auto">
         {MOBILE_LINKS.map(({ path, label, icon: Icon }) => {
           const isActive = location.pathname === path;
@@ -41,27 +41,27 @@ export const MobileNav: React.FC = () => {
                 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-juro-orange focus-visible:ring-inset
                 ${
                   isActive
-                    ? "text-juro-orange font-semibold"
-                    : "text-neutral-400 hover:text-neutral-900 dark:text-neutral-500 dark:hover:text-white"
+                    ? "text-juro-orange font-bold"
+                    : "text-charcoal/55 hover:text-charcoal dark:text-neutral-400 dark:hover:text-white"
                 }
               `}
             >
               {isActive && (
                 <span
-                  className="absolute top-0 w-6 h-0.5 rounded-full bg-juro-orange"
+                  className="absolute top-0 w-9 h-[3px] bg-juro-orange border-x border-b border-charcoal"
                   aria-hidden="true"
                 />
               )}
               <span className="relative inline-flex">
-                <Icon size={19} strokeWidth={isActive ? 2.3 : 1.8} />
+                <Icon size={18} strokeWidth={isActive ? 2.4 : 2} />
                 {showDot && (
                   <span
-                    className="absolute -top-0.5 -right-1 w-1.5 h-1.5 rounded-full bg-sky-500"
+                    className="absolute -top-0.5 -right-1.5 w-2 h-2 rounded-[1px] bg-sky-500 border border-charcoal"
                     aria-hidden="true"
                   />
                 )}
               </span>
-              <span className="text-[11px] font-medium mt-0.5 leading-none">
+              <span className="font-pixel text-[10px] font-bold uppercase tracking-wide mt-1 leading-none">
                 {label}
               </span>
             </Link>

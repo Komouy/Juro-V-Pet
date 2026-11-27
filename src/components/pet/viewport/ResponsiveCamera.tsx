@@ -66,7 +66,7 @@ export const ResponsiveCamera: React.FC<ResponsiveCameraProps> = ({
     if (controlsRef.current) {
       controlsRef.current.target.set(focusX, focusY, focusZ);
       controlsRef.current.minDistance = 4.0;
-      controlsRef.current.maxDistance = 45.0;
+      controlsRef.current.maxDistance = 54.0;
       controlsRef.current.minPolarAngle = Math.PI * 0.12;
       controlsRef.current.maxPolarAngle = Math.PI * 0.44;
       controlsRef.current.enablePan = cameraMode === "free";

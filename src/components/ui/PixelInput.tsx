@@ -1,6 +1,7 @@
-import React from "react";
+import React, { useState } from "react";
 import { type LucideIcon, X, AlertCircle, CheckCircle2 } from "lucide-react";
 import { soundEffects } from "../../engine/audio/soundEffects";
+import { NotchedSlot } from "./CartridgeFrame";
 
 export interface PixelInputProps extends React.InputHTMLAttributes<HTMLInputElement> {
   label?: string;
@@ -8,6 +9,7 @@ export interface PixelInputProps extends React.InputHTMLAttributes<HTMLInputElem
   error?: string;
   hint?: string;
   isSuccess?: boolean;
+  compact?: boolean;
   onClear?: () => void;
 }
 
@@ -17,14 +19,18 @@ export const PixelInput: React.FC<PixelInputProps> = ({
   error,
   hint,
   isSuccess,
+  compact = false,
   onClear,
   value,
   maxLength,
   className = "",
   disabled,
   onChange,
+  onFocus,
+  onBlur,
   ...props
 }) => {
+  const [isFocused, setIsFocused] = useState(false);
   const currentLength = typeof value === "string" ? value.length : 0;
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -32,92 +38,108 @@ export const PixelInput: React.FC<PixelInputProps> = ({
     onChange?.(e);
   };
 
+  const slotState = error ? "error" : isSuccess ? "success" : "default";
+
   return (
     <div className="space-y-1.5 w-full select-none">
-      {/* Label & Character Counter Bar */}
+      {/* Label & Cartridge Character Counter */}
       {(label || maxLength) && (
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between gap-2">
           {label && (
-            <label className="text-xs font-medium text-neutral-700 dark:text-neutral-200">
+            <label className="font-pixel text-[11px] font-bold uppercase tracking-wide text-charcoal dark:text-neutral-200">
               {label}
             </label>
           )}
           {maxLength && (
-            <span className="text-xs tabular-nums text-neutral-500 dark:text-neutral-400">
-              {currentLength}/{maxLength}
+            <span className="font-mono-hud text-[11px] font-semibold px-1.5 py-0.5 rounded-[2px] bg-[#EFE9DC] dark:bg-[#101114] border border-charcoal/25 dark:border-[#3F424E] text-charcoal/75 dark:text-neutral-400">
+              {String(currentLength).padStart(2, "0")}/{maxLength}
             </span>
           )}
         </div>
       )}
 
-      {/* Input Outer Frame */}
-      <div className="relative flex items-center">
-        {Icon && (
-          <div className="absolute left-3.5 pointer-events-none text-neutral-400 dark:text-neutral-400 z-10">
-            <Icon size={16} strokeWidth={2} />
-          </div>
-        )}
+      {/* Notched / Chamfered Cartridge Input Slot */}
+      <NotchedSlot
+        state={slotState}
+        disabled={disabled}
+        innerClassName={`${compact ? "px-2.5 py-1.5" : "px-3 py-2"} gap-2 relative`}
+      >
+        {/* Prompt Glyph / Optional Icon + Custom Blinking Cursor Indicator */}
+        <div className="flex items-center gap-1 shrink-0 pointer-events-none">
+          {Icon ? (
+            <Icon
+              size={compact ? 14 : 15}
+              strokeWidth={2.2}
+              className="text-juro-orange"
+            />
+          ) : (
+            <span className="font-pixel text-xs font-bold text-juro-orange leading-none">
+              &gt;
+            </span>
+          )}
+          {isFocused && !disabled && (
+            <span
+              aria-hidden="true"
+              className="animate-console-cursor inline-block w-1.5 h-3.5 bg-juro-orange"
+            />
+          )}
+        </div>
 
         <input
           value={value}
           maxLength={maxLength}
           disabled={disabled}
+          onFocus={(e) => {
+            setIsFocused(true);
+            onFocus?.(e);
+          }}
+          onBlur={(e) => {
+            setIsFocused(false);
+            onBlur?.(e);
+          }}
           className={`
-            w-full rounded-xl bg-white dark:bg-dark-surface
-            border transition-all duration-150 text-sm
-            text-neutral-900 dark:text-white
-            placeholder:text-neutral-400 dark:placeholder:text-neutral-500
-            py-2.5 px-3.5
-            ${Icon ? "pl-10" : "pl-3.5"}
-            ${onClear || isSuccess || error ? "pr-10" : "pr-3.5"}
-            ${
-              error
-                ? "border-rose-500 focus:ring-2 focus:ring-rose-500/20"
-                : isSuccess
-                ? "border-emerald-500 focus:ring-2 focus:ring-emerald-500/20"
-                : "border-neutral-300 dark:border-neutral-700 focus:border-juro-orange focus:ring-2 focus:ring-juro-orange/20"
-            }
-            focus:outline-none
-            disabled:opacity-50 disabled:cursor-not-allowed
+            flex-1 min-w-0 bg-transparent text-xs sm:text-sm font-mono-hud
+            text-charcoal dark:text-[#F4F4F5] caret-juro-orange
+            placeholder:text-neutral-500 dark:placeholder:text-neutral-500
+            focus:outline-none disabled:cursor-not-allowed
             ${className}
           `}
           onChange={handleChange}
           {...props}
         />
 
-        {/* Action / Status Icons on Right */}
-        <div className="absolute right-3 flex items-center gap-1.5">
-          {onClear && currentLength > 0 && !disabled && (
-            <button
-              type="button"
-              onClick={onClear}
-              className="p-1 rounded-md text-neutral-400 hover:text-neutral-700 dark:hover:text-white transition-colors cursor-pointer"
-              title="Bersihkan input"
-            >
-              <X size={14} strokeWidth={2} />
-            </button>
-          )}
-
-          {isSuccess && !error && (
-            <CheckCircle2 size={16} strokeWidth={2} className="text-emerald-500" />
-          )}
-
-          {error && (
-            <AlertCircle size={16} strokeWidth={2} className="text-rose-500" />
-          )}
-        </div>
-      </div>
+        {/* Right Action / Semantic Status */}
+        {(onClear && currentLength > 0 && !disabled) || isSuccess || error ? (
+          <div className="flex items-center gap-1.5 shrink-0">
+            {onClear && currentLength > 0 && !disabled && (
+              <button
+                type="button"
+                onClick={onClear}
+                className="p-0.5 rounded-[2px] text-neutral-500 hover:text-charcoal hover:bg-charcoal/10 dark:hover:text-white dark:hover:bg-white/10 transition-colors cursor-pointer"
+                title="Bersihkan input"
+                aria-label="Bersihkan input"
+              >
+                <X size={13} strokeWidth={2.2} />
+              </button>
+            )}
+            {isSuccess && !error && (
+              <CheckCircle2 size={15} strokeWidth={2.2} className="text-emerald-600 dark:text-emerald-400" />
+            )}
+            {error && (
+              <AlertCircle size={15} strokeWidth={2.2} className="text-rose-600 dark:text-rose-400" />
+            )}
+          </div>
+        ) : null}
+      </NotchedSlot>
 
       {/* Helper / Error Text */}
       {error ? (
-        <p className="text-xs text-rose-600 dark:text-rose-400 flex items-center gap-1.5">
-          <AlertCircle size={13} strokeWidth={2} />
+        <p className="text-xs font-medium text-rose-600 dark:text-rose-400 flex items-center gap-1.5">
+          <AlertCircle size={13} strokeWidth={2.2} />
           <span>{error}</span>
         </p>
       ) : hint ? (
-        <p className="text-xs text-neutral-500 dark:text-neutral-400">
-          {hint}
-        </p>
+        <p className="text-xs text-neutral-600 dark:text-neutral-400">{hint}</p>
       ) : null}
     </div>
   );

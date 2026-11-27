@@ -22,6 +22,26 @@ export interface PetMemoryItem {
 type MemoryChangeListener = (memories: PetMemoryItem[]) => void;
 const memoryListeners: Set<MemoryChangeListener> = new Set();
 
+type ChatHistoryChangeListener = (history: ChatMessage[]) => void;
+const chatListeners: Set<ChatHistoryChangeListener> = new Set();
+
+export function onChatHistoryChanged(listener: ChatHistoryChangeListener): () => void {
+  chatListeners.add(listener);
+  return () => {
+    chatListeners.delete(listener);
+  };
+}
+
+function notifyChatListeners(history: ChatMessage[]): void {
+  for (const listener of chatListeners) {
+    try {
+      listener(history);
+    } catch {
+      // Safe execution
+    }
+  }
+}
+
 export function onPetMemoriesChanged(listener: MemoryChangeListener): () => void {
   memoryListeners.add(listener);
   return () => {
@@ -90,6 +110,7 @@ export function addChatMessage(sender: "user" | "juro", text: string): ChatMessa
   const history = getChatHistory();
   const updated = [...history, newMessage].slice(-MAX_STORED_MESSAGES);
   writeStorage(CHAT_HISTORY_STORAGE_KEY, updated);
+  notifyChatListeners(updated);
   return newMessage;
 }
 
@@ -99,6 +120,7 @@ export function addChatMessage(sender: "user" | "juro", text: string): ChatMessa
 export function clearChatHistory(): void {
   try {
     localStorage.removeItem(CHAT_HISTORY_STORAGE_KEY);
+    notifyChatListeners([]);
   } catch {
     // Ignored
   }

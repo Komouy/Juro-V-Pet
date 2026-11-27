@@ -18,6 +18,9 @@ import {
 import { useCaregiverStore } from "../../stores/caregiverStore";
 import { soundEffects } from "../../engine/audio/soundEffects";
 import type { CareActionType } from "../../types/caregiver";
+import { PixelSegmented } from "../ui/PixelSegmented";
+import { PixelInput } from "../ui/PixelInput";
+import { Button } from "../ui/Button";
 
 interface CaregiverHubModalProps {
   isOpen: boolean;
@@ -57,7 +60,11 @@ function formatTimeAgo(timestamp: number): string {
   return `${diffDay}h yang lalu`;
 }
 
-export const CaregiverHubModal: React.FC<CaregiverHubModalProps> = ({ isOpen, onClose }) => {
+/**
+ * Reusable Caregiver profile, 2P pairing, and care log panel.
+ * Embedded inline in SettingsPage and reused by CaregiverHubModal.
+ */
+export const CaregiverHubPanel: React.FC<{ onClose?: () => void }> = ({ onClose }) => {
   const [activeTab, setActiveTab] = useState<"pairing" | "logs">("pairing");
   const [joinCodeInput, setJoinCodeInput] = useState("");
   const [copiedCode, setCopiedCode] = useState(false);
@@ -76,9 +83,6 @@ export const CaregiverHubModal: React.FC<CaregiverHubModalProps> = ({ isOpen, on
     joinRoom,
     disconnectRoom,
   } = useCaregiverStore();
-
-  if (!isOpen) return null;
-  if (typeof document === "undefined") return null;
 
   const isPaired = activeRoomCode !== null;
 
@@ -112,274 +116,269 @@ export const CaregiverHubModal: React.FC<CaregiverHubModalProps> = ({ isOpen, on
     }
   };
 
-  return createPortal(
-    <div
-      onClick={onClose}
-      className="fixed inset-0 z-100 flex items-center justify-center p-3 sm:p-4 bg-neutral-950/60 select-none animate-fade-in"
-    >
-      <div
-        onClick={(e) => e.stopPropagation()}
-        className="relative w-full max-w-md rounded-2xl bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-700 shadow-2xl p-5 max-h-[85vh] flex flex-col animate-scale-up"
-      >
-        {/* Header */}
-        <div className="flex items-center justify-between border-b border-neutral-200 dark:border-neutral-800 pb-3.5 mb-3.5 shrink-0">
-          <div className="flex items-center gap-2.5">
-            <span className="p-2 rounded-xl bg-orange-50 dark:bg-orange-500/15 text-juro-orange">
-              <Users size={18} />
-            </span>
-            <div>
-              <h2 className="text-base font-bold text-neutral-900 dark:text-white leading-tight">
-                Profil & Perawat
-              </h2>
-              <p className="text-xs text-neutral-500 dark:text-neutral-400">
-                {isPaired
-                  ? `Kemitraan aktif (${activeRoomCode})`
-                  : "Perawatan mandiri"}
-              </p>
-            </div>
+  return (
+    <div className="flex flex-col min-h-0">
+      {/* Header */}
+      <div className="flex items-center justify-between border-b-2 border-dashed border-charcoal/20 dark:border-[#3F424E] pb-3 mb-3 shrink-0">
+        <div className="flex items-center gap-2">
+          <Users size={15} strokeWidth={2.2} className="text-juro-orange shrink-0" />
+          <div>
+            <h2 className="font-pixel text-xs sm:text-sm font-bold uppercase text-charcoal dark:text-white leading-tight">
+              Profil &amp; Perawat
+            </h2>
+            <p className="font-mono-hud text-[11px] text-neutral-600 dark:text-neutral-400">
+              {isPaired ? `Kamar 2P (${activeRoomCode})` : "Perawatan mandiri"}
+            </p>
           </div>
+        </div>
+        {onClose && (
           <button
             type="button"
             onClick={onClose}
-            className="p-1.5 rounded-lg text-neutral-400 hover:text-neutral-700 hover:bg-neutral-100 dark:hover:text-white dark:hover:bg-neutral-800 cursor-pointer"
+            className="console-btn-bevel w-8 h-8 rounded-[4px] border-2 border-charcoal dark:border-[#3F424E] bg-[#FDFBF7] dark:bg-[#101114] shadow-[0_2px_0_#18181B] inline-flex items-center justify-center text-charcoal hover:text-juro-orange dark:text-neutral-200 cursor-pointer"
             aria-label="Tutup dialog"
           >
-            <X size={18} />
+            <X size={16} strokeWidth={2.4} />
           </button>
-        </div>
+        )}
+      </div>
 
-        {/* Tab Switcher */}
-        <div className="flex rounded-xl bg-neutral-100 dark:bg-neutral-800 p-1 mb-4 shrink-0">
-          <button
-            type="button"
-            onClick={() => {
-              setActiveTab("pairing");
-              soundEffects.playClick();
-            }}
-            className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs sm:text-sm font-medium cursor-pointer transition-all ${
-              activeTab === "pairing"
-                ? "bg-white dark:bg-neutral-900 text-neutral-900 dark:text-white shadow-xs font-semibold"
-                : "text-neutral-500 hover:text-neutral-900 dark:hover:text-white"
-            }`}
-          >
-            <HeartHandshake size={15} />
-            Profil & 2P
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              setActiveTab("logs");
-              soundEffects.playClick();
-            }}
-            className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs sm:text-sm font-medium cursor-pointer transition-all ${
-              activeTab === "logs"
-                ? "bg-white dark:bg-neutral-900 text-neutral-900 dark:text-white shadow-xs font-semibold"
-                : "text-neutral-500 hover:text-neutral-900 dark:hover:text-white"
-            }`}
-          >
-            <BookOpen size={15} />
-            Buku Harian ({activityLogs.length})
-          </button>
-        </div>
+      {/* Console Tab Switcher */}
+      <div className="mb-3 shrink-0">
+        <PixelSegmented
+          fullWidth
+          className="w-full"
+          size="sm"
+          value={activeTab}
+          onChange={setActiveTab}
+          options={[
+            { value: "pairing", label: "Profil & 2P" },
+            {
+              value: "logs",
+              label: "Buku Harian",
+              badge: `${activityLogs.length}`,
+            },
+          ]}
+        />
+      </div>
 
-        {/* Tab 1: Kemitraan (Pairing) */}
-        {activeTab === "pairing" && (
-          <div className="flex-1 overflow-y-auto space-y-3.5 pr-1">
-            {/* Profil Saya Card */}
-            <div className="p-3.5 rounded-xl bg-neutral-50 dark:bg-neutral-800/80 border border-neutral-200 dark:border-neutral-700">
-              <div className="flex items-center justify-between gap-3">
-                <div className="min-w-0 flex-1">
-                  <span className="text-xs text-neutral-500 dark:text-neutral-400">
-                    Profil kamu
-                  </span>
-                  {isEditingName ? (
-                    <form onSubmit={handleSaveEditName} className="flex items-center gap-2 mt-1">
-                      <input
+      {/* Tab 1: Kemitraan (Pairing) */}
+      {activeTab === "pairing" && (
+        <div className="space-y-3">
+          {/* Profil Saya Card */}
+          <div className="p-3 rounded-[4px] bg-[#EFE9DC] dark:bg-[#101114] border-2 border-charcoal/80 dark:border-[#3F424E]">
+            <div className="flex items-center justify-between gap-3">
+              <div className="min-w-0 flex-1">
+                <span className="font-pixel text-[10px] font-bold uppercase text-neutral-600 dark:text-neutral-400">
+                  Profil kamu
+                </span>
+                {isEditingName ? (
+                  <form onSubmit={handleSaveEditName} className="flex items-center gap-2 mt-1.5">
+                    <div className="flex-1 min-w-0">
+                      <PixelInput
+                        compact
                         type="text"
                         value={editNameValue}
                         onChange={(e) => setEditNameValue(e.target.value)}
-                        className="flex-1 min-w-0 px-2.5 py-1.5 rounded-lg border border-neutral-300 dark:border-neutral-600 text-sm bg-white dark:bg-neutral-900 focus:outline-none focus:border-juro-orange"
                         autoFocus
                         maxLength={20}
                       />
-                      <button
-                        type="submit"
-                        className="px-3 py-1.5 rounded-lg bg-juro-orange text-white text-xs font-semibold cursor-pointer hover:bg-orange-600"
-                      >
-                        Simpan
-                      </button>
-                    </form>
-                  ) : (
-                    <div className="flex items-center gap-2 mt-0.5">
-                      <h3 className="font-semibold text-neutral-900 dark:text-white text-sm truncate">
-                        {myProfile?.name || "Perawat"}
-                      </h3>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setEditNameValue(myProfile?.name || "");
-                          setIsEditingName(true);
-                        }}
-                        className="text-xs font-medium text-juro-orange hover:underline cursor-pointer"
-                      >
-                        Ubah
-                      </button>
                     </div>
-                  )}
-                </div>
-                <div className="w-9 h-9 rounded-full bg-orange-100 dark:bg-orange-500/20 text-juro-orange flex items-center justify-center font-bold text-sm shrink-0">
-                  {myProfile?.name?.charAt(0).toUpperCase() || "P"}
-                </div>
+                    <Button type="submit" label="Simpan" size="sm" variant="accent" />
+                  </form>
+                ) : (
+                  <div className="flex items-center gap-2 mt-0.5">
+                    <h3 className="font-bold text-charcoal dark:text-white text-sm truncate">
+                      {myProfile?.name || "Perawat"}
+                    </h3>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setEditNameValue(myProfile?.name || "");
+                        setIsEditingName(true);
+                      }}
+                      className="font-pixel text-[10px] font-bold uppercase text-juro-orange hover:underline cursor-pointer"
+                    >
+                      Ubah
+                    </button>
+                  </div>
+                )}
+              </div>
+              <div className="w-9 h-9 rounded-[4px] bg-juro-orange text-white border-2 border-charcoal flex items-center justify-center font-pixel font-bold text-sm shrink-0">
+                {myProfile?.name?.charAt(0).toUpperCase() || "P"}
               </div>
             </div>
+          </div>
 
-            {/* Status Kemitraan */}
-            {isPaired ? (
-              <div className="p-3.5 rounded-xl bg-emerald-50/70 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800 space-y-3">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <span className="w-2 h-2 rounded-full bg-emerald-500" />
-                    <span className="text-xs font-semibold text-emerald-800 dark:text-emerald-300">
-                      Kamar Pairing Terhubung
-                    </span>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={disconnectRoom}
-                    className="flex items-center gap-1 text-xs font-medium text-rose-600 dark:text-rose-400 hover:underline cursor-pointer"
-                  >
-                    <LogOut size={13} />
-                    Putuskan
-                  </button>
+          {/* Status Kemitraan */}
+          {isPaired ? (
+            <div className="p-3 rounded-[4px] bg-emerald-50/80 dark:bg-emerald-950/30 border-2 border-emerald-700 dark:border-emerald-700 space-y-2.5">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-[1px] bg-emerald-500 border border-charcoal" />
+                  <span className="font-pixel text-[11px] font-bold uppercase text-emerald-800 dark:text-emerald-300">
+                    Kamar Pairing Terhubung
+                  </span>
                 </div>
-
-                {/* Kode Pairing Box */}
-                <div className="flex items-center justify-between rounded-xl bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-700 p-2.5">
-                  <div>
-                    <span className="text-[11px] text-neutral-500 dark:text-neutral-400 block">
-                      Kode pairing
-                    </span>
-                    <span className="text-base font-bold text-neutral-900 dark:text-white tracking-wider tabular-nums">
-                      {activeRoomCode}
-                    </span>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={handleCopyCode}
-                    className="flex items-center gap-1.5 py-1.5 px-3 rounded-lg bg-neutral-100 dark:bg-neutral-800 hover:bg-neutral-200 dark:hover:bg-neutral-700 text-xs font-semibold text-neutral-800 dark:text-neutral-100 cursor-pointer transition-colors"
-                  >
-                    {copiedCode ? <Check size={14} className="text-emerald-600" /> : <Copy size={14} />}
-                    {copiedCode ? "Tersalin" : "Salin"}
-                  </button>
-                </div>
-
-                <p className="text-xs text-neutral-600 dark:text-neutral-400 leading-relaxed">
-                  {partnerProfile ? (
-                    <>
-                      Juro dirawat bersama oleh <strong>{myProfile?.name}</strong> dan{" "}
-                      <strong>{partnerProfile.name}</strong>.
-                    </>
-                  ) : (
-                    <>Bagikan kode di atas agar teman atau pasangan bisa bergabung.</>
-                  )}
-                </p>
+                <button
+                  type="button"
+                  onClick={disconnectRoom}
+                  className="flex items-center gap-1 font-pixel text-[10px] font-bold uppercase text-rose-600 dark:text-rose-400 hover:underline cursor-pointer"
+                >
+                  <LogOut size={13} />
+                  Putuskan
+                </button>
               </div>
-            ) : (
-              <div className="space-y-3">
-                {/* Buat Kamar Baru */}
-                <div className="p-3.5 rounded-xl bg-neutral-50 dark:bg-neutral-800/80 border border-neutral-200 dark:border-neutral-700 space-y-2">
-                  <h4 className="text-sm font-semibold text-neutral-900 dark:text-white">
-                    Buat Kamar Asuh Baru
-                  </h4>
-                  <p className="text-xs text-neutral-500 dark:text-neutral-400">
-                    Dapatkan kode untuk merawat Juro bersama secara sinkron.
-                  </p>
-                  <button
-                    type="button"
-                    onClick={handleStartCreateRoom}
-                    disabled={pairingStatus === "loading"}
-                    className="w-full py-2.5 rounded-xl bg-juro-orange hover:bg-orange-600 active:scale-[0.98] text-white text-xs sm:text-sm font-semibold cursor-pointer disabled:opacity-50 transition-all"
-                  >
-                    {pairingStatus === "loading" ? "Membuat..." : "Buat Kode Pairing"}
-                  </button>
-                </div>
 
-                {/* Gabung Kamar Pasangan */}
-                <div className="p-3.5 rounded-xl bg-neutral-50 dark:bg-neutral-800/80 border border-neutral-200 dark:border-neutral-700 space-y-2">
-                  <h4 className="text-sm font-semibold text-neutral-900 dark:text-white">
-                    Gabung Kamar
-                  </h4>
-                  <form onSubmit={handleStartJoinRoom} className="flex gap-2">
-                    <input
+              {/* Kode Pairing Box */}
+              <div className="flex items-center justify-between rounded-[4px] bg-[#FDFBF7] dark:bg-[#101114] border-2 border-charcoal dark:border-[#3F424E] p-2.5">
+                <div>
+                  <span className="font-pixel text-[10px] uppercase text-neutral-500 dark:text-neutral-400 block">
+                    Kode pairing
+                  </span>
+                  <span className="font-mono-hud text-base font-bold text-charcoal dark:text-white tracking-wider">
+                    {activeRoomCode}
+                  </span>
+                </div>
+                <Button
+                  type="button"
+                  onClick={handleCopyCode}
+                  icon={copiedCode ? Check : Copy}
+                  label={copiedCode ? "Tersalin" : "Salin"}
+                  size="sm"
+                  variant="secondary"
+                />
+              </div>
+
+              <p className="text-xs text-neutral-600 dark:text-neutral-400 leading-relaxed">
+                {partnerProfile ? (
+                  <>
+                    Juro dirawat bersama oleh <strong>{myProfile?.name}</strong> dan{" "}
+                    <strong>{partnerProfile.name}</strong>.
+                  </>
+                ) : (
+                  <>Bagikan kode di atas agar teman atau pasangan bisa bergabung.</>
+                )}
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {/* Buat Kamar Baru */}
+              <div className="p-3 rounded-[4px] bg-[#EFE9DC] dark:bg-[#101114] border-2 border-charcoal/80 dark:border-[#3F424E] space-y-2">
+                <h4 className="font-pixel text-xs font-bold uppercase text-charcoal dark:text-white">
+                  Buat Kamar Baru
+                </h4>
+                <p className="text-xs text-neutral-600 dark:text-neutral-400">
+                  Dapatkan kode untuk merawat Juro bersama secara sinkron.
+                </p>
+                <Button
+                  type="button"
+                  onClick={handleStartCreateRoom}
+                  disabled={pairingStatus === "loading"}
+                  label={pairingStatus === "loading" ? "Membuat..." : "Buat Kode Pairing"}
+                  variant="accent"
+                  size="sm"
+                  className="w-full"
+                />
+              </div>
+
+              {/* Gabung Kamar Pasangan */}
+              <div className="p-3 rounded-[4px] bg-[#EFE9DC] dark:bg-[#101114] border-2 border-charcoal/80 dark:border-[#3F424E] space-y-2">
+                <h4 className="font-pixel text-xs font-bold uppercase text-charcoal dark:text-white">
+                  Gabung Kamar
+                </h4>
+                <form onSubmit={handleStartJoinRoom} className="flex items-center gap-2">
+                  <div className="flex-1 min-w-0">
+                    <PixelInput
+                      compact
                       type="text"
                       value={joinCodeInput}
                       onChange={(e) => setJoinCodeInput(e.target.value.toUpperCase())}
                       placeholder="Contoh: JURO-5821"
-                      className="flex-1 min-w-0 px-3 py-2 rounded-xl border border-neutral-300 dark:border-neutral-700 text-xs sm:text-sm uppercase bg-white dark:bg-neutral-900 focus:outline-none focus:border-juro-orange"
+                      className="uppercase"
                     />
-                    <button
-                      type="submit"
-                      disabled={pairingStatus === "loading" || !joinCodeInput.trim()}
-                      className="py-2 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs sm:text-sm font-semibold cursor-pointer disabled:opacity-50 transition-colors"
-                    >
-                      Gabung
-                    </button>
-                  </form>
-                </div>
-
-                {errorMessage && (
-                  <p className="text-xs text-rose-600 dark:text-rose-400 text-center">
-                    {errorMessage}
-                  </p>
-                )}
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* Tab 2: Buku Harian Asuh */}
-        {activeTab === "logs" && (
-          <div className="flex-1 overflow-y-auto space-y-2 pr-1">
-            {activityLogs.length === 0 ? (
-              <div className="p-6 text-center text-neutral-400">
-                <BookOpen size={28} className="mx-auto mb-2 opacity-40" />
-                <p className="text-sm font-medium text-neutral-600 dark:text-neutral-300">
-                  Belum ada riwayat asuh
-                </p>
-                <p className="text-xs text-neutral-500 mt-1">
-                  Aktivitas perawatan Juro akan tercatat di sini.
-                </p>
-              </div>
-            ) : (
-              activityLogs.map((log) => {
-                const isMe = log.caregiverId === myProfile?.id;
-                return (
-                  <div
-                    key={log.id}
-                    className="p-3 rounded-xl bg-neutral-50 dark:bg-neutral-800/80 border border-neutral-200 dark:border-neutral-700 flex items-start gap-2.5"
-                  >
-                    <span className="p-1.5 rounded-lg bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-700 shrink-0 mt-0.5">
-                      {getActionIcon(log.actionType)}
-                    </span>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center justify-between gap-2 mb-0.5">
-                        <span className="font-semibold text-xs text-neutral-900 dark:text-white truncate">
-                          {log.caregiverName} {isMe && "(Kamu)"}
-                        </span>
-                        <span className="text-[11px] text-neutral-400 shrink-0">
-                          {formatTimeAgo(log.timestamp)}
-                        </span>
-                      </div>
-                      <p className="text-xs text-neutral-600 dark:text-neutral-300 leading-snug">
-                        {log.description}
-                      </p>
-                    </div>
                   </div>
-                );
-              })
-            )}
-          </div>
-        )}
+                  <Button
+                    type="submit"
+                    disabled={pairingStatus === "loading" || !joinCodeInput.trim()}
+                    label="Gabung"
+                    variant="primary"
+                    size="sm"
+                  />
+                </form>
+              </div>
+
+              {errorMessage && (
+                <p className="text-xs font-semibold text-rose-600 dark:text-rose-400 text-center">
+                  {errorMessage}
+                </p>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Tab 2: Buku Harian Asuh */}
+      {activeTab === "logs" && (
+        <div className="max-h-64 overflow-y-auto space-y-2 pr-1">
+          {activityLogs.length === 0 ? (
+            <div className="p-5 text-center text-neutral-500">
+              <BookOpen size={26} className="mx-auto mb-2 opacity-40" />
+              <p className="font-pixel text-xs font-bold uppercase text-charcoal dark:text-neutral-300">
+                Belum ada riwayat asuh
+              </p>
+              <p className="text-xs text-neutral-500 mt-1">
+                Aktivitas perawatan Juro akan tercatat di sini.
+              </p>
+            </div>
+          ) : (
+            activityLogs.map((log) => {
+              const isMe = log.caregiverId === myProfile?.id;
+              return (
+                <div
+                  key={log.id}
+                  className="p-2.5 rounded-[4px] bg-[#EFE9DC] dark:bg-[#101114] border-2 border-charcoal/75 dark:border-[#3F424E] flex items-start gap-2.5"
+                >
+                  <span className="p-1.5 rounded-[3px] bg-[#FDFBF7] dark:bg-[#1E2028] border border-charcoal/60 dark:border-[#3F424E] shrink-0 mt-0.5">
+                    {getActionIcon(log.actionType)}
+                  </span>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between gap-2 mb-0.5">
+                      <span className="font-semibold text-xs text-charcoal dark:text-white truncate">
+                        {log.caregiverName} {isMe && "(Kamu)"}
+                      </span>
+                      <span className="font-mono-hud text-[11px] text-neutral-500 shrink-0">
+                        {formatTimeAgo(log.timestamp)}
+                      </span>
+                    </div>
+                    <p className="text-xs text-neutral-700 dark:text-neutral-300 leading-snug">
+                      {log.description}
+                    </p>
+                  </div>
+                </div>
+              );
+            })
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
+
+export const CaregiverHubModal: React.FC<CaregiverHubModalProps> = ({ isOpen, onClose }) => {
+  if (!isOpen) return null;
+  if (typeof document === "undefined") return null;
+
+  return createPortal(
+    <div
+      onClick={onClose}
+      className="fixed inset-0 z-100 flex items-center justify-center p-3 sm:p-4 bg-charcoal/65 select-none animate-fade-in"
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className="relative w-full max-w-md rounded-[6px] bg-[#FDFBF7] dark:bg-[#1E2028] border-2 border-charcoal dark:border-[#4A4E5E] shadow-[6px_6px_0_#18181B] dark:shadow-[6px_6px_0_#09090B] p-5 max-h-[85vh] overflow-y-auto animate-scale-up"
+      >
+        <CaregiverHubPanel onClose={onClose} />
       </div>
     </div>,
     document.body

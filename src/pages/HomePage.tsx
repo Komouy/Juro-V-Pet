@@ -2,7 +2,11 @@ import React, { useEffect } from "react";
 import { PetViewport } from "../components/pet/PetViewport";
 import { usePetStore } from "../stores/petStore";
 
-export const HomePage: React.FC = () => {
+export interface HomePageProps {
+  isPaused?: boolean;
+}
+
+export const HomePage: React.FC<HomePageProps> = ({ isPaused = false }) => {
   const { recalculateFromTimestamp } = usePetStore();
 
   useEffect(() => {
@@ -12,7 +16,7 @@ export const HomePage: React.FC = () => {
 
   return (
     <main className="flex-1 min-h-0 w-full flex flex-col">
-      <PetViewport />
+      <PetViewport isPaused={isPaused} />
     </main>
   );
 };

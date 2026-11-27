@@ -1,10 +1,15 @@
 import { describe, it, expect } from "vitest";
 import {
   BASE_GROUND_Y,
+  ISLAND_RADIUS,
   MAP_OBSTACLES,
+  TREE_RING_MAX_RADIUS,
+  WALKABLE_RADIUS,
   JURO_BED_POS,
   JURO_BENCH_POS,
   JURO_TRAMPOLINE_POS,
+  distanceToCanalAxis,
+  distanceToTrail,
   getTerrainHeightAt,
   getBridgeElevation,
   isWaterAt,
@@ -34,7 +39,7 @@ describe("Terrain & Object Collision Hull System", () => {
     const bench = MAP_OBSTACLES.find((o) => Math.hypot(o.x - 6.0, o.z - 20.6) < 0.1);
     expect(bench).toBeDefined();
 
-    // Shop at Kafe Senja
+    // Shop at WARUNG
     const shop = MAP_OBSTACLES.find((o) => Math.hypot(o.x - 18.8, o.z - -3.2) < 0.1);
     expect(shop).toBeDefined();
 
@@ -128,7 +133,7 @@ describe("Terrain & Object Collision Hull System", () => {
   it("routes Juro across the Wooden Bridge to reach the opposite side of the canal without entering water", () => {
     const navGrid = getGlobalNavGrid();
     const westBank = { x: -15.0, z: 4.0 }; // Bukit Santai lounge
-    const eastBank = { x: 13.4, z: -0.6 }; // Kafe Senja plaza
+    const eastBank = { x: 13.4, z: -0.6 }; // WARUNG plaza
 
     const path = findPath(navGrid, westBank, eastBank);
     expect(path.length).toBeGreaterThan(0);
@@ -188,5 +193,66 @@ describe("Terrain & Object Collision Hull System", () => {
         expect(d).toBeGreaterThanOrEqual(2.4);
       }
     }
+  });
+
+  it("frames the circular island edge with trees and clamps movement inside WALKABLE_RADIUS", () => {
+    const { trees, rocks } = generateWorldProps();
+    let perimeterTreeCount = 0;
+
+    for (const t of trees) {
+      const r = Math.hypot(t.x, t.z);
+      expect(r).toBeLessThanOrEqual(TREE_RING_MAX_RADIUS);
+      expect(r).toBeLessThan(ISLAND_RADIUS);
+      if (r >= 24.5) perimeterTreeCount++;
+    }
+
+    for (const rock of rocks) {
+      expect(Math.hypot(rock.x, rock.z)).toBeLessThanOrEqual(TREE_RING_MAX_RADIUS);
+    }
+
+    expect(perimeterTreeCount).toBeGreaterThanOrEqual(30);
+
+    // Corner outside circular walkable radius gets clamped cleanly onto the circle
+    const outsideCol = resolveHorizontalCollisions(25.5, 25.5, BASE_GROUND_Y);
+    expect(Math.hypot(outsideCol.x, outsideCol.z)).toBeLessThanOrEqual(WALKABLE_RADIUS + 0.001);
+  });
+
+  it("places enlarged mushroom trampoline clear of both sandy trail and river canal", () => {
+    const trailDist = distanceToTrail(JURO_TRAMPOLINE_POS.x, JURO_TRAMPOLINE_POS.z);
+    const canalDist = distanceToCanalAxis(JURO_TRAMPOLINE_POS.x, JURO_TRAMPOLINE_POS.z).dist;
+
+    expect(isWaterAt(JURO_TRAMPOLINE_POS.x, JURO_TRAMPOLINE_POS.z)).toBe(false);
+    expect(trailDist).toBeGreaterThanOrEqual(3.2);
+    expect(canalDist).toBeGreaterThanOrEqual(5.5);
+  });
+
+  it("prevents Juro from clipping into trees, rocks, WARUNG corners, and bridge side railings", () => {
+    const { trees, rocks } = generateWorldProps();
+    const innerTree = trees.find((t) => Math.hypot(t.x, t.z) <= 22);
+    expect(innerTree).toBeDefined();
+    if (innerTree) {
+      expect(isInsideObstacle(innerTree.x, innerTree.z, 0.2)).toBe(true);
+      const col = resolveHorizontalCollisions(innerTree.x, innerTree.z, BASE_GROUND_Y, 0.5);
+      expect(col.hitObstacle).toBe(true);
+      expect(Math.hypot(col.x - innerTree.x, col.z - innerTree.z)).toBeGreaterThanOrEqual(
+        0.48 * innerTree.scale + 0.45
+      );
+    }
+
+    const innerRock = rocks.find((r) => Math.hypot(r.x, r.z) <= 22);
+    expect(innerRock).toBeDefined();
+    if (innerRock) {
+      expect(isInsideObstacle(innerRock.x, innerRock.z, 0.2)).toBe(true);
+      const col = resolveHorizontalCollisions(innerRock.x, innerRock.z, BASE_GROUND_Y, 0.5);
+      expect(col.hitObstacle).toBe(true);
+    }
+
+    // WARUNG front counter & corner
+    expect(resolveHorizontalCollisions(17.56, -1.05, BASE_GROUND_Y, 0.5).hitObstacle).toBe(true);
+    expect(resolveHorizontalCollisions(15.89, -2.57, BASE_GROUND_Y, 0.5).hitObstacle).toBe(true);
+
+    // Bridge side railing blocks sideways clip while center bridge deck stays clear
+    expect(resolveHorizontalCollisions(-2.1, -2.1, 0.9, 0.5).hitObstacle).toBe(true);
+    expect(isInsideObstacle(-3.2, -3.2, 0.35)).toBe(false);
   });
 });

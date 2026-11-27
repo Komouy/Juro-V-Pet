@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from "react";
-import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import {
   Store,
   Coins,
@@ -9,10 +9,13 @@ import {
   ShoppingBag,
   ArrowRightLeft,
   Palette,
+  Lock,
+  Utensils,
+  Gamepad2,
   X,
+  type LucideIcon,
 } from "lucide-react";
 import { Card } from "../components/ui/Card";
-import { Button } from "../components/ui/Button";
 import { PixelSegmented } from "../components/ui/PixelSegmented";
 import { ItemIllustration } from "../components/items/ItemIllustration";
 import { useGameStore } from "../stores/gameStore";
@@ -33,6 +36,177 @@ import { soundEffects } from "../engine/audio/soundEffects";
 type ShopTab = "food" | "toy" | "skins" | "sell" | "tools";
 
 const VALID_TABS: ShopTab[] = ["food", "toy", "skins", "sell", "tools"];
+
+interface PriceKeycapButtonProps {
+  label: string;
+  priceText?: string;
+  icon?: LucideIcon;
+  tone?: "orange" | "charcoal";
+  disabled?: boolean;
+  onClick: () => void;
+  className?: string;
+}
+
+/**
+ * Primary cartridge keycap button for shop purchases, upgrades, and bulk sales.
+ */
+const PriceKeycapButton: React.FC<PriceKeycapButtonProps> = ({
+  label,
+  priceText,
+  icon: Icon,
+  tone = "orange",
+  disabled = false,
+  onClick,
+  className = "",
+}) => {
+  const toneStyle = disabled
+    ? "bg-[#EFE9DC] text-neutral-500 border-charcoal/40 dark:bg-[#101114] dark:text-neutral-500 dark:border-[#3F424E]"
+    : tone === "orange"
+    ? "bg-juro-orange text-white border-charcoal shadow-[inset_0_2px_0_rgba(255,255,255,0.28),0_2px_0_#18181B] hover:bg-[#EA580C] active:shadow-none dark:border-[#3F424E] dark:shadow-[inset_0_2px_0_rgba(255,255,255,0.22),0_2px_0_#09090B]"
+    : "bg-charcoal text-[#FDFBF7] border-charcoal shadow-[inset_0_2px_0_rgba(255,255,255,0.16),0_2px_0_#09090B] hover:bg-[#27272A] active:shadow-none dark:bg-[#FDFBF7] dark:text-charcoal dark:border-[#3F424E]";
+
+  return (
+    <button
+      type="button"
+      disabled={disabled}
+      onClick={() => {
+        if (disabled) return;
+        soundEffects.playClick();
+        onClick();
+      }}
+      className={`console-btn-bevel inline-flex items-center justify-center gap-1.5 min-h-[38px] px-3 py-1.5 rounded-[4px] border-2 cursor-pointer select-none disabled:opacity-50 disabled:cursor-not-allowed disabled:translate-y-0 ${toneStyle} ${className}`}
+    >
+      {Icon && <Icon size={13} strokeWidth={2.3} className="shrink-0" />}
+      <span className="font-pixel text-[11px] font-bold uppercase leading-none whitespace-nowrap">
+        {label}
+      </span>
+      {priceText && (
+        <span
+          className={`font-mono-hud text-[11px] font-bold px-1.5 py-0.5 rounded-[2px] leading-none whitespace-nowrap ${
+            disabled
+              ? "bg-charcoal/10 text-neutral-500 dark:bg-[#1E2028]"
+              : "bg-black/20 text-white dark:bg-black/25"
+          }`}
+        >
+          {priceText}
+        </span>
+      )}
+    </button>
+  );
+};
+
+interface NotchedActionKeycapProps {
+  label: string;
+  subText?: string;
+  disabled?: boolean;
+  onClick: () => void;
+  className?: string;
+}
+
+/**
+ * Secondary 45-degree chamfered cartridge keycap for quick stacks (x3) or single-unit sales.
+ */
+const NotchedActionKeycap: React.FC<NotchedActionKeycapProps> = ({
+  label,
+  subText,
+  disabled = false,
+  onClick,
+  className = "",
+}) => {
+  return (
+    <button
+      type="button"
+      disabled={disabled}
+      onClick={() => {
+        if (disabled) return;
+        soundEffects.playClick();
+        onClick();
+      }}
+      className={`console-btn-bevel cartridge-chamfer p-[2px] min-h-[38px] cursor-pointer select-none disabled:opacity-45 disabled:cursor-not-allowed disabled:translate-y-0 transition-colors ${
+        disabled
+          ? "bg-charcoal/35 dark:bg-[#3F424E]"
+          : "bg-charcoal hover:bg-juro-orange dark:bg-[#4A4E5E] dark:hover:bg-juro-orange"
+      } ${className}`}
+    >
+      <span className="cartridge-chamfer w-full h-full px-2.5 py-1.5 bg-[#EFE9DC] dark:bg-[#101114] inline-flex items-center justify-center gap-1.5">
+        <span className="font-pixel text-[11px] font-bold uppercase text-charcoal dark:text-white leading-none whitespace-nowrap">
+          {label}
+        </span>
+        {subText && (
+          <span className="font-mono-hud text-[11px] font-bold text-neutral-600 dark:text-neutral-400 leading-none whitespace-nowrap">
+            {subText}
+          </span>
+        )}
+      </span>
+    </button>
+  );
+};
+
+interface EquipTogglePillProps {
+  label: string;
+  icon: LucideIcon;
+  onClick: () => void;
+  className?: string;
+}
+
+/**
+ * Compact interactive pill button for equipping or removing unlocked cosmetics.
+ */
+const EquipTogglePill: React.FC<EquipTogglePillProps> = ({
+  label,
+  icon: Icon,
+  onClick,
+  className = "",
+}) => {
+  return (
+    <button
+      type="button"
+      onClick={() => {
+        soundEffects.playClick();
+        onClick();
+      }}
+      className={`console-btn-bevel inline-flex items-center justify-center gap-1.5 min-h-[38px] px-3 py-1.5 rounded-[4px] border-2 border-charcoal dark:border-[#4A4E5E] bg-[#FDFBF7] dark:bg-[#101114] text-charcoal dark:text-white shadow-[0_2px_0_#18181B] dark:shadow-[0_2px_0_#09090B] hover:border-juro-orange hover:text-juro-orange cursor-pointer select-none ${className}`}
+    >
+      <Icon size={13} strokeWidth={2.3} className="shrink-0 text-juro-orange" />
+      <span className="font-pixel text-[11px] font-bold uppercase leading-none whitespace-nowrap">
+        {label}
+      </span>
+    </button>
+  );
+};
+
+interface ShopStatusStampProps {
+  label: string;
+  icon?: LucideIcon;
+  tone?: "accent" | "good" | "neutral";
+  className?: string;
+}
+
+/**
+ * Non-interactive inset stamp replacing static disabled rectangular buttons.
+ */
+const ShopStatusStamp: React.FC<ShopStatusStampProps> = ({
+  label,
+  icon: Icon,
+  tone = "neutral",
+  className = "",
+}) => {
+  const toneClass =
+    tone === "accent"
+      ? "bg-[#FFF5E9] text-juro-orange border-juro-orange/60 dark:bg-[#231B16] dark:text-orange-300 dark:border-juro-orange/50"
+      : tone === "good"
+      ? "bg-emerald-50 text-emerald-700 border-emerald-600/40 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-700/50"
+      : "bg-[#EFE9DC]/80 text-neutral-500 border-charcoal/25 dark:bg-[#101114] dark:text-neutral-400 dark:border-[#3F424E]";
+
+  return (
+    <span
+      className={`inline-flex items-center justify-center gap-1.5 min-h-[38px] px-3 py-1.5 rounded-[4px] border-2 border-dashed font-pixel text-[11px] font-bold uppercase leading-none select-none whitespace-nowrap ${toneClass} ${className}`}
+    >
+      {Icon && <Icon size={12} strokeWidth={2.5} className="shrink-0" />}
+      <span>{label}</span>
+    </span>
+  );
+};
 
 export const ShopPage: React.FC = () => {
   const navigate = useNavigate();
@@ -91,6 +265,15 @@ export const ShopPage: React.FC = () => {
     (acc, c) => acc + (crystals[c.id] ?? 0) * c.sellPrice,
     0
   );
+  const totalFoodStock = SHOP_FOODS.reduce((acc, f) => acc + (foodInventory[f.id] ?? 0), 0);
+
+  const tabSummaryLabel: Record<ShopTab, string> = {
+    food: `${SHOP_FOODS.length} Menu · ${totalFoodStock} Stok`,
+    toy: `${ownedToys.length}/${SHOP_TOYS.length} Dimiliki`,
+    skins: `${unlockedHats.length + unlockedSkins.length}/${HAT_CATALOG.length + SKIN_CATALOG.length} Koleksi`,
+    sell: `${totalCrystals} Kristal`,
+    tools: `Beliung Lv.${pickaxeLevel}/${PICKAXE_TIERS.length}`,
+  };
 
   const handleBuyFood = (foodId: string, name: string, qty: number, unitPrice: number) => {
     const success = buyFood(foodId, qty);
@@ -235,25 +418,25 @@ export const ShopPage: React.FC = () => {
   };
 
   return (
-    <section className="w-full px-4 sm:px-6 py-4 sm:py-5 space-y-4">
-      {/* Compact Overlay Header & Wallet Row */}
-      <div className="border-b border-neutral-200/80 dark:border-neutral-800 pb-3.5 flex items-center justify-between gap-3">
-        <h1 className="text-base sm:text-lg font-bold text-neutral-900 dark:text-white tracking-tight flex items-center gap-2 shrink-0">
+    <section className="w-full px-3.5 sm:px-6 py-4 sm:py-5 pb-5 sm:pb-6 space-y-3.5 sm:space-y-4">
+      {/* Compact Console Header & Wallet Readout */}
+      <div className="border-b-2 border-dashed border-charcoal/20 dark:border-[#3F424E] pb-3 flex items-center justify-between gap-2.5">
+        <h1 className="font-pixel text-sm sm:text-lg font-bold uppercase text-charcoal dark:text-white tracking-wide flex items-center gap-2 shrink-0">
           <Store size={18} strokeWidth={2.2} className="text-juro-orange" />
           <span>Toko</span>
         </h1>
 
-        <div className="flex items-center gap-2 sm:gap-3">
+        <div className="flex items-center gap-2 sm:gap-2.5">
           <div
-            className={`inline-flex items-center gap-3 text-xs sm:text-sm font-semibold tabular-nums transition-transform ${
-              walletPulse ? "animate-wallet-pop text-juro-orange" : "text-neutral-900 dark:text-white"
+            className={`inline-flex items-center gap-2.5 px-2.5 py-1 rounded-[4px] bg-[#EFE9DC] dark:bg-[#101114] border-2 border-charcoal dark:border-[#3F424E] font-mono-hud text-xs sm:text-sm font-bold transition-transform ${
+              walletPulse ? "animate-wallet-pop text-juro-orange" : "text-charcoal dark:text-white"
             }`}
           >
             <span className="inline-flex items-center gap-1.5">
               <Coins size={14} strokeWidth={2.2} className="text-amber-500" />
               <span>{coins}</span>
             </span>
-            <span className="w-px h-3.5 bg-neutral-200 dark:bg-neutral-700" aria-hidden="true" />
+            <span className="w-0.5 h-3.5 bg-charcoal/25 dark:bg-[#3F424E]" aria-hidden="true" />
             <span className="inline-flex items-center gap-1.5">
               <Gem size={14} strokeWidth={2.2} className="text-sky-500" />
               <span>{totalCrystals}</span>
@@ -266,165 +449,146 @@ export const ShopPage: React.FC = () => {
               soundEffects.playDismiss();
               navigate("/");
             }}
-            className="w-8 h-8 rounded-xl inline-flex items-center justify-center text-neutral-500 hover:text-neutral-900 hover:bg-neutral-100 dark:text-neutral-400 dark:hover:text-white dark:hover:bg-neutral-800 transition-colors cursor-pointer"
+            className="console-btn-bevel w-8 h-8 rounded-[4px] border-2 border-charcoal dark:border-[#3F424E] bg-[#FDFBF7] dark:bg-[#101114] shadow-[0_2px_0_#18181B] inline-flex items-center justify-center text-charcoal hover:text-juro-orange dark:text-neutral-200 transition-colors cursor-pointer"
             aria-label="Tutup dan kembali ke Home"
             title="Kembali ke Home"
           >
-            <X size={17} strokeWidth={2} />
+            <X size={16} strokeWidth={2.4} />
           </button>
         </div>
       </div>
 
-      {/* Category Switcher */}
-      <div className="w-full flex items-center justify-between gap-3">
+      {/* Category Switcher + Contextual Summary Readout */}
+      <div className="w-full flex items-stretch gap-2.5">
         <PixelSegmented
-          fullWidthOnMobile
+          mobileDropdown
+          fullWidth
+          className="flex-1 min-w-0"
           value={activeTab}
           onChange={setActiveTab}
           options={[
-            { value: "food", label: "Makanan" },
-            { value: "toy", label: "Mainan" },
-            { value: "skins", label: "Aksesoris" },
+            { value: "food", label: "Makanan", icon: Utensils },
+            { value: "toy", label: "Mainan", icon: Gamepad2 },
+            { value: "skins", label: "Aksesoris", icon: Palette },
             {
               value: "sell",
               label: "Kristal",
+              icon: Gem,
               badge: totalCrystals > 0 ? `${totalCrystals}` : undefined,
             },
-            { value: "tools", label: "Beliung" },
+            { value: "tools", label: "Beliung", icon: Pickaxe },
           ]}
         />
+
+        <span className="hidden md:inline-flex items-center px-3 rounded-[5px] bg-[#EFE9DC]/80 dark:bg-[#101114] border-2 border-dashed border-charcoal/25 dark:border-[#3F424E] font-mono-hud text-xs font-bold text-charcoal/80 dark:text-neutral-300 shrink-0 whitespace-nowrap">
+          {tabSummaryLabel[activeTab]}
+        </span>
       </div>
 
       {/* Tab Content Stage */}
       <div className="w-full min-h-[340px]">
-        {/* TAB 1: MAKANAN */}
+        {/* TAB 1: RAK KIOS MAKANAN (Unified 5-row Ledger — Zero Orphan Cards) */}
         {activeTab === "food" && (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5">
-            {SHOP_FOODS.map((food) => {
-              const stock = foodInventory[food.id] ?? 0;
-              const canBuy1 = coins >= food.price;
-              const canBuy3 = coins >= food.price * 3;
+          <Card shadowOffset="sm" className="overflow-hidden">
+            <div className="divide-y-2 divide-dashed divide-charcoal/15 dark:divide-[#3F424E]">
+              {SHOP_FOODS.map((food) => {
+                const stock = foodInventory[food.id] ?? 0;
+                const canBuy1 = coins >= food.price;
+                const canBuy3 = coins >= food.price * 3;
 
-              return (
-                <Card key={food.id} shadowOffset="sm" className="p-4 shadow-none flex flex-col justify-between gap-3">
-                  <div className="flex items-center gap-3">
-                    <div className="w-12 h-12 rounded-xl bg-neutral-50 dark:bg-neutral-800 border border-neutral-200/80 dark:border-neutral-700/70 flex items-center justify-center shrink-0">
-                      <ItemIllustration id={food.id} size={34} />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center justify-between gap-2">
-                        <h3 className="text-sm font-semibold text-neutral-900 dark:text-white truncate">
-                          {food.name}
-                        </h3>
-                        <span
-                          className={`text-xs font-semibold tabular-nums shrink-0 ${
-                            stock > 0
-                              ? "text-emerald-600 dark:text-emerald-400"
-                              : "text-neutral-400"
-                          }`}
-                        >
-                          ×{stock}
-                        </span>
+                return (
+                  <div
+                    key={food.id}
+                    className="px-4 py-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:bg-[#F4EFE6]/45 dark:hover:bg-[#16181F] transition-colors"
+                  >
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="w-12 h-12 rounded-[4px] bg-[#EFE9DC] dark:bg-[#101114] border-2 border-charcoal/80 dark:border-[#3F424E] flex items-center justify-center shrink-0">
+                        <ItemIllustration id={food.id} size={34} />
                       </div>
-                      <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-1 tabular-nums truncate">
-                        +{food.hungerRestore} Lapar · +{food.happinessGain} Senang · +{food.xpReward} XP
-                      </p>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2">
+                          <h3 className="text-sm font-bold text-charcoal dark:text-white truncate">
+                            {food.name}
+                          </h3>
+                          <span
+                            className={`font-mono-hud text-[11px] font-bold px-1.5 py-0.5 rounded-[2px] border shrink-0 leading-none ${
+                              stock > 0
+                                ? "bg-emerald-50 text-emerald-700 border-emerald-600/35 dark:bg-emerald-950/40 dark:text-emerald-300"
+                                : "bg-[#EFE9DC] text-neutral-500 border-charcoal/15 dark:bg-[#101114] dark:border-[#3F424E]"
+                            }`}
+                          >
+                            ×{stock}
+                          </span>
+                        </div>
+                        <p className="font-mono-hud text-[11px] text-neutral-600 dark:text-neutral-400 mt-1 truncate">
+                          +{food.hungerRestore} Lapar · +{food.happinessGain} Senang · +{food.xpReward} XP
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="pt-2.5 border-t-2 border-dashed border-charcoal/15 dark:border-[#3F424E] sm:pt-0 sm:border-t-0 grid grid-cols-2 sm:flex sm:items-center gap-2 shrink-0 w-full sm:w-auto">
+                      <NotchedActionKeycap
+                        label="×3"
+                        subText={`${food.price * 3}`}
+                        disabled={!canBuy3}
+                        onClick={() => handleBuyFood(food.id, food.name, 3, food.price)}
+                      />
+                      <PriceKeycapButton
+                        label="Beli"
+                        priceText={`${food.price}`}
+                        icon={Coins}
+                        disabled={!canBuy1}
+                        onClick={() => handleBuyFood(food.id, food.name, 1, food.price)}
+                      />
                     </div>
                   </div>
-
-                  <div className="pt-3 border-t border-neutral-100 dark:border-neutral-800 grid grid-cols-2 gap-2">
-                    <button
-                      type="button"
-                      disabled={!canBuy1}
-                      onClick={() => {
-                        soundEffects.playClick();
-                        handleBuyFood(food.id, food.name, 1, food.price);
-                      }}
-                      className={`w-full min-h-[40px] py-1.5 px-2.5 rounded-xl border text-center transition-all cursor-pointer select-none active:scale-[0.98] disabled:opacity-45 disabled:cursor-not-allowed disabled:active:scale-100 ${
-                        canBuy1
-                          ? "bg-neutral-900 text-white border-neutral-900 hover:bg-neutral-800 dark:bg-neutral-100 dark:text-neutral-900 dark:border-neutral-100 dark:hover:bg-neutral-200"
-                          : "bg-white text-neutral-800 border-neutral-200 dark:bg-neutral-800 dark:text-neutral-100 dark:border-neutral-700"
-                      }`}
-                    >
-                      <span className="block text-xs font-semibold leading-tight">Beli 1</span>
-                      <span className="block text-[11px] opacity-80 tabular-nums leading-tight mt-0.5">
-                        {food.price} Koin
-                      </span>
-                    </button>
-                    <button
-                      type="button"
-                      disabled={!canBuy3}
-                      onClick={() => {
-                        soundEffects.playClick();
-                        handleBuyFood(food.id, food.name, 3, food.price);
-                      }}
-                      className="w-full min-h-[40px] py-1.5 px-2.5 rounded-xl border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-800 dark:text-neutral-100 hover:bg-neutral-50 hover:border-neutral-300 dark:hover:bg-neutral-750 text-center transition-all cursor-pointer select-none active:scale-[0.98] disabled:opacity-45 disabled:cursor-not-allowed disabled:active:scale-100"
-                    >
-                      <span className="block text-xs font-semibold leading-tight">Beli 3</span>
-                      <span className="block text-[11px] text-neutral-500 dark:text-neutral-400 tabular-nums leading-tight mt-0.5">
-                        {food.price * 3} Koin
-                      </span>
-                    </button>
-                  </div>
-                </Card>
-              );
-            })}
-          </div>
+                );
+              })}
+            </div>
+          </Card>
         )}
 
-        {/* TAB 2: MAINAN */}
+        {/* TAB 2: ETALASE MAINAN (Symmetrical 3-column Shelf) */}
         {activeTab === "toy" && (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5">
             {SHOP_TOYS.map((toy) => {
               const isOwned = ownedToys.includes(toy.id);
               const canBuy = !isOwned && coins >= toy.price;
 
               return (
-                <Card key={toy.id} shadowOffset="sm" className="p-4 shadow-none flex flex-col justify-between gap-3">
-                  <div className="flex items-center gap-3">
-                    <div className="w-12 h-12 rounded-xl bg-neutral-50 dark:bg-neutral-800 border border-neutral-200/80 dark:border-neutral-700/70 flex items-center justify-center shrink-0">
+                <Card key={toy.id} shadowOffset="sm" className="p-4 flex flex-col justify-between gap-3">
+                  <div className="flex items-start gap-3">
+                    <div className="w-12 h-12 rounded-[4px] bg-[#EFE9DC] dark:bg-[#101114] border-2 border-charcoal/80 dark:border-[#3F424E] flex items-center justify-center shrink-0">
                       <ItemIllustration id={toy.id} size={34} />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-center justify-between gap-2">
-                        <h3 className="text-sm font-semibold text-neutral-900 dark:text-white truncate">
-                          {toy.name}
-                        </h3>
-                        <span
-                          className={`text-xs font-semibold tabular-nums shrink-0 ${
-                            isOwned
-                              ? "text-emerald-600 dark:text-emerald-400"
-                              : "text-juro-orange"
-                          }`}
-                        >
-                          {isOwned ? "Milik" : `${toy.price} Koin`}
-                        </span>
-                      </div>
-                      <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-1 tabular-nums truncate">
+                      <h3 className="text-sm font-bold text-charcoal dark:text-white truncate">
+                        {toy.name}
+                      </h3>
+                      <p className="font-mono-hud text-[11px] text-neutral-600 dark:text-neutral-400 mt-1">
                         +{toy.happinessGain} Senang · +{toy.affectionGain} Sayang · +{toy.xpReward} XP
                       </p>
                     </div>
                   </div>
 
-                  <div className="pt-3 border-t border-neutral-100 dark:border-neutral-800">
+                  <div className="pt-3 border-t-2 border-dashed border-charcoal/15 dark:border-[#3F424E] flex items-center justify-between gap-2">
+                    <span
+                      className={`font-mono-hud text-xs font-bold ${
+                        isOwned ? "text-emerald-600 dark:text-emerald-400" : "text-juro-orange"
+                      }`}
+                    >
+                      {isOwned ? "Permanen" : `${toy.price} Koin`}
+                    </span>
+
                     {isOwned ? (
-                      <Button
-                        label="Dimiliki"
-                        icon={Check}
-                        size="sm"
-                        variant="secondary"
-                        disabled
-                        className="w-full min-h-[40px]"
-                      />
+                      <ShopStatusStamp label="Dimiliki" icon={Check} tone="good" />
                     ) : (
-                      <Button
-                        label={`Beli (${toy.price} Koin)`}
+                      <PriceKeycapButton
+                        label="Beli"
+                        priceText={`${toy.price}`}
                         icon={ShoppingBag}
-                        size="sm"
-                        variant={canBuy ? "primary" : "secondary"}
                         disabled={!canBuy}
                         onClick={() => handleBuyToy(toy.id, toy.name, toy.price)}
-                        className="w-full min-h-[40px]"
                       />
                     )}
                   </div>
@@ -434,20 +598,20 @@ export const ShopPage: React.FC = () => {
           </div>
         )}
 
-        {/* TAB 3: AKSESORIS JURO (TOPI & WARNA DIGABUNG DALAM 1 HALAMAN) */}
+        {/* TAB 3: AKSESORIS JURO (Koleksi Topi 3-col + Warna Tubuh Jeli 5-col / Mobile Rows) */}
         {activeTab === "skins" && (
           <div className="space-y-6">
-            {/* Bagian 1: Koleksi Topi (Bagian Atas) */}
-            <div className="space-y-3.5">
-              <div className="flex items-center justify-between border-b border-neutral-200/80 dark:border-neutral-800 pb-2.5">
+            {/* Bagian 1: Koleksi Topi (6 item -> 2 baris x 3 kolom penuh) */}
+            <div className="space-y-3">
+              <div className="flex items-center justify-between border-b-2 border-dashed border-charcoal/20 dark:border-[#3F424E] pb-2">
                 <div className="flex items-center gap-2">
                   <ShoppingBag size={16} strokeWidth={2.2} className="text-juro-orange" />
-                  <h2 className="text-sm font-semibold text-neutral-900 dark:text-white">
+                  <h2 className="font-pixel text-xs sm:text-sm font-bold uppercase text-charcoal dark:text-white">
                     Koleksi Topi
                   </h2>
                 </div>
-                <span className="text-xs text-neutral-500 dark:text-neutral-400 tabular-nums">
-                  {unlockedHats.length} / {HAT_CATALOG.length} dimiliki
+                <span className="font-mono-hud text-xs font-bold text-neutral-600 dark:text-neutral-400">
+                  {unlockedHats.length}/{HAT_CATALOG.length}
                 </span>
               </div>
 
@@ -461,70 +625,60 @@ export const ShopPage: React.FC = () => {
                     <Card
                       key={hat.id}
                       shadowOffset="sm"
-                      className={`p-4 shadow-none flex flex-col justify-between gap-3 transition-all ${
-                        isSelected ? "border-juro-orange ring-1 ring-juro-orange/25" : ""
+                      variant={isSelected ? "warm" : "default"}
+                      className={`p-3.5 flex flex-col justify-between gap-3 transition-colors ${
+                        isSelected ? "border-juro-orange" : ""
                       }`}
                     >
                       <div className="flex items-center gap-3">
-                        <div className="relative w-12 h-12 rounded-xl bg-neutral-50 dark:bg-neutral-800 border border-neutral-200/80 dark:border-neutral-700/70 flex items-center justify-center shrink-0">
+                        <div className="relative w-12 h-12 rounded-[4px] bg-[#EFE9DC] dark:bg-[#101114] border-2 border-charcoal/80 dark:border-[#3F424E] flex items-center justify-center shrink-0">
                           <ItemIllustration id={hat.illustrationId} size={34} />
                           {isSelected && (
-                            <span className="absolute -top-1.5 -right-1.5 w-4.5 h-4.5 rounded-full bg-juro-orange text-white shadow-xs flex items-center justify-center">
+                            <span className="absolute -top-1.5 -right-1.5 w-4.5 h-4.5 rounded-[2px] bg-juro-orange text-white border border-charcoal flex items-center justify-center">
                               <Check size={10} strokeWidth={2.8} />
                             </span>
                           )}
                         </div>
 
-                        <div className="min-w-0 flex-1 flex items-center justify-between gap-2">
-                          <h3 className="text-sm font-semibold text-neutral-900 dark:text-white truncate">
+                        <div className="min-w-0 flex-1">
+                          <h3 className="text-sm font-bold text-charcoal dark:text-white truncate">
                             {hat.name}
                           </h3>
-                          <span
-                            className={`text-xs font-semibold tabular-nums shrink-0 ${
-                              isSelected
-                                ? "text-juro-orange"
-                                : isUnlocked
-                                ? "text-emerald-600 dark:text-emerald-400"
-                                : "text-neutral-500 dark:text-neutral-400"
-                            }`}
-                          >
+                          <p className="font-mono-hud text-[11px] font-bold text-neutral-500 dark:text-neutral-400 mt-0.5">
                             {isSelected
-                              ? "Aktif"
+                              ? "Sedang dipakai"
                               : isUnlocked
-                              ? "Milik"
+                              ? "Sudah dimiliki"
                               : hat.price > 0
                               ? `${hat.price} Koin`
                               : "Gratis"}
-                          </span>
+                          </p>
                         </div>
                       </div>
 
-                      <div className="pt-3 border-t border-neutral-100 dark:border-neutral-800">
-                        {isUnlocked ? (
-                          <Button
-                            label={
-                              isSelected
-                                ? "Dipakai"
-                                : hat.id === "hat-none"
-                                ? "Lepas Topi"
-                                : "Pakai Topi"
-                            }
-                            icon={isSelected ? Check : ShoppingBag}
-                            size="sm"
-                            variant={isSelected ? "secondary" : "primary"}
-                            disabled={isSelected}
+                      <div className="pt-2.5 border-t-2 border-dashed border-charcoal/15 dark:border-[#3F424E] flex items-center justify-end">
+                        {isSelected ? (
+                          <ShopStatusStamp
+                            label="Dipakai"
+                            icon={Check}
+                            tone="accent"
+                            className="w-full"
+                          />
+                        ) : isUnlocked ? (
+                          <EquipTogglePill
+                            label={hat.id === "hat-none" ? "Lepas Topi" : "Pakai Topi"}
+                            icon={ShoppingBag}
                             onClick={() => handleEquipHat(hat.id, hat.name)}
-                            className="w-full min-h-[40px]"
+                            className="w-full"
                           />
                         ) : (
-                          <Button
-                            label={`Beli (${hat.price} Koin)`}
+                          <PriceKeycapButton
+                            label="Beli"
+                            priceText={`${hat.price}`}
                             icon={ShoppingBag}
-                            size="sm"
-                            variant={canBuy ? "primary" : "secondary"}
                             disabled={!canBuy}
                             onClick={() => handleUnlockHat(hat.id, hat.name, hat.price)}
-                            className="w-full min-h-[40px]"
+                            className="w-full"
                           />
                         )}
                       </div>
@@ -534,21 +688,21 @@ export const ShopPage: React.FC = () => {
               </div>
             </div>
 
-            {/* Bagian 2: Warna Tubuh Jeli (Bagian Bawah) */}
-            <div className="space-y-3.5 pt-1">
-              <div className="flex items-center justify-between border-b border-neutral-200/80 dark:border-neutral-800 pb-2.5">
+            {/* Bagian 2: Warna Tubuh Jeli (5 item -> 5 ubin sejajar di desktop, baris rapi di mobile) */}
+            <div className="space-y-3 pt-1">
+              <div className="flex items-center justify-between border-b-2 border-dashed border-charcoal/20 dark:border-[#3F424E] pb-2">
                 <div className="flex items-center gap-2">
                   <Palette size={16} strokeWidth={2.2} className="text-juro-orange" />
-                  <h2 className="text-sm font-semibold text-neutral-900 dark:text-white">
+                  <h2 className="font-pixel text-xs sm:text-sm font-bold uppercase text-charcoal dark:text-white">
                     Warna Tubuh Jeli
                   </h2>
                 </div>
-                <span className="text-xs text-neutral-500 dark:text-neutral-400 tabular-nums">
-                  {unlockedSkins.length} / {SKIN_CATALOG.length} dimiliki
+                <span className="font-mono-hud text-xs font-bold text-neutral-600 dark:text-neutral-400">
+                  {unlockedSkins.length}/{SKIN_CATALOG.length}
                 </span>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5">
+              <div className="grid grid-cols-1 lg:grid-cols-5 gap-3">
                 {SKIN_CATALOG.map((skin) => {
                   const isUnlocked = unlockedSkins.includes(skin.id);
                   const isSelected = activeSkin === skin.id;
@@ -572,12 +726,13 @@ export const ShopPage: React.FC = () => {
                     <Card
                       key={skin.id}
                       shadowOffset="sm"
-                      className={`p-4 shadow-none flex flex-col justify-between gap-3 transition-all ${
-                        isSelected ? "border-juro-orange ring-1 ring-juro-orange/25" : ""
+                      variant={isSelected ? "warm" : "default"}
+                      className={`p-3 flex flex-row lg:flex-col items-center justify-between gap-3 transition-colors ${
+                        isSelected ? "border-juro-orange" : ""
                       }`}
                     >
-                      <div className="flex items-center gap-3">
-                        <div className="relative w-12 h-12 rounded-xl bg-neutral-50 dark:bg-neutral-800 border border-neutral-200/80 dark:border-neutral-700/70 flex items-center justify-center shrink-0">
+                      <div className="flex flex-row lg:flex-col items-center gap-3 lg:gap-2 min-w-0 flex-1 lg:w-full">
+                        <div className="relative w-12 h-12 rounded-[4px] bg-[#EFE9DC] dark:bg-[#101114] border-2 border-charcoal/80 dark:border-[#3F424E] flex items-center justify-center shrink-0">
                           <div
                             className="relative w-9 h-8 rounded-t-full rounded-b-[12px] border border-black/15 shadow-xs overflow-hidden flex items-center justify-center"
                             style={{
@@ -595,50 +750,44 @@ export const ShopPage: React.FC = () => {
                             </span>
                           </div>
                           {isSelected && (
-                            <span className="absolute -top-1.5 -right-1.5 w-4.5 h-4.5 rounded-full bg-juro-orange text-white shadow-xs flex items-center justify-center">
+                            <span className="absolute -top-1.5 -right-1.5 w-4.5 h-4.5 rounded-[2px] bg-juro-orange text-white border border-charcoal flex items-center justify-center">
                               <Check size={10} strokeWidth={2.8} />
                             </span>
                           )}
                         </div>
 
-                        <div className="min-w-0 flex-1 flex items-center justify-between gap-2">
-                          <h3 className="text-sm font-semibold text-neutral-900 dark:text-white truncate">
+                        <div className="min-w-0 lg:text-center lg:w-full">
+                          <h3 className="text-xs sm:text-sm font-bold text-charcoal dark:text-white truncate">
                             {skin.name}
                           </h3>
-                          <span
-                            className={`text-xs font-semibold tabular-nums shrink-0 ${
-                              isSelected
-                                ? "text-juro-orange"
-                                : isUnlocked
-                                ? "text-emerald-600 dark:text-emerald-400"
-                                : "text-neutral-500 dark:text-neutral-400"
-                            }`}
-                          >
-                            {isSelected ? "Aktif" : isUnlocked ? "Milik" : costLabel}
-                          </span>
+                          <p className="font-mono-hud text-[11px] font-bold text-neutral-500 dark:text-neutral-400 mt-0.5 truncate">
+                            {isSelected ? "Aktif" : isUnlocked ? "Terbuka" : costLabel}
+                          </p>
                         </div>
                       </div>
 
-                      <div className="pt-3 border-t border-neutral-100 dark:border-neutral-800">
-                        {isUnlocked ? (
-                          <Button
-                            label={isSelected ? "Dipakai" : "Pakai Warna"}
-                            icon={isSelected ? Check : Palette}
-                            size="sm"
-                            variant={isSelected ? "secondary" : "primary"}
-                            disabled={isSelected}
+                      <div className="shrink-0 lg:w-full lg:pt-2.5 lg:border-t-2 lg:border-dashed lg:border-charcoal/15 dark:lg:border-[#3F424E]">
+                        {isSelected ? (
+                          <ShopStatusStamp
+                            label="Dipakai"
+                            icon={Check}
+                            tone="accent"
+                            className="lg:w-full"
+                          />
+                        ) : isUnlocked ? (
+                          <EquipTogglePill
+                            label="Pakai"
+                            icon={Palette}
                             onClick={() => handleEquipSkin(skin.id, skin.name)}
-                            className="w-full min-h-[40px]"
+                            className="lg:w-full"
                           />
                         ) : (
-                          <Button
-                            label={`Buka (${costLabel})`}
+                          <PriceKeycapButton
+                            label={costLabel}
                             icon={Gem}
-                            size="sm"
-                            variant={canUnlock ? "primary" : "secondary"}
                             disabled={!canUnlock}
                             onClick={() => handleUnlockSkin(skin.id, skin.name, costLabel)}
-                            className="w-full min-h-[40px]"
+                            className="lg:w-full"
                           />
                         )}
                       </div>
@@ -650,19 +799,19 @@ export const ShopPage: React.FC = () => {
           </div>
         )}
 
-        {/* TAB 4: JUAL KRISTAL */}
+        {/* TAB 4: KONTER PENUKARAN KRISTAL (Summary Bar + Grid 2x2) */}
         {activeTab === "sell" && (
           <div className="space-y-3.5">
             <Card
               variant="warm"
               shadowOffset="sm"
-              className="p-4 shadow-none flex flex-wrap items-center justify-between gap-3"
+              className="p-4 flex flex-wrap items-center justify-between gap-3"
             >
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-white dark:bg-neutral-900 border border-neutral-200/80 dark:border-neutral-700 flex items-center justify-center shrink-0">
+                <div className="w-10 h-10 rounded-[4px] bg-[#FDFBF7] dark:bg-[#101114] border-2 border-charcoal dark:border-[#3F424E] flex items-center justify-center shrink-0">
                   <ArrowRightLeft size={16} strokeWidth={2.2} className="text-juro-orange" />
                 </div>
-                <p className="text-sm font-semibold text-neutral-900 dark:text-white tabular-nums">
+                <p className="font-mono-hud text-sm font-bold text-charcoal dark:text-white">
                   {totalCrystals > 0
                     ? `${totalCrystals} Kristal · ~${totalCrystalValue} Koin`
                     : "Kantong kristal kosong"}
@@ -670,17 +819,19 @@ export const ShopPage: React.FC = () => {
               </div>
 
               {totalCrystals > 0 ? (
-                <Button
-                  label={`Jual Semua (+${totalCrystalValue})`}
+                <PriceKeycapButton
+                  label="Jual Semua"
+                  priceText={`+${totalCrystalValue}`}
                   icon={Coins}
-                  size="sm"
-                  variant="primary"
                   onClick={handleSellAll}
                 />
               ) : (
-                <Link to="/mine">
-                  <Button label="Ke Tambang" icon={Pickaxe} size="sm" variant="primary" />
-                </Link>
+                <PriceKeycapButton
+                  label="Ke Tambang"
+                  icon={Pickaxe}
+                  tone="charcoal"
+                  onClick={() => navigate("/mine")}
+                />
               )}
             </Card>
 
@@ -690,43 +841,51 @@ export const ShopPage: React.FC = () => {
                 const totalVal = count * c.sellPrice;
 
                 return (
-                  <Card key={c.id} shadowOffset="sm" className="p-4 shadow-none flex flex-col justify-between gap-3">
+                  <Card key={c.id} shadowOffset="sm" className="p-4 flex flex-col justify-between gap-3">
                     <div className="flex items-center gap-3">
-                      <div className="w-12 h-12 rounded-xl bg-neutral-50 dark:bg-neutral-800 border border-neutral-200/80 dark:border-neutral-700/70 flex items-center justify-center shrink-0">
+                      <div className="w-12 h-12 rounded-[4px] bg-[#EFE9DC] dark:bg-[#101114] border-2 border-charcoal/80 dark:border-[#3F424E] flex items-center justify-center shrink-0">
                         <ItemIllustration id={c.illustrationId} size={34} />
                       </div>
                       <div className="flex-1 min-w-0">
-                        <h3 className="text-sm font-semibold text-neutral-900 dark:text-white truncate">
-                          {c.name}
-                        </h3>
-                        <div className="mt-1 flex items-center justify-between text-xs tabular-nums">
-                          <span className="text-neutral-600 dark:text-neutral-300">
-                            Stok: <strong className="text-juro-orange">×{count}</strong>
-                          </span>
-                          <span className="text-amber-600 dark:text-amber-400 font-semibold">
+                        <div className="flex items-center justify-between gap-2">
+                          <h3 className="text-sm font-bold text-charcoal dark:text-white truncate">
+                            {c.name}
+                          </h3>
+                          <span className="font-mono-hud text-xs font-bold text-amber-600 dark:text-amber-400 shrink-0">
                             {c.sellPrice} Koin
                           </span>
                         </div>
+                        <p className="font-mono-hud text-xs text-neutral-600 dark:text-neutral-300 mt-1">
+                          Stok: <strong className={count > 0 ? "text-juro-orange" : ""}>×{count}</strong>
+                        </p>
                       </div>
                     </div>
 
-                    <div className="pt-3 border-t border-neutral-100 dark:border-neutral-800 grid grid-cols-2 gap-2">
-                      <Button
-                        label={`Jual 1 (+${c.sellPrice})`}
-                        size="sm"
-                        variant="secondary"
-                        disabled={count < 1}
-                        onClick={() => handleSellCrystal(c.id, c.name, 1)}
-                        className="w-full min-h-[40px]"
-                      />
-                      <Button
-                        label={count > 0 ? `Semua (+${totalVal})` : "Semua"}
-                        size="sm"
-                        variant={count > 0 ? "primary" : "secondary"}
-                        disabled={count < 1}
-                        onClick={() => handleSellCrystal(c.id, c.name, count)}
-                        className="w-full min-h-[40px]"
-                      />
+                    <div className="pt-3 border-t-2 border-dashed border-charcoal/15 dark:border-[#3F424E] flex items-center justify-between gap-2">
+                      {count === 0 ? (
+                        <>
+                          <span className="font-mono-hud text-[11px] text-neutral-500 dark:text-neutral-400">
+                            Belum ada stok
+                          </span>
+                          <ShopStatusStamp label="Kosong" tone="neutral" />
+                        </>
+                      ) : (
+                        <>
+                          <NotchedActionKeycap
+                            label="Jual 1"
+                            subText={`+${c.sellPrice}`}
+                            onClick={() => handleSellCrystal(c.id, c.name, 1)}
+                            className="flex-1"
+                          />
+                          <PriceKeycapButton
+                            label="Semua"
+                            priceText={`+${totalVal}`}
+                            icon={Coins}
+                            onClick={() => handleSellCrystal(c.id, c.name, count)}
+                            className="flex-1"
+                          />
+                        </>
+                      )}
                     </div>
                   </Card>
                 );
@@ -735,85 +894,78 @@ export const ShopPage: React.FC = () => {
           </div>
         )}
 
-        {/* TAB 5: UPGRADE BELIUNG */}
+        {/* TAB 5: TANGGA PENINGKATAN BELIUNG (Sequential 5-step Progression Ledger) */}
         {activeTab === "tools" && (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5">
-            {PICKAXE_TIERS.map((tier) => {
-              const isOwned = pickaxeLevel >= tier.level;
-              const isActive = pickaxeLevel === tier.level;
-              const isNext = pickaxeLevel + 1 === tier.level;
-              const canBuy = isNext && coins >= tier.price;
+          <Card shadowOffset="sm" className="overflow-hidden">
+            <div className="divide-y-2 divide-dashed divide-charcoal/15 dark:divide-[#3F424E]">
+              {PICKAXE_TIERS.map((tier) => {
+                const isOwned = pickaxeLevel >= tier.level;
+                const isActive = pickaxeLevel === tier.level;
+                const isNext = pickaxeLevel + 1 === tier.level;
+                const canBuy = isNext && coins >= tier.price;
 
-              return (
-                <Card
-                  key={tier.level}
-                  variant={isActive ? "warm" : "default"}
-                  shadowOffset="sm"
-                  className={`p-4 shadow-none flex flex-col justify-between gap-3 ${
-                    isActive ? "border-juro-orange ring-1 ring-juro-orange/25" : ""
-                  }`}
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="w-12 h-12 rounded-xl bg-white dark:bg-neutral-800 border border-neutral-200/80 dark:border-neutral-700/70 flex items-center justify-center shrink-0">
-                      <ItemIllustration id={tier.illustrationId} size={34} />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center justify-between gap-2">
-                        <h3 className="text-sm font-semibold text-neutral-900 dark:text-white truncate">
-                          Lv.{tier.level} · {tier.name}
-                        </h3>
-                        <span
-                          className={`text-xs font-semibold tabular-nums shrink-0 ${
-                            isActive
-                              ? "text-juro-orange"
-                              : isOwned
-                              ? "text-emerald-600 dark:text-emerald-400"
-                              : "text-neutral-500 dark:text-neutral-400"
-                          }`}
-                        >
-                          {isActive ? "Aktif" : isOwned ? "Milik" : `${tier.price} Koin`}
-                        </span>
+                return (
+                  <div
+                    key={tier.level}
+                    className={`px-4 py-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 transition-colors ${
+                      isActive ? "bg-[#FFF5E9]/70 dark:bg-[#231B16]/70" : ""
+                    }`}
+                  >
+                    <div className="flex items-center gap-3 min-w-0">
+                      <span
+                        className={`w-9 h-9 rounded-[4px] border-2 font-pixel text-[11px] font-bold flex items-center justify-center shrink-0 ${
+                          isActive
+                            ? "bg-juro-orange text-white border-charcoal"
+                            : isOwned
+                            ? "bg-emerald-50 text-emerald-700 border-emerald-600/40 dark:bg-emerald-950/40 dark:text-emerald-300"
+                            : "bg-[#EFE9DC] text-neutral-500 border-charcoal/30 dark:bg-[#101114] dark:border-[#3F424E]"
+                        }`}
+                      >
+                        L{tier.level}
+                      </span>
+
+                      <div className="w-11 h-11 rounded-[4px] bg-[#EFE9DC] dark:bg-[#101114] border-2 border-charcoal/80 dark:border-[#3F424E] flex items-center justify-center shrink-0">
+                        <ItemIllustration id={tier.illustrationId} size={30} />
                       </div>
-                      <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-1 tabular-nums truncate">
-                        Daya {tier.power} · +{Math.round(tier.bonusChance * 100)}% Bonus
-                      </p>
+
+                      <div className="min-w-0 flex-1">
+                        <h3 className="text-sm font-bold text-charcoal dark:text-white truncate">
+                          {tier.name}
+                        </h3>
+                        <p className="font-mono-hud text-[11px] text-neutral-600 dark:text-neutral-400 mt-0.5 truncate">
+                          Daya {tier.power} · +{Math.round(tier.bonusChance * 100)}% Bonus Kristal
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="pt-2.5 border-t-2 border-dashed border-charcoal/15 dark:border-[#3F424E] sm:pt-0 sm:border-t-0 flex items-center justify-end shrink-0 w-full sm:w-auto">
+                      {isActive ? (
+                        <ShopStatusStamp label="Aktif" icon={Check} tone="accent" className="w-full sm:w-auto" />
+                      ) : isOwned ? (
+                        <ShopStatusStamp label="Dimiliki" icon={Check} tone="good" className="w-full sm:w-auto" />
+                      ) : isNext ? (
+                        <PriceKeycapButton
+                          label="Upgrade"
+                          priceText={`${tier.price}`}
+                          icon={Pickaxe}
+                          disabled={!canBuy}
+                          onClick={() => handleUpgradePickaxe(tier.name, tier.price)}
+                          className="w-full sm:w-auto"
+                        />
+                      ) : (
+                        <ShopStatusStamp
+                          label={`Butuh Lv.${tier.level - 1}`}
+                          icon={Lock}
+                          tone="neutral"
+                          className="w-full sm:w-auto"
+                        />
+                      )}
                     </div>
                   </div>
-
-                  <div className="pt-3 border-t border-neutral-100 dark:border-neutral-800">
-                    {isOwned ? (
-                      <Button
-                        label={isActive ? "Dipakai" : "Dimiliki"}
-                        icon={Check}
-                        size="sm"
-                        variant="secondary"
-                        disabled
-                        className="w-full min-h-[40px]"
-                      />
-                    ) : isNext ? (
-                      <Button
-                        label={`Upgrade (${tier.price} Koin)`}
-                        icon={Pickaxe}
-                        size="sm"
-                        variant={canBuy ? "primary" : "secondary"}
-                        disabled={!canBuy}
-                        onClick={() => handleUpgradePickaxe(tier.name, tier.price)}
-                        className="w-full min-h-[40px]"
-                      />
-                    ) : (
-                      <Button
-                        label={`Buka Lv.${tier.level - 1}`}
-                        size="sm"
-                        variant="secondary"
-                        disabled
-                        className="w-full min-h-[40px]"
-                      />
-                    )}
-                  </div>
-                </Card>
-              );
-            })}
-          </div>
+                );
+              })}
+            </div>
+          </Card>
         )}
       </div>
     </section>

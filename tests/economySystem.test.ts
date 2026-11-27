@@ -155,12 +155,12 @@ describe("Economy, Mining & Shop System", () => {
   });
 
   it("resolves solid map obstacles and elevated platform cliff walls accurately", () => {
-    // Trying to walk straight into the lantern at (-6.0, -0.4) pushes Juro outside
-    const hitLantern = resolveHorizontalCollisions(-6.0, -0.4, BASE_GROUND_Y, 0.4, false);
+    // Trying to walk straight into the bridge-side lantern at (-7.1, -1.7) pushes Juro outside
+    const hitLantern = resolveHorizontalCollisions(-7.1, -1.7, BASE_GROUND_Y, 0.4, false);
     expect(hitLantern.hitObstacle).toBe(true);
-    expect(Math.hypot(hitLantern.x - -6.0, hitLantern.z - -0.4)).toBeGreaterThanOrEqual(0.55);
+    expect(Math.hypot(hitLantern.x - -7.1, hitLantern.z - -1.7)).toBeGreaterThanOrEqual(0.55);
 
-    // Trying to walk into Kafe Senja building at (18.8, -3.2) blocks entry
+    // Trying to walk into WARUNG building at (18.8, -3.2) blocks entry
     const hitShop = resolveHorizontalCollisions(18.8, -3.2, BASE_GROUND_Y, 0.4, false);
     expect(hitShop.hitObstacle).toBe(true);
 
@@ -184,8 +184,8 @@ describe("Economy, Mining & Shop System", () => {
         id === 0
           ? { kind: "crystal", crystalId: "quartz" }
           : id === 1
-          ? { kind: "ladder" }
-          : { kind: "empty" },
+            ? { kind: "ladder" }
+            : { kind: "empty" },
       hasGlint: false,
       collected: false,
     }));

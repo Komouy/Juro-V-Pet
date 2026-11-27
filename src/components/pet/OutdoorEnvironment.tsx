@@ -16,6 +16,7 @@ import {
   JURO_TRAMPOLINE_POS,
   JURO_SHOP_POS,
   JURO_MINE_POS,
+  clampToCircularWorld,
 } from "../../engine/world/mapTerrain";
 import { createPixelTextureSet } from "./environment/pixelTextures";
 import { buildRetroWorld, type BuiltWorld } from "./environment/mapWorldBuilder";
@@ -29,6 +30,7 @@ import type { GraphicsProfile } from "../../engine/world/graphicsProfile";
 interface OutdoorEnvironmentProps {
   theme: TimeThemeConfig;
   weather?: WeatherMode;
+  isRaining?: boolean;
   graphicsProfile?: GraphicsProfile;
   onOpenShop?: () => void;
   onOpenMine?: () => void;
@@ -45,6 +47,7 @@ interface OutdoorEnvironmentProps {
   onStopBounce?: () => void;
   onCloseTrampolineMenu?: () => void;
   isBouncingOnTrampoline?: boolean;
+  onGroundClick?: (point: { x: number; z: number }) => void;
 }
 
 const _dummy = new THREE.Object3D();
@@ -53,6 +56,7 @@ export const OutdoorEnvironment: React.FC<OutdoorEnvironmentProps> = React.memo(
   ({
     theme,
     weather = "clear",
+    isRaining: isRainingProp,
     graphicsProfile,
     onOpenShop,
     onOpenMine,
@@ -69,6 +73,7 @@ export const OutdoorEnvironment: React.FC<OutdoorEnvironmentProps> = React.memo(
     onStopBounce,
     onCloseTrampolineMenu,
     isBouncingOnTrampoline = false,
+    onGroundClick,
   }) => {
     const [hoveredLandmark, setHoveredLandmark] = useState<
       "none" | "shop" | "mine" | "bed" | "bench" | "trampoline"
@@ -134,23 +139,12 @@ export const OutdoorEnvironment: React.FC<OutdoorEnvironmentProps> = React.memo(
       };
     }, []);
 
-    // Handle clicks across interactive landmarks in the 3D diorama
+    // Handle clicks across interactive landmarks and walkable 3D valley ground
     const handleClick = useCallback(
       (e: ThreeEvent<MouseEvent>) => {
-        const hitObj = e.object;
-        const landmarkId = hitObj.userData?.landmarkId;
-        const isInteractive =
-          landmarkId === "cafe" ||
-          landmarkId === "tunnel" ||
-          landmarkId === "bed" ||
-          landmarkId === "overlook" ||
-          landmarkId === "trampoline";
-
-        if (!isInteractive) {
+        if (e.nativeEvent.button !== 0) {
           return;
         }
-
-        e.stopPropagation();
 
         // Reject if this click was actually a camera rotate/drag gesture
         if (pointerDownPosRef.current) {
@@ -164,27 +158,46 @@ export const OutdoorEnvironment: React.FC<OutdoorEnvironmentProps> = React.memo(
           }
         }
 
-        if (landmarkId === "cafe") {
-          onOpenShop?.();
+        const hitObj = e.object;
+        const landmarkId = hitObj.userData?.landmarkId;
+        const isInteractive =
+          landmarkId === "cafe" ||
+          landmarkId === "tunnel" ||
+          landmarkId === "bed" ||
+          landmarkId === "overlook" ||
+          landmarkId === "trampoline";
+
+        if (isInteractive) {
+          e.stopPropagation();
+          if (landmarkId === "cafe") {
+            onOpenShop?.();
+            return;
+          }
+          if (landmarkId === "tunnel") {
+            onOpenMine?.();
+            return;
+          }
+          if (landmarkId === "bed") {
+            onBedClick?.();
+            return;
+          }
+          if (landmarkId === "overlook") {
+            onBenchClick?.();
+            return;
+          }
+          if (landmarkId === "trampoline") {
+            onTrampolineClick?.();
+          }
           return;
         }
-        if (landmarkId === "tunnel") {
-          onOpenMine?.();
-          return;
-        }
-        if (landmarkId === "bed") {
-          onBedClick?.();
-          return;
-        }
-        if (landmarkId === "overlook") {
-          onBenchClick?.();
-          return;
-        }
-        if (landmarkId === "trampoline") {
-          onTrampolineClick?.();
+
+        if (onGroundClick && hitObj.name !== "island-cliff-skirt") {
+          e.stopPropagation();
+          const { x, z } = clampToCircularWorld(e.point.x, e.point.z);
+          onGroundClick({ x, z });
         }
       },
-      [onOpenShop, onOpenMine, onBedClick, onBenchClick, onTrampolineClick]
+      [onOpenShop, onOpenMine, onBedClick, onBenchClick, onTrampolineClick, onGroundClick]
     );
 
     const handlePointerOver = useCallback((e: ThreeEvent<PointerEvent>) => {
@@ -219,20 +232,53 @@ export const OutdoorEnvironment: React.FC<OutdoorEnvironmentProps> = React.memo(
         textures.waterPixel.offset.y = (state.clock.elapsedTime * 0.035) % 1;
       }
 
-      // Animate swimming koi and ducks
+      // Animate swimming koi along canal/pond with tangent heading, S-wave sway, fin paddling & water depth
+      const elapsed = state.clock.elapsedTime;
       for (let i = 0; i < kois.length; i++) {
         const k = kois[i];
         k.phase += delta * k.speed;
-        k.group.position.x = k.centerX + Math.cos(k.phase) * k.radiusX;
-        k.group.position.z = k.centerZ + Math.sin(k.phase) * k.radiusZ;
-        k.group.rotation.y = -k.phase - Math.PI / 2;
+
+        const rot = k.pathRotation ?? 0;
+        const cosR = Math.cos(rot);
+        const sinR = Math.sin(rot);
+        const meander = k.meanderAmp ?? 0;
+
+        // Local elliptical patrol + gentle sinusoidal river weave
+        const lx = Math.cos(k.phase) * k.radiusX;
+        const lz = Math.sin(k.phase) * k.radiusZ + Math.sin(k.phase * 3.0) * meander;
+
+        // Derivatives w.r.t. phase for exact forward tangent direction
+        const dlx = -Math.sin(k.phase) * k.radiusX;
+        const dlz = Math.cos(k.phase) * k.radiusZ + Math.cos(k.phase * 3.0) * 3.0 * meander;
+
+        const wx = k.centerX + lx * cosR - lz * sinR;
+        const wz = k.centerZ + lx * sinR + lz * cosR;
+        const vx = dlx * cosR - dlz * sinR;
+        const vz = dlx * sinR + dlz * cosR;
+
+        const bob = Math.sin(elapsed * (k.isDuck ? 2.4 : 2.1) + i * 1.4) * (k.isDuck ? 0.018 : 0.022);
+        k.group.position.set(wx, k.baseY + bob, wz);
+
+        // Model nose faces +Z locally -> atan2(vx, vz) aligns nose exactly along motion vector
+        k.group.rotation.y = Math.atan2(vx, vz);
+
+        const swimWave = elapsed * (k.isDuck ? 4.8 : 7.5 + i * 0.4) + i * 1.3;
         if (k.tail) {
-          k.tail.rotation.y = Math.sin(k.phase * 5.0) * 0.28;
+          k.tail.rotation.y = Math.sin(swimWave) * (k.isDuck ? 0.16 : 0.44);
+        }
+        if (k.body) {
+          k.body.rotation.y = Math.sin(swimWave - 0.6) * 0.1;
+          k.body.rotation.z = Math.sin(swimWave * 0.5) * 0.04;
+        }
+        if (k.leftFin && k.rightFin) {
+          const pad = Math.sin(swimWave * 0.85) * 0.35;
+          k.leftFin.rotation.y = -0.15 + pad;
+          k.rightFin.rotation.y = 0.15 - pad;
         }
       }
 
       // Animate rain & water ripples during rain
-      const isRaining = isRainingWeather(weather);
+      const isRaining = isRainingProp ?? isRainingWeather(weather);
       if (rain.mesh.visible !== isRaining) {
         rain.mesh.visible = isRaining;
         rain.ripples.forEach((r) => (r.visible = isRaining));
@@ -263,13 +309,40 @@ export const OutdoorEnvironment: React.FC<OutdoorEnvironmentProps> = React.memo(
         }
       }
 
-      // Adjust lantern light intensity & bulb emissive based on weather / night
+      // Adjust lantern light intensity & bulb emissive based on time-of-day + rain
       const normW = normalizeWeather(weather);
-      const isNight = normW === "malam" || (normW === "cerah" && theme.isNight);
+      const isNight = normW === "malam" || theme.isNight;
       const isSunset = normW === "senja";
-      const targetIntensity = isNight ? 3.0 : isSunset ? 1.9 : isRaining ? 1.5 : 0.0;
-      const targetEmissive = isNight ? 2.3 : isSunset ? 1.6 : isRaining ? 1.3 : 0.35;
-      const needLights = isNight || isSunset || isRaining;
+      const isMorning = normW === "pagi";
+      const targetIntensity = isNight
+        ? isRaining
+          ? 3.2
+          : 3.0
+        : isSunset
+        ? isRaining
+          ? 2.2
+          : 1.9
+        : isMorning
+        ? isRaining
+          ? 1.2
+          : 0.45
+        : isRaining
+        ? 1.5
+        : 0.0;
+      const targetEmissive = isNight
+        ? 2.3
+        : isSunset
+        ? isRaining
+          ? 1.8
+          : 1.6
+        : isMorning
+        ? isRaining
+          ? 1.15
+          : 0.65
+        : isRaining
+        ? 1.3
+        : 0.35;
+      const needLights = isNight || isSunset || isRaining || isMorning;
 
       // Adjust lantern light visibility & intensity to optimize mobile GPU shader passes
       if (lanternLights.length > 0) {
@@ -313,7 +386,7 @@ export const OutdoorEnvironment: React.FC<OutdoorEnvironmentProps> = React.memo(
         {/* 3D Contextual Hover Badges for Landmarks */}
         {hoveredLandmark === "shop" && (
           <Html position={[JURO_SHOP_POS.x, 1.6, JURO_SHOP_POS.z]} center>
-            <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/95 dark:bg-neutral-900/95 border border-neutral-200 dark:border-neutral-700 shadow-md text-xs font-semibold text-amber-700 dark:text-amber-400 select-none pointer-events-none whitespace-nowrap">
+            <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-[4px] bg-[#FDFBF7] dark:bg-[#1E2028] border-2 border-charcoal dark:border-[#4A4E5E] shadow-[0_2px_0_#18181B] font-pixel text-[11px] font-bold uppercase text-amber-700 dark:text-amber-400 select-none pointer-events-none whitespace-nowrap">
               <ShoppingBag size={13} />
               Toko Kafe
             </div>
@@ -322,7 +395,7 @@ export const OutdoorEnvironment: React.FC<OutdoorEnvironmentProps> = React.memo(
 
         {hoveredLandmark === "mine" && (
           <Html position={[JURO_MINE_POS.x, 1.8, JURO_MINE_POS.z]} center>
-            <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/95 dark:bg-neutral-900/95 border border-neutral-200 dark:border-neutral-700 shadow-md text-xs font-semibold text-amber-600 dark:text-amber-400 select-none pointer-events-none whitespace-nowrap">
+            <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-[4px] bg-[#FDFBF7] dark:bg-[#1E2028] border-2 border-charcoal dark:border-[#4A4E5E] shadow-[0_2px_0_#18181B] font-pixel text-[11px] font-bold uppercase text-amber-700 dark:text-amber-400 select-none pointer-events-none whitespace-nowrap">
               <Pickaxe size={13} />
               Tambang
             </div>
@@ -331,7 +404,7 @@ export const OutdoorEnvironment: React.FC<OutdoorEnvironmentProps> = React.memo(
 
         {hoveredLandmark === "bench" && (
           <Html position={[JURO_BENCH_POS.x, JURO_BENCH_POS.seatY + 0.75, JURO_BENCH_POS.z]} center>
-            <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/95 dark:bg-neutral-900/95 border border-neutral-200 dark:border-neutral-700 shadow-md text-xs font-semibold text-emerald-700 dark:text-emerald-400 select-none pointer-events-none whitespace-nowrap">
+            <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-[4px] bg-[#FDFBF7] dark:bg-[#1E2028] border-2 border-charcoal dark:border-[#4A4E5E] shadow-[0_2px_0_#18181B] font-pixel text-[11px] font-bold uppercase text-emerald-700 dark:text-emerald-400 select-none pointer-events-none whitespace-nowrap">
               <Armchair size={13} />
               Pos Pandang
             </div>
@@ -340,7 +413,7 @@ export const OutdoorEnvironment: React.FC<OutdoorEnvironmentProps> = React.memo(
 
         {hoveredLandmark === "trampoline" && (
           <Html position={[JURO_TRAMPOLINE_POS.x, JURO_TRAMPOLINE_POS.surfaceY + 0.75, JURO_TRAMPOLINE_POS.z]} center>
-            <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/95 dark:bg-neutral-900/95 border border-neutral-200 dark:border-neutral-700 shadow-md text-xs font-semibold text-rose-600 dark:text-rose-400 select-none pointer-events-none whitespace-nowrap">
+            <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-[4px] bg-[#FDFBF7] dark:bg-[#1E2028] border-2 border-charcoal dark:border-[#4A4E5E] shadow-[0_2px_0_#18181B] font-pixel text-[11px] font-bold uppercase text-rose-600 dark:text-rose-400 select-none pointer-events-none whitespace-nowrap">
               <ArrowBigUp size={13} />
               Trampolin
             </div>
@@ -358,19 +431,19 @@ export const OutdoorEnvironment: React.FC<OutdoorEnvironmentProps> = React.memo(
             <div
               onPointerDown={(e) => e.stopPropagation()}
               onClick={(e) => e.stopPropagation()}
-              className="animate-tray-enter relative flex flex-col gap-2 p-2.5 rounded-2xl bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-700 shadow-xl min-w-[152px] pointer-events-auto select-none"
+              className="animate-tray-enter relative flex flex-col gap-2 p-2.5 rounded-[6px] bg-[#FDFBF7] dark:bg-[#1E2028] border-2 border-charcoal dark:border-[#4A4E5E] shadow-[0_4px_0_#18181B] min-w-[160px] pointer-events-auto select-none"
             >
-              <div className="flex items-center justify-between gap-2 border-b border-neutral-200 dark:border-neutral-800 pb-1.5">
+              <div className="flex items-center justify-between gap-2 border-b-2 border-dashed border-charcoal/20 dark:border-[#3F424E] pb-1.5">
                 <div className="flex items-center gap-1.5">
                   <Armchair size={14} className="text-amber-600 dark:text-amber-400 shrink-0" />
-                  <span className="text-xs font-semibold text-neutral-900 dark:text-white">
+                  <span className="font-pixel text-[11px] font-bold uppercase text-charcoal dark:text-white">
                     Pos Pandang
                   </span>
                 </div>
                 <button
                   type="button"
                   onClick={onCloseBenchMenu}
-                  className="p-0.5 rounded-md text-neutral-400 hover:text-neutral-700 dark:hover:text-white cursor-pointer"
+                  className="p-0.5 rounded-[3px] text-neutral-500 hover:text-charcoal dark:hover:text-white cursor-pointer"
                   aria-label="Tutup menu kursi"
                 >
                   <X size={14} />
@@ -380,7 +453,7 @@ export const OutdoorEnvironment: React.FC<OutdoorEnvironmentProps> = React.memo(
                 <button
                   type="button"
                   onClick={onStandFromBench}
-                  className="w-full flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl bg-amber-500 hover:bg-amber-600 text-white text-xs font-semibold cursor-pointer active:scale-95 transition-all"
+                  className="console-btn-bevel w-full flex items-center justify-center gap-1.5 py-2 px-3 rounded-[4px] bg-amber-500 hover:bg-amber-600 text-charcoal border-2 border-charcoal shadow-[0_2px_0_#18181B] font-pixel text-[11px] font-bold uppercase cursor-pointer"
                 >
                   <Footprints size={14} />
                   Berdiri
@@ -389,7 +462,7 @@ export const OutdoorEnvironment: React.FC<OutdoorEnvironmentProps> = React.memo(
                 <button
                   type="button"
                   onClick={onSitOnBench}
-                  className="w-full flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold cursor-pointer active:scale-95 transition-all"
+                  className="console-btn-bevel w-full flex items-center justify-center gap-1.5 py-2 px-3 rounded-[4px] bg-emerald-600 hover:bg-emerald-700 text-white border-2 border-charcoal shadow-[0_2px_0_#18181B] font-pixel text-[11px] font-bold uppercase cursor-pointer"
                 >
                   <Armchair size={14} />
                   Duduk
@@ -410,19 +483,19 @@ export const OutdoorEnvironment: React.FC<OutdoorEnvironmentProps> = React.memo(
             <div
               onPointerDown={(e) => e.stopPropagation()}
               onClick={(e) => e.stopPropagation()}
-              className="animate-tray-enter relative flex flex-col gap-2 p-2.5 rounded-2xl bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-700 shadow-xl min-w-[152px] pointer-events-auto select-none"
+              className="animate-tray-enter relative flex flex-col gap-2 p-2.5 rounded-[6px] bg-[#FDFBF7] dark:bg-[#1E2028] border-2 border-charcoal dark:border-[#4A4E5E] shadow-[0_4px_0_#18181B] min-w-[160px] pointer-events-auto select-none"
             >
-              <div className="flex items-center justify-between gap-2 border-b border-neutral-200 dark:border-neutral-800 pb-1.5">
+              <div className="flex items-center justify-between gap-2 border-b-2 border-dashed border-charcoal/20 dark:border-[#3F424E] pb-1.5">
                 <div className="flex items-center gap-1.5">
                   <ArrowBigUp size={15} className="text-rose-500 shrink-0" />
-                  <span className="text-xs font-semibold text-neutral-900 dark:text-white">
+                  <span className="font-pixel text-[11px] font-bold uppercase text-charcoal dark:text-white">
                     Trampolin
                   </span>
                 </div>
                 <button
                   type="button"
                   onClick={onCloseTrampolineMenu}
-                  className="p-0.5 rounded-md text-neutral-400 hover:text-neutral-700 dark:hover:text-white cursor-pointer"
+                  className="p-0.5 rounded-[3px] text-neutral-500 hover:text-charcoal dark:hover:text-white cursor-pointer"
                   aria-label="Tutup menu trampolin"
                 >
                   <X size={14} />
@@ -432,7 +505,7 @@ export const OutdoorEnvironment: React.FC<OutdoorEnvironmentProps> = React.memo(
                 <button
                   type="button"
                   onClick={onStopBounce}
-                  className="w-full flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl bg-amber-500 hover:bg-amber-600 text-white text-xs font-semibold cursor-pointer active:scale-95 transition-all"
+                  className="console-btn-bevel w-full flex items-center justify-center gap-1.5 py-2 px-3 rounded-[4px] bg-amber-500 hover:bg-amber-600 text-charcoal border-2 border-charcoal shadow-[0_2px_0_#18181B] font-pixel text-[11px] font-bold uppercase cursor-pointer"
                 >
                   <Footprints size={14} />
                   Selesai
@@ -441,7 +514,7 @@ export const OutdoorEnvironment: React.FC<OutdoorEnvironmentProps> = React.memo(
                 <button
                   type="button"
                   onClick={onStartBounce}
-                  className="w-full flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl bg-rose-500 hover:bg-rose-600 text-white text-xs font-semibold cursor-pointer active:scale-95 transition-all"
+                  className="console-btn-bevel w-full flex items-center justify-center gap-1.5 py-2 px-3 rounded-[4px] bg-rose-600 hover:bg-rose-700 text-white border-2 border-charcoal shadow-[0_2px_0_#18181B] font-pixel text-[11px] font-bold uppercase cursor-pointer"
                 >
                   <ArrowBigUp size={14} />
                   Lompat

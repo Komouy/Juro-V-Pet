@@ -1,6 +1,14 @@
-import React, { useState } from "react";
-import { MessageSquare, Send, X } from "lucide-react";
+import React, { useState, useEffect, useRef } from "react";
+import { MessageSquare, Send, Trash2, X } from "lucide-react";
 import { soundEffects } from "../../../engine/audio/soundEffects";
+import { PixelInput } from "../../ui/PixelInput";
+import {
+  clearChatHistory,
+  getChatHistory,
+  onChatHistoryChanged,
+  type ChatMessage,
+} from "../../../services/petMemoryService";
+
 export interface JuroChatModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -18,23 +26,20 @@ function getDynamicQuickPrompts(props: JuroChatModalProps): string[] {
   const prompts: string[] = [];
 
   if ((props.hunger ?? 100) < 45) {
-    prompts.push("Kamu laper ya Juro?");
+    prompts.push("Apakah kamu lapar?");
   }
   if ((props.cleanliness ?? 100) < 45) {
-    prompts.push("Ayo kita mandi busa!");
+    prompts.push("Ayo mandi busa!");
   }
   if (props.isSleeping || (props.energy ?? 100) < 40) {
-    prompts.push("Mau tidur nyenyak ya?");
+    prompts.push("Sudah mengantuk?");
   }
   if ((props.happiness ?? 100) < 45) {
-    prompts.push("Juro jangan sedih ya!");
+    prompts.push("Semangat ya, Juro!");
   }
 
   const defaults: string[] = [
-    "Lagi ngapain Juro?",
-    "Cerita dong tentang harimu!",
-    "Kamu suka main apa?",
-    "Ayo jalan-jalan di taman!",
+    ""
   ];
 
   for (const d of defaults) {
@@ -50,7 +55,20 @@ function getDynamicQuickPrompts(props: JuroChatModalProps): string[] {
 export const JuroChatModal: React.FC<JuroChatModalProps> = (props) => {
   const { isOpen, onClose, onSendMessage, isLoading, petName } = props;
   const [input, setInput] = useState("");
+  const [messages, setMessages] = useState<ChatMessage[]>(() => getChatHistory());
+  const scrollEndRef = useRef<HTMLDivElement>(null);
   const quickPrompts = getDynamicQuickPrompts(props);
+
+  useEffect(() => {
+    return onChatHistoryChanged((next) => {
+      setMessages(next);
+    });
+  }, []);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    scrollEndRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
+  }, [isOpen, messages.length, isLoading]);
 
   if (!isOpen) return null;
 
@@ -58,35 +76,106 @@ export const JuroChatModal: React.FC<JuroChatModalProps> = (props) => {
     e.preventDefault();
     const trimmed = input.trim();
     if (!trimmed || isLoading) return;
-    onSendMessage(trimmed);
     setInput("");
+    onSendMessage(trimmed);
   };
 
   const handleQuickPrompt = (prompt: string) => {
+    if (isLoading) return;
     soundEffects.playClick();
     onSendMessage(prompt);
   };
 
+  const handleClearHistory = () => {
+    soundEffects.playDismiss();
+    clearChatHistory();
+  };
+
+  const recentMessages = messages.slice(-12);
+
   return (
-    <div className="animate-tray-enter absolute bottom-17 sm:bottom-19 left-1/2 -translate-x-1/2 z-30 w-84 sm:w-96 max-w-[calc(100vw-1.5rem)] rounded-2xl bg-white dark:bg-neutral-900 border border-neutral-200/90 dark:border-neutral-800 shadow-xl p-3.5 select-none">
-      <div className="flex items-center justify-between border-b border-neutral-200 dark:border-neutral-800 pb-2 mb-2.5">
+    <div className="animate-tray-enter absolute bottom-17 sm:bottom-19 left-1/2 -translate-x-1/2 z-30 w-88 sm:w-[400px] max-w-[calc(100vw-1.5rem)] rounded-[6px] bg-[#FDFBF7] dark:bg-[#1E2028] border-2 border-charcoal dark:border-[#4A4E5E] shadow-[0_5px_0_#18181B] dark:shadow-[0_5px_0_#09090B] p-3.5 select-none">
+      <div className="flex items-center justify-between border-b-2 border-dashed border-charcoal/20 dark:border-[#3F424E] pb-2 mb-2.5">
         <div className="flex items-center gap-2">
           <MessageSquare size={15} className="text-juro-orange" />
-          <span className="text-sm font-semibold text-neutral-900 dark:text-white">
-            {petName}
+          <span className="font-pixel text-xs font-bold uppercase text-charcoal dark:text-white">
+            Obrolan · {petName}
           </span>
         </div>
-        <button
-          type="button"
-          onClick={() => {
-            soundEffects.playDismiss();
-            onClose();
-          }}
-          className="p-1 rounded-lg text-neutral-400 hover:text-neutral-700 hover:bg-neutral-100 dark:hover:text-white dark:hover:bg-neutral-800 cursor-pointer"
-          aria-label="Tutup obrolan"
-        >
-          <X size={16} />
-        </button>
+        <div className="flex items-center gap-1">
+          {recentMessages.length > 0 && (
+            <button
+              type="button"
+              onClick={handleClearHistory}
+              className="p-1 rounded-[4px] border-2 border-transparent hover:border-charcoal text-neutral-500 hover:text-rose-600 hover:bg-[#EFE9DC] dark:text-neutral-400 dark:hover:text-rose-400 dark:hover:bg-[#101114] cursor-pointer"
+              aria-label="Hapus riwayat obrolan"
+              title="Hapus riwayat obrolan"
+            >
+              <Trash2 size={14} strokeWidth={2.2} />
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={() => {
+              soundEffects.playDismiss();
+              onClose();
+            }}
+            className="p-1 rounded-[4px] border-2 border-transparent hover:border-charcoal text-charcoal/70 hover:text-charcoal hover:bg-[#EFE9DC] dark:text-neutral-300 dark:hover:bg-[#101114] cursor-pointer"
+            aria-label="Tutup obrolan"
+          >
+            <X size={15} strokeWidth={2.2} />
+          </button>
+        </div>
+      </div>
+
+      {/* Live Scrollable Conversation Transcript */}
+      <div className="max-h-40 overflow-y-auto space-y-2 mb-3 pr-1">
+        {recentMessages.length === 0 && !isLoading ? (
+          <div className="p-2.5 rounded-[4px] bg-[#EFE9DC] dark:bg-[#101114] border border-charcoal/30 dark:border-[#3F424E] text-xs text-neutral-600 dark:text-neutral-400 text-center">
+            Mulai percakapan dengan {petName} melalui sapaan cepat atau ketik pesan di bawah.
+          </div>
+        ) : (
+          recentMessages.map((msg) => {
+            const isUser = msg.sender === "user";
+            return (
+              <div
+                key={msg.id}
+                className={`flex ${isUser ? "justify-end" : "justify-start"}`}
+              >
+                <div
+                  className={`max-w-[85%] px-2.5 py-1.5 rounded-[4px] border-2 text-xs leading-relaxed ${
+                    isUser
+                      ? "bg-juro-orange text-white border-charcoal font-medium"
+                      : "bg-[#EFE9DC] dark:bg-[#101114] text-charcoal dark:text-neutral-100 border-charcoal/70 dark:border-[#3F424E]"
+                  }`}
+                >
+                  {!isUser && (
+                    <span className="block font-pixel text-[9px] font-bold uppercase text-juro-orange mb-0.5">
+                      {petName}
+                    </span>
+                  )}
+                  <span className="select-text break-words">{msg.text}</span>
+                </div>
+              </div>
+            );
+          })
+        )}
+
+        {isLoading && (
+          <div className="flex justify-start">
+            <div className="px-2.5 py-1.5 rounded-[4px] border-2 border-charcoal/70 dark:border-[#3F424E] bg-[#EFE9DC] dark:bg-[#101114] inline-flex items-center gap-2">
+              <span className="font-pixel text-[10px] font-bold text-neutral-600 dark:text-neutral-400">
+                {petName} berpikir
+              </span>
+              <span className="inline-flex gap-1">
+                <span className="w-1.5 h-1.5 bg-juro-orange rounded-[1px] animate-bounce [animation-delay:-0.3s]" />
+                <span className="w-1.5 h-1.5 bg-juro-orange rounded-[1px] animate-bounce [animation-delay:-0.15s]" />
+                <span className="w-1.5 h-1.5 bg-juro-orange rounded-[1px] animate-bounce" />
+              </span>
+            </div>
+          </div>
+        )}
+        <div ref={scrollEndRef} />
       </div>
 
       {/* Dynamic Contextual Quick Prompts */}
@@ -97,34 +186,37 @@ export const JuroChatModal: React.FC<JuroChatModalProps> = (props) => {
             type="button"
             disabled={isLoading}
             onClick={() => handleQuickPrompt(prompt)}
-            className="px-2.5 py-1 rounded-full bg-neutral-100 dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 text-xs text-neutral-700 dark:text-neutral-200 hover:border-juro-orange hover:text-juro-orange active:scale-95 transition-all cursor-pointer"
+            className="console-btn-bevel px-2.5 py-1 rounded-[4px] bg-[#EFE9DC] dark:bg-[#101114] border-2 border-charcoal/75 dark:border-[#3F424E] text-xs font-medium text-charcoal dark:text-neutral-200 hover:border-juro-orange hover:text-juro-orange disabled:opacity-50 cursor-pointer"
           >
             {prompt}
           </button>
         ))}
       </div>
 
-      {/* Input Form */}
+      {/* Cartridge Input Form */}
       <form onSubmit={handleSubmit} className="flex items-center gap-2">
-        <input
-          type="text"
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          placeholder={`Kirim pesan untuk ${petName}...`}
-          maxLength={100}
-          disabled={isLoading}
-          className="flex-1 min-w-0 px-3 py-2 rounded-xl bg-neutral-50 dark:bg-neutral-800 border border-neutral-300 dark:border-neutral-700 text-xs sm:text-sm text-neutral-900 dark:text-white placeholder:text-neutral-400 focus:outline-none focus:border-juro-orange focus:ring-2 focus:ring-juro-orange/20"
-        />
+        <div className="flex-1 min-w-0">
+          <PixelInput
+            type="text"
+            compact
+            autoFocus
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            placeholder={`Kirim pesan untuk ${petName}...`}
+            maxLength={100}
+            disabled={isLoading}
+          />
+        </div>
         <button
           type="submit"
           disabled={!input.trim() || isLoading}
-          className={`px-3.5 py-2 rounded-xl text-xs sm:text-sm font-semibold flex items-center gap-1.5 transition-all ${
+          className={`console-btn-bevel h-[38px] px-3 rounded-[4px] border-2 border-charcoal font-pixel text-xs font-bold uppercase flex items-center gap-1.5 shrink-0 ${
             input.trim() && !isLoading
-              ? "bg-juro-orange text-white hover:bg-orange-600 cursor-pointer active:scale-95"
-              : "bg-neutral-200 dark:bg-neutral-700 text-neutral-400 cursor-not-allowed opacity-60"
+              ? "bg-juro-orange text-white shadow-[0_2px_0_#18181B] hover:bg-[#EA580C] cursor-pointer"
+              : "bg-[#EFE9DC] dark:bg-[#101114] text-neutral-400 cursor-not-allowed opacity-60"
           }`}
         >
-          <Send size={13} strokeWidth={2} />
+          <Send size={13} strokeWidth={2.2} />
           <span>{isLoading ? "..." : "Kirim"}</span>
         </button>
       </form>

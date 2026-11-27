@@ -18,10 +18,17 @@ export const PixelToast: React.FC = () => {
 
   const toneStyles =
     toast.tone === "warn"
-      ? "bg-rose-600 text-white border-rose-700"
+      ? "bg-rose-600 text-white border-charcoal"
       : toast.tone === "info"
-      ? "bg-neutral-900 text-white border-neutral-800 dark:bg-neutral-800 dark:border-neutral-700"
-      : "bg-emerald-600 text-white border-emerald-700";
+      ? "bg-charcoal text-[#FDFBF7] border-charcoal dark:bg-[#1E2028] dark:border-[#4A4E5E]"
+      : "bg-emerald-600 text-white border-charcoal";
+
+  const ledColor =
+    toast.tone === "warn"
+      ? "bg-amber-300"
+      : toast.tone === "info"
+      ? "bg-juro-orange"
+      : "bg-emerald-200";
 
   const Icon =
     toast.tone === "warn" ? AlertCircle : toast.tone === "info" ? Info : Check;
@@ -34,9 +41,10 @@ export const PixelToast: React.FC = () => {
     >
       <div
         key={toast.id}
-        className={`animate-toast-enter max-w-full sm:max-w-md px-4 py-2 rounded-full border shadow-lg inline-flex items-center gap-2 text-xs sm:text-sm font-medium ${toneStyles}`}
+        className={`animate-toast-enter max-w-full sm:max-w-md px-3.5 py-2 rounded-[4px] border-2 shadow-[0_4px_0_#18181B] inline-flex items-center gap-2 text-xs font-pixel font-bold tracking-wide ${toneStyles}`}
       >
-        <Icon size={15} strokeWidth={2.2} className="shrink-0" />
+        <span className={`w-2 h-2 rounded-[1px] border border-charcoal shrink-0 ${ledColor}`} aria-hidden="true" />
+        <Icon size={14} strokeWidth={2.4} className="shrink-0" />
         <span className="truncate">{toast.text}</span>
       </div>
     </div>

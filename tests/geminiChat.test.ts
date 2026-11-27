@@ -279,5 +279,62 @@ describe("Gemini AI Chat Service", () => {
       expect(reply.length).toBeGreaterThan(0);
       expect(JURO_FALLBACK_REPLIES).toContain(reply);
     });
+
+    it("does not duplicate user message in contents payload and skips history pollution on spontaneous prompts", async () => {
+      const fetchMock = vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          text: "Hari ini udara lembah sangat segar!",
+        }),
+      });
+      vi.stubGlobal("fetch", fetchMock);
+
+      await chatWithJuro("Cerita harimu, yuk!", {
+        name: "Juro",
+        hunger: 80,
+        energy: 80,
+        cleanliness: 80,
+        happiness: 80,
+        affection: 80,
+        currentState: "idle",
+      });
+
+      const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+      const parsedBody = JSON.parse(String(init.body));
+      expect(parsedBody.contents).toHaveLength(1);
+      expect(parsedBody.contents[0].parts[0].text).toBe("Cerita harimu, yuk!");
+
+      await chatWithJuro("[REAKSI MAKAN]: Enak!", {
+        name: "Juro",
+        hunger: 90,
+        energy: 80,
+        cleanliness: 80,
+        happiness: 80,
+        affection: 80,
+        currentState: "eating",
+        isSpontaneous: true,
+      });
+
+      const historyRaw = JSON.parse(localStorage.getItem("juro_chat_history_v1") || "[]") as Array<{
+        sender: string;
+        text: string;
+      }>;
+      expect(historyRaw.some((m) => m.text.includes("[REAKSI MAKAN]"))).toBe(false);
+    });
+
+    it("answers quick-prompt topics contextually when falling back offline", () => {
+      const ctx = {
+        name: "Juro",
+        hunger: 80,
+        energy: 80,
+        cleanliness: 80,
+        happiness: 80,
+        affection: 80,
+        currentState: "idle",
+      };
+      expect(getContextualFallbackReply(ctx, "Cerita harimu, yuk!")).toMatch(/lembah|seru/i);
+      expect(getContextualFallbackReply(ctx, "Kamu suka main apa?")).toMatch(/trampolin|bola/i);
+      expect(getContextualFallbackReply(ctx, "Ayo jalan di taman!")).toMatch(/setapak|jembatan/i);
+    });
   });
 });

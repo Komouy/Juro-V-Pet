@@ -11,6 +11,8 @@ import { juroSyncService } from "../services/firebase/juroSyncService";
 import { usePetStore } from "./petStore";
 import { useGameStore } from "./gameStore";
 import { useUIStore } from "./uiStore";
+import { usePartnerPetStore } from "./partnerPetStore";
+import { useCareLogStore, computeCaregiverRelationship } from "./careLogStore";
 import { soundEffects } from "../engine/audio/soundEffects";
 import {
   addPetMemory,
@@ -23,7 +25,7 @@ import { notificationService } from "../services/notificationService";
 const PROFILE_STORAGE_KEY = "juro_caregiver_profile";
 const ROOM_STORAGE_KEY = "juro_caregiver_room";
 
-let isSyncingFromRemote = false;
+const isSyncingFromRemote = false;
 
 function getStoredProfile(): CaregiverProfile | null {
   if (typeof window === "undefined" || typeof localStorage === "undefined") return null;
@@ -51,7 +53,7 @@ interface CaregiverState {
   hasRegisteredName: boolean;
   isHubModalOpen: boolean;
 
-  // Dual-Pet 2-Player State
+  // Dual-Pet 2-Player State (mirrored with usePartnerPetStore)
   partnerPet: PartnerPetState | null;
   isPartnerPetPresent: boolean;
 
@@ -93,8 +95,11 @@ export const useCaregiverStore = create<CaregiverState>((set, get) => {
 
     openHubModal: () => set({ isHubModalOpen: true }),
     closeHubModal: () => set({ isHubModalOpen: false }),
-    setPartnerPet: (partnerPet: PartnerPetState | null) =>
-      set({ partnerPet, isPartnerPetPresent: partnerPet !== null }),
+
+    setPartnerPet: (partnerPet: PartnerPetState | null) => {
+      usePartnerPetStore.getState().setPartnerPet(partnerPet);
+      set({ partnerPet, isPartnerPetPresent: partnerPet !== null });
+    },
 
     setProfile: (name: string, roleTitle = "Perawat Juro") => {
       const cleanName = name.trim();
@@ -157,8 +162,6 @@ export const useCaregiverStore = create<CaregiverState>((set, get) => {
           pairingStatus: "paired",
           errorMessage: null,
         });
-
-        // Hubungkan listener realtime
         get().initRealtimeSubscription();
         return { ok: true, roomCode: result.roomCode };
       }
@@ -174,20 +177,17 @@ export const useCaregiverStore = create<CaregiverState>((set, get) => {
       }
 
       set({ pairingStatus: "loading", errorMessage: null });
-
       const result = await juroSyncService.joinPairingRoom(roomCodeInput, myProfile);
 
       if (result.ok && result.roomData) {
         const room = result.roomData;
         localStorage.setItem(ROOM_STORAGE_KEY, room.roomCode);
 
-        // Ambil data perawat pasangan
         const partner =
           room.caregivers.caregiver1.id === myProfile.id
             ? room.caregivers.caregiver2 ?? null
             : room.caregivers.caregiver1;
 
-        // Sync data Juro dari kamar ke store lokal
         if (room.juro) {
           const roomJuro = room.juro;
           usePetStore.setState({
@@ -204,47 +204,43 @@ export const useCaregiverStore = create<CaregiverState>((set, get) => {
             lastUpdated: roomJuro.lastUpdated || Date.now(),
           });
 
-          useGameStore.setState((prev) => {
-            const mergedHats = Array.from(
-              new Set([...(prev.unlockedHats || []), ...(roomJuro.unlockedHats || [])])
-            );
-            const mergedSkins = Array.from(
+          useGameStore.setState((prev) => ({
+            activeSkin: roomJuro.activeSkin || prev.activeSkin,
+            unlockedSkins: Array.from(
               new Set([...(prev.unlockedSkins || []), ...(roomJuro.unlockedSkins || [])])
-            );
-            const mergedToys = Array.from(
+            ),
+            activeHat: roomJuro.activeHat !== undefined ? roomJuro.activeHat : prev.activeHat,
+            unlockedHats: Array.from(
+              new Set([...(prev.unlockedHats || []), ...(roomJuro.unlockedHats || [])])
+            ),
+            deepestFloor: Math.max(prev.deepestFloor ?? 1, roomJuro.deepestFloor ?? 1),
+            coins: roomJuro.coins ?? prev.coins,
+            crystals: roomJuro.crystals || prev.crystals,
+            foodInventory: roomJuro.foodInventory || prev.foodInventory,
+            ownedToys: Array.from(
               new Set([...(prev.ownedToys || []), ...(roomJuro.ownedToys || [])])
-            );
-
-            return {
-              activeSkin: roomJuro.activeSkin || prev.activeSkin,
-              unlockedSkins: mergedSkins,
-              activeHat: roomJuro.activeHat !== undefined ? roomJuro.activeHat : prev.activeHat,
-              unlockedHats: mergedHats,
-              deepestFloor: Math.max(prev.deepestFloor ?? 1, roomJuro.deepestFloor ?? 1),
-              coins: roomJuro.coins ?? prev.coins,
-              crystals: roomJuro.crystals || prev.crystals,
-              foodInventory: roomJuro.foodInventory || prev.foodInventory,
-              ownedToys: mergedToys,
-              pickaxeLevel: Math.max(prev.pickaxeLevel ?? 1, roomJuro.pickaxeLevel ?? 1),
-            };
-          });
+            ),
+            pickaxeLevel: Math.max(prev.pickaxeLevel ?? 1, roomJuro.pickaxeLevel ?? 1),
+          }));
 
           if (roomJuro.memories && Array.isArray(roomJuro.memories)) {
             syncAndMergeMemories(roomJuro.memories);
           }
         }
 
-        const logs = room.activityLogs ? Object.values(room.activityLogs) : [];
+        const logs = room.activityLogs
+          ? Object.values(room.activityLogs).sort((a, b) => b.timestamp - a.timestamp)
+          : [];
+        useCareLogStore.getState().setLogs(logs);
 
         set({
           activeRoomCode: room.roomCode,
           partnerProfile: partner,
-          activityLogs: logs.sort((a, b) => b.timestamp - a.timestamp),
+          activityLogs: logs,
           pairingStatus: "paired",
           errorMessage: null,
         });
 
-        // Hubungkan listener realtime
         get().initRealtimeSubscription();
         soundEffects.playSuccess();
         return { ok: true };
@@ -257,6 +253,7 @@ export const useCaregiverStore = create<CaregiverState>((set, get) => {
     disconnectRoom: () => {
       juroSyncService.unsubscribe();
       localStorage.removeItem(ROOM_STORAGE_KEY);
+      usePartnerPetStore.getState().clearPartnerPet();
       set({
         activeRoomCode: null,
         partnerProfile: null,
@@ -286,15 +283,15 @@ export const useCaregiverStore = create<CaregiverState>((set, get) => {
         statChanges,
       };
 
-      // Tambahkan ke log lokal
+      useCareLogStore.getState().prependLog(logEntry);
       set((state) => ({
         activityLogs: [logEntry, ...state.activityLogs].slice(0, 80),
       }));
 
-      // Tambahkan juga ke log umum gameStore
-      useGameStore.getState().addLog(actionType === "shop" ? "interaction" : (actionType as any), description);
+      useGameStore
+        .getState()
+        .addLog(actionType === "shop" ? "interaction" : (actionType as any), description);
 
-      // Jika terhubung ke kamar Firebase, kirim ke cloud
       if (activeRoomCode) {
         const pet = usePetStore.getState();
         const game = useGameStore.getState();
@@ -385,96 +382,17 @@ export const useCaregiverStore = create<CaregiverState>((set, get) => {
 
     getCaregiverRelationship: (): CaregiverRelationshipInfo => {
       const { myProfile, partnerProfile, activityLogs } = get();
-      const myName = myProfile?.name || "Perawat Juro";
-      const partnerName = partnerProfile?.name;
-      const isDual = !!partnerName;
-      const caregiverCount: 1 | 2 = isDual ? 2 : 1;
-
-      const myActions = activityLogs.filter((l) => l.caregiverId === myProfile?.id);
-      const partnerActions = partnerProfile
-        ? activityLogs.filter((l) => l.caregiverId === partnerProfile.id)
-        : [];
-
-      const totalMy = myActions.length;
-      const totalPartner = partnerActions.length;
-
-      let feedCount = 0;
-      let playCount = 0;
-      let bathCount = 0;
-      let petCount = 0;
-
-      for (const log of activityLogs) {
-        if (log.actionType === "feed") feedCount++;
-        else if (log.actionType === "play") playCount++;
-        else if (log.actionType === "bath") bathCount++;
-        else if (log.actionType === "pet") petCount++;
-      }
-
-      let developmentTrait = "Sahabat Sejati";
-      let traitDescription = `Juro tumbuh bahagia dan setia bersama ${myName}.`;
-
-      if (isDual) {
-        if (totalMy > 0 && totalPartner > 0) {
-          if (Math.abs(totalMy - totalPartner) <= 3) {
-            developmentTrait = "Harmoni Dua Sahabat";
-            traitDescription = `Juro berkembang sangat seimbang dan penuh kasih karena ${myName} dan ${partnerName} merawatnya secara kompak.`;
-          } else {
-            const moreActive = totalMy > totalPartner ? myName : partnerName;
-            developmentTrait = "Dua Bintang Penjaga";
-            traitDescription = `Juro sangat bersyukur dijaga oleh dua perawat, dengan ${moreActive} yang saat ini paling aktif menemani.`;
-          }
-        } else {
-          developmentTrait = "Kemitraan Hangat";
-          traitDescription = `Juro menyadari ia memiliki dua perawat (${myName} dan ${partnerName}) dan selalu menantikan momen bersama keduanya.`;
-        }
-      } else {
-        const totalCare = feedCount + playCount + bathCount + petCount;
-        if (totalCare >= 2) {
-          if (feedCount >= playCount && feedCount >= bathCount && feedCount >= petCount) {
-            developmentTrait = "Gourmet Jeli";
-            traitDescription = `Juro tumbuh lahap dan gembul, sangat menantikan suapan camilan lezat dari ${myName}.`;
-          } else if (playCount >= feedCount && playCount >= bathCount && playCount >= petCount) {
-            developmentTrait = "Akrobatik Ceria";
-            traitDescription = `Juro tumbuh sangat lincah dan berenergi tinggi karena sering diajak bermain oleh ${myName}.`;
-          } else if (petCount >= feedCount && petCount >= playCount && petCount >= bathCount) {
-            developmentTrait = "Manja Penuh Kasih";
-            traitDescription = `Juro tumbuh sangat lekat dan hangat, selalu mendambakan elusan lembut dari ${myName}.`;
-          } else if (bathCount >= feedCount && bathCount >= playCount && bathCount >= petCount) {
-            developmentTrait = "Pusaka Berkilau";
-            traitDescription = `Juro tumbuh bersih bercahaya dan selalu segar berkat ketelatenan ${myName}.`;
-          }
-        }
-      }
-
-      const recent = activityLogs
-        .slice(0, 3)
-        .map((l) => `${l.caregiverName} (${l.actionType})`)
-        .join(", ");
-      const recentSummary = recent.length > 0 ? recent : "Belum ada catatan asuhan";
-
-      return {
-        caregiverCount,
-        myCaregiverName: myName,
-        partnerCaregiverName: partnerName,
-        totalMyActions: totalMy,
-        totalPartnerActions: totalPartner,
-        developmentTrait,
-        traitDescription,
-        recentSummary,
-      };
+      return computeCaregiverRelationship(myProfile, partnerProfile, activityLogs);
     },
 
     initRealtimeSubscription: () => {
       const { activeRoomCode, myProfile } = get();
       if (!activeRoomCode || !myProfile) return;
 
-      // Segera publikasikan status pet lokal ke cloud kamar bersama saat terhubung
       get().syncMyPetToCloud();
 
       juroSyncService.subscribeToRoom(activeRoomCode, myProfile.id, {
         onJuroStateSync: (incoming) => {
-          // Pada mode Dual-Pet, ekonomi dan status pet masing-masing pemain 100% independen.
-          // Hanya memori kolektif yang disinkronkan secara bersama jika tersedia.
           if (incoming.memories && Array.isArray(incoming.memories)) {
             syncAndMergeMemories(incoming.memories);
           }
@@ -492,6 +410,7 @@ export const useCaregiverStore = create<CaregiverState>((set, get) => {
         },
 
         onPartnerPetSync: (partnerPet) => {
+          usePartnerPetStore.getState().setPartnerPet(partnerPet);
           set({
             partnerPet,
             isPartnerPetPresent: partnerPet !== null,
@@ -499,33 +418,28 @@ export const useCaregiverStore = create<CaregiverState>((set, get) => {
         },
 
         onInitialLogsLoaded: (logs) => {
+          useCareLogStore.getState().setLogs(logs);
           set({ activityLogs: logs });
         },
 
         onActivityLogAdded: (newLog) => {
+          useCareLogStore.getState().prependLog(newLog);
           set((state) => {
-            const alreadyExists = state.activityLogs.some((l) => l.id === newLog.id);
-            if (alreadyExists) return state;
+            if (state.activityLogs.some((l) => l.id === newLog.id)) return state;
             return {
               activityLogs: [newLog, ...state.activityLogs].slice(0, 80),
             };
           });
 
-          // Mainkan suara riak gembira saat ada aksi dari pasangan
           soundEffects.playPop();
 
-          // Munculkan toast notifikasi langsung di layar
           const myId = get().myProfile?.id;
           if (newLog.caregiverId !== myId) {
             useUIStore.getState().showToast(
               `${newLog.caregiverName}: ${newLog.description}`,
               "info"
             );
-            // Kirim notifikasi sistem ke perangkat / browser
-            notificationService.notifyPartnerAction(
-              newLog.caregiverName,
-              newLog.description
-            );
+            notificationService.notifyPartnerAction(newLog.caregiverName, newLog.description);
           }
         },
 
@@ -537,7 +451,6 @@ export const useCaregiverStore = create<CaregiverState>((set, get) => {
   };
 });
 
-// Sinkronisasi otomatis ke cloud saat memori Juro diperbarui secara lokal
 onPetMemoriesChanged(() => {
   if (isSyncingFromRemote) return;
   const store = useCaregiverStore.getState();
@@ -548,9 +461,6 @@ onPetMemoriesChanged(() => {
 
 let syncDebounceTimer: ReturnType<typeof setTimeout> | null = null;
 
-/**
- * Memicu sinkronisasi status pet lokal ke kamar bersama secara debounced (350ms)
- */
 export function triggerDebouncedPetSync(): void {
   if (syncDebounceTimer) clearTimeout(syncDebounceTimer);
   syncDebounceTimer = setTimeout(() => {
@@ -561,7 +471,6 @@ export function triggerDebouncedPetSync(): void {
   }, 350);
 }
 
-// Pantau perubahan status pet & kosmetik untuk sinkronisasi otomatis ke pasangan
 usePetStore.subscribe((state, prevState) => {
   if (
     state.currentState !== prevState.currentState ||
@@ -575,10 +484,7 @@ usePetStore.subscribe((state, prevState) => {
 });
 
 useGameStore.subscribe((state, prevState) => {
-  if (
-    state.activeHat !== prevState.activeHat ||
-    state.activeSkin !== prevState.activeSkin
-  ) {
+  if (state.activeHat !== prevState.activeHat || state.activeSkin !== prevState.activeSkin) {
     triggerDebouncedPetSync();
   }
 });

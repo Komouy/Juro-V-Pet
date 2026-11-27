@@ -93,4 +93,22 @@ describe("Adaptive Graphics Profile & Mobile Sharpness", () => {
     expect(useUIStore.getState().graphicsQuality).toBe("balanced");
     expect(window.localStorage.getItem("juro_graphics_quality")).toBe("balanced");
   });
+
+  it("classifies 4GB entry-level octa-core phones as low tier while keeping UI/3D crisp", () => {
+    const profile = resolveGraphicsProfile("auto", {
+      nativeDpr: 2,
+      deviceMemoryGb: 4,
+      hardwareConcurrency: 8,
+      viewportWidth: 390,
+      isTouchDevice: true,
+      isSoftwareRenderer: false,
+    });
+
+    expect(profile.tier).toBe("low");
+    expect(profile.antialias).toBe(false);
+    expect(profile.shadowsEnabled).toBe(false);
+    expect(profile.usePhysicalJuroBody).toBe(false);
+    expect(profile.cloudSegments).toEqual([8, 6]);
+    expect(profile.dpr).toBe(1.5);
+  });
 });

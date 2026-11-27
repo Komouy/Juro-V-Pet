@@ -6,6 +6,7 @@ import {
   type RockSpec,
   STUMP_SPECS,
   type TreeSpec,
+  WALKABLE_RADIUS,
   distanceToCanalAxis,
   generateWorldProps,
   isBridgeDeck,
@@ -58,8 +59,8 @@ export function buildNavGrid(trees: TreeSpec[], rocks: RockSpec[]): NavGrid {
       const idx = gz * size + gx;
       const { x, z } = gridToWorld(gx, gz);
 
-      // Outer world boundary
-      if (Math.abs(x) > 32.5 || Math.abs(z) > 32.5) {
+      // Circular island outer boundary
+      if (Math.hypot(x, z) > WALKABLE_RADIUS + 0.8) {
         walkable[idx] = 0;
         cost[idx] = 999;
         kind[idx] = "blocked";

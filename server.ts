@@ -1,4 +1,4 @@
-import "dotenv/config";
+import dotenv from "dotenv";
 import express, { type Request, type Response } from "express";
 import fs from "node:fs";
 import path from "node:path";
@@ -6,10 +6,17 @@ import { fileURLToPath } from "node:url";
 import { GoogleGenAI, ThinkingLevel } from "@google/genai";
 import { z } from "zod";
 
+dotenv.config({ path: ".env.local" });
+dotenv.config();
+
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const GEMINI_MODEL = "gemini-4-hydrogen";
+const DEFAULT_GEMINI_MODELS = [
+  process.env.GEMINI_MODEL?.trim(),
+  "gemini-2.5-flash",
+  "gemini-2.0-flash",
+].filter((m, idx, arr): m is string => Boolean(m) && arr.indexOf(m) === idx);
 const PORT = Number(process.env.PORT) || 3000;
 
 const chatPartSchema = z.object({
@@ -67,39 +74,46 @@ async function generateWithRetry(
   ai: GoogleGenAI,
   payload: z.infer<typeof chatRequestSchema>
 ): Promise<string> {
-  const maxAttempts = 2;
   let lastError: unknown;
 
-  for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
-    try {
-      const response = await ai.models.generateContent({
-        model: GEMINI_MODEL,
-        contents: payload.contents,
-        config: {
-          ...(payload.systemInstruction
-            ? { systemInstruction: payload.systemInstruction }
-            : {}),
-          thinkingConfig: {
-            thinkingLevel: ThinkingLevel.LOW,
+  for (const model of DEFAULT_GEMINI_MODELS) {
+    const maxAttempts = 2;
+    for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+      try {
+        const isGemini25Plus = model.includes("2.5") || model.includes("3") || model.includes("4");
+        const response = await ai.models.generateContent({
+          model,
+          contents: payload.contents,
+          config: {
+            ...(payload.systemInstruction
+              ? { systemInstruction: payload.systemInstruction }
+              : {}),
+            ...(isGemini25Plus
+              ? { thinkingConfig: { thinkingLevel: ThinkingLevel.LOW } }
+              : {}),
           },
-        },
-      });
-
-      const replyText = response.text;
-      if (!replyText || typeof replyText !== "string") {
-        throw Object.assign(new Error("Empty response from Gemini API."), {
-          status: 502,
         });
+
+        const replyText = response.text;
+        if (!replyText || typeof replyText !== "string") {
+          throw Object.assign(new Error("Empty response from Gemini API."), {
+            status: 502,
+          });
+        }
+        return replyText;
+      } catch (error) {
+        lastError = error;
+        const status = getErrorStatus(error);
+        if (status === 404) {
+          // Try next configured fallback model
+          break;
+        }
+        if (attempt < maxAttempts - 1 && isRetryableStatus(status)) {
+          await new Promise((resolve) => setTimeout(resolve, 400 * (attempt + 1)));
+          continue;
+        }
+        throw error;
       }
-      return replyText;
-    } catch (error) {
-      lastError = error;
-      const status = getErrorStatus(error);
-      if (attempt < maxAttempts - 1 && isRetryableStatus(status)) {
-        await new Promise((resolve) => setTimeout(resolve, 400 * (attempt + 1)));
-        continue;
-      }
-      throw error;
     }
   }
 
